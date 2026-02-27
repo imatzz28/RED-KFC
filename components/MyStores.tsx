@@ -117,24 +117,39 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
         groupData[gid] = { scores: [], passed: 0 };
       });
 
+      const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+
       storeEmps.forEach(emp => {
         const normTitle = normalizeRole(emp.title);
         cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
+
         const effective = dataService.getEffectiveGrades(emp.id, selectedMonth);
+        const empSummary = summaryMap.get(String(emp.id).trim());
 
         let sum = 0;
-        effective.forEach(g => sum += g.score);
+        let isApproved = false;
 
-        const totalAvg = TOTAL_CATEGORIES_COUNT > 0 ? sum / TOTAL_CATEGORIES_COUNT : 0;
-        if (effective.length > 0 && totalAvg >= APPROVAL_THRESHOLD) storeApprovedCount++;
+        if (effective.length > 0) {
+          sum = effective.reduce((s, g) => s + g.score, 0);
+          isApproved = (sum / TOTAL_CATEGORIES_COUNT) >= APPROVAL_THRESHOLD;
+        } else if (empSummary) {
+          sum = empSummary.avg_score * TOTAL_CATEGORIES_COUNT;
+          isApproved = empSummary.is_approved;
+        }
+
+        if (isApproved) storeApprovedCount++;
 
         Object.entries(EVALUATION_GROUPS).forEach(([gid, gconfig]) => {
+          let gAvg = 0;
           const groupGrades = effective.filter(g => g.group === gid);
 
-          let gSum = 0;
-          groupGrades.forEach(g => gSum += g.score);
+          if (groupGrades.length > 0) {
+            const gSum = groupGrades.reduce((s, g) => s + g.score, 0);
+            gAvg = gSum / gconfig.categories.length;
+          } else if (empSummary) {
+            gAvg = empSummary[`avg_${gid.toLowerCase()}`] || 0;
+          }
 
-          const gAvg = gSum / gconfig.categories.length;
           groupData[gid].scores.push(gAvg);
           if (gAvg >= APPROVAL_THRESHOLD) groupData[gid].passed++;
         });
@@ -179,18 +194,39 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
       groupData[gid] = { scores: [], passed: 0 };
     });
 
+    const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+
     storeEmps.forEach(emp => {
       const normTitle = normalizeRole(emp.title);
       cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
+
       const effective = dataService.getEffectiveGrades(emp.id, month);
-      const sum = effective.reduce((s, g) => s + g.score, 0);
-      const totalAvg = TOTAL_CATEGORIES_COUNT > 0 ? sum / TOTAL_CATEGORIES_COUNT : 0;
-      if (effective.length > 0 && totalAvg >= APPROVAL_THRESHOLD) storeApprovedCount++;
+      const empSummary = summaryMap.get(String(emp.id).trim());
+
+      let sum = 0;
+      let isApproved = false;
+
+      if (effective.length > 0) {
+        sum = effective.reduce((s, g) => s + g.score, 0);
+        isApproved = (sum / TOTAL_CATEGORIES_COUNT) >= APPROVAL_THRESHOLD;
+      } else if (empSummary) {
+        sum = empSummary.avg_score * TOTAL_CATEGORIES_COUNT;
+        isApproved = empSummary.is_approved;
+      }
+
+      if (isApproved) storeApprovedCount++;
 
       Object.entries(EVALUATION_GROUPS).forEach(([gid, gconfig]) => {
+        let gAvg = 0;
         const groupGrades = effective.filter(g => g.group === gid);
-        const gSum = groupGrades.reduce((s, g) => s + g.score, 0);
-        const gAvg = gSum / gconfig.categories.length;
+
+        if (groupGrades.length > 0) {
+          const gSum = groupGrades.reduce((s, g) => s + g.score, 0);
+          gAvg = gSum / gconfig.categories.length;
+        } else if (empSummary) {
+          gAvg = empSummary[`avg_${gid.toLowerCase()}`] || 0;
+        }
+
         groupData[gid].scores.push(gAvg);
         if (gAvg >= APPROVAL_THRESHOLD) groupData[gid].passed++;
       });
@@ -235,21 +271,22 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
-        doc.text('REPORTE DE CERTIFICACIÓN - GENERAR CURVAS', 20, 15);
+        doc.text('CURVAS DE ENTRENAMIENTO', 20, 15);
         doc.setFontSize(26);
         doc.text(selectedStore.name.toUpperCase(), 20, 30);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(`CECO: ${selectedStore.id} | REGIÓN: ${selectedStore.region} | PERIODO: ${pdfMonth}`, 20, 38);
 
+        // Logo Circular en lugar del porcentaje
         doc.setFillColor(255, 255, 255);
         doc.circle(170, 25, 18, 'F');
         doc.setTextColor(colors.kfcRed[0], colors.kfcRed[1], colors.kfcRed[2]);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text(`${stats.percent}%`, 170, 27, { align: 'center' });
+        doc.setFontSize(20);
+        doc.text('EX', 170, 26, { align: 'center' });
         doc.setFontSize(6);
-        doc.text('CURVA TOTAL', 170, 32, { align: 'center' });
+        doc.text('CURVAS', 170, 32, { align: 'center' });
 
         doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
         doc.setFontSize(11);
@@ -437,10 +474,21 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {storeEmps.map(emp => {
+                  const empSummary = (dataService.getGradesSummary() || []).find((s: any) => String(s.employee_id).trim() === String(emp.id).trim());
                   const effective = dataService.getEffectiveGrades(emp.id, selectedMonth);
-                  const sum = effective.reduce((s, g) => s + g.score, 0);
-                  const avg = Math.round(sum / TOTAL_CATEGORIES_COUNT);
-                  const status = effective.length === 0 ? 'PENDING' : (avg >= APPROVAL_THRESHOLD ? 'APPROVED' : 'FAILED');
+
+                  let avg = 0;
+                  let status = 'PENDING';
+
+                  if (effective.length > 0) {
+                    const sum = effective.reduce((s, g) => s + g.score, 0);
+                    avg = Math.round(sum / TOTAL_CATEGORIES_COUNT);
+                    status = avg >= APPROVAL_THRESHOLD ? 'APPROVED' : 'FAILED';
+                  } else if (empSummary) {
+                    avg = Math.round(empSummary.avg_score);
+                    status = empSummary.is_approved ? 'APPROVED' : 'FAILED';
+                  }
+
                   const seniority = getSeniorityMonths(emp.join_date, selectedMonth);
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/80 transition-all group relative">
