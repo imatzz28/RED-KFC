@@ -25,6 +25,17 @@ const GroupIcons: Record<string, React.ReactNode> = {
   'E': <Vault className="w-4 h-4" />,
 };
 
+const normalizeRole = (title: string): string => {
+  const upper = (title || '').toUpperCase();
+  if (upper.includes('SUBGERENTE')) return JobTitle.SUBGERENTE;
+  if (upper.includes('GERENTE')) return JobTitle.GERENTE;
+  if (upper.includes('LÍDER') || upper.includes('LIDER')) return JobTitle.LIDER_TURNO;
+  if (upper.includes('ENTRENADOR')) return JobTitle.ENTRENADOR;
+  if (upper.includes('DOMICILIARIO')) return JobTitle.DOMICILIARIO;
+  if (upper.includes('ROLEX') || upper.includes('FDS') || upper.includes('HRS') || upper.includes('FIN DE SEMANA')) return JobTitle.MIEMBRO_EQUIPO_ROLEX;
+  return JobTitle.MIEMBRO_EQUIPO_FULL;
+};
+
 const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selectedMonth, onUpdate }) => {
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -107,7 +118,8 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
       });
 
       storeEmps.forEach(emp => {
-        cargoCounts[emp.title] = (cargoCounts[emp.title] || 0) + 1;
+        const normTitle = normalizeRole(emp.title);
+        cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
         const effective = dataService.getEffectiveGrades(emp.id, selectedMonth);
 
         let sum = 0;
@@ -168,7 +180,8 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
     });
 
     storeEmps.forEach(emp => {
-      cargoCounts[emp.title] = (cargoCounts[emp.title] || 0) + 1;
+      const normTitle = normalizeRole(emp.title);
+      cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
       const effective = dataService.getEffectiveGrades(emp.id, month);
       const sum = effective.reduce((s, g) => s + g.score, 0);
       const totalAvg = TOTAL_CATEGORIES_COUNT > 0 ? sum / TOTAL_CATEGORIES_COUNT : 0;
@@ -315,14 +328,13 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
               emp.name.toUpperCase(),
               emp.join_date,
               emp.title.toUpperCase(),
-              { content: `${avg}%`, styles: { fontStyle: 'bold', textColor: isCert ? colors.emerald : colors.kfcRed } },
               getScore('A'), getScore('B'), getScore('C'), getScore('D'), getScore('E')
             ];
           });
 
         autoTable(doc, {
           startY: 20,
-          head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'PROM.', 'BAS.', 'STAR', 'ALLS.', 'SST', 'VAUL.']],
+          head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'BAS.', 'STAR', 'ALLS.', 'SST', 'VAUL.']],
           body: tableData,
           theme: 'grid',
           styles: { fontSize: 7, halign: 'center', cellPadding: 2 },
@@ -534,21 +546,35 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
         {assigned.map(store => {
           const stats = getStoreStatsForMonth(store.id, selectedMonth);
           return (
-            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden hover:border-red-400 hover:shadow-2xl hover:shadow-red-500/10 transition-all duration-300 group cursor-pointer flex flex-col p-8 md:p-10 relative">
-              <div className="absolute top-8 right-8 text-slate-200 group-hover:translate-x-1 group-hover:text-red-500 transition-all duration-300"><ChevronRight className="w-8 h-8" /></div>
-              <div className="flex items-start justify-between mb-10">
-                <div className="flex items-center space-x-5">
-                  <div className="w-16 h-16 bg-slate-50/50 rounded-3xl flex items-center justify-center text-slate-400 group-hover:bg-red-600 group-hover:text-white transition-all shadow-inner border border-slate-100/50"><Store className="w-8 h-8" /></div>
-                  <div className="min-w-0">
-                    <h3 className="font-black text-slate-800 text-xl truncate uppercase tracking-tighter leading-tight italic">{store.name}</h3>
-                    <p className="text-[10px] text-slate-400 font-extrabold uppercase truncate tracking-widest mt-1.5 opacity-80">{store.region} • {store.zone}</p>
+            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[32px] shadow-sm hover:shadow-2xl border-2 border-slate-100 hover:border-red-500 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden relative">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 to-rose-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+              <div className="p-7 flex-1 flex flex-col">
+                <div className="flex justify-between items-start mb-8">
+                  <div className="flex gap-4">
+                    <div className="w-14 h-14 bg-red-50 rounded-[20px] flex shrink-0 items-center justify-center text-red-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                      <Store className="w-7 h-7" />
+                    </div>
+                    <div className="min-w-0 pr-2">
+                      <h3 className="font-black text-slate-900 text-xl uppercase tracking-tighter leading-none italic group-hover:text-red-700 transition-colors truncate">{store.name}</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3 text-red-400 shrink-0" /> {store.region} • {store.zone}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-auto">
-                <div className="bg-slate-50/50 p-5 rounded-[28px] border border-slate-100/50 text-center transition-colors group-hover:bg-red-50/50 group-hover:border-red-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-widest group-hover:text-red-400 transition-colors">Equipo Total</p>
-                  <p className="text-2xl font-black text-slate-800 tracking-tighter group-hover:text-red-700 transition-colors">{stats.total} <span className="text-sm font-bold text-slate-400 group-hover:text-red-400 uppercase tracking-tight">Colab.</span></p>
+
+                <div className="mt-auto grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-4 rounded-[20px] border border-slate-100 flex flex-col items-center justify-center group-hover:bg-rose-50/50 transition-colors">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Personal</p>
+                    <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">
+                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">Act.</span>
+                    </p>
+                  </div>
+                  <div className={`p-4 rounded-[20px] border flex flex-col items-center justify-center transition-all duration-300 ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-500' : 'bg-red-50 border-red-100 group-hover:bg-red-600'}`}>
+                    <p className={`text-[8px] font-black uppercase tracking-widest mb-1.5 transition-colors ${stats.percent >= 90 ? 'text-emerald-600 group-hover:text-emerald-50' : 'text-red-600 group-hover:text-red-50'}`}>Curva Total</p>
+                    <p className={`text-2xl font-black tracking-tighter leading-none transition-colors ${stats.percent >= 90 ? 'text-emerald-700 group-hover:text-white' : 'text-red-700 group-hover:text-white'}`}>
+                      {stats.percent}%
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
