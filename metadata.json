@@ -1,0 +1,5 @@
+{
+  "name": "La Akademia Tool",
+  "description": "A comprehensive management and administration tool for KFC restaurant worker certifications and grades, featuring role-based access, historical data tracking, and visual metrics.",
+  "requestFramePermissions": []
+}
