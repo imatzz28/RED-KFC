@@ -288,10 +288,21 @@ export const dataService = {
     await dataService.supabaseFetch('restaurants', 'POST', restaurants, '?on_conflict=id');
   },
 
-  // Added saveUsers method to persist user data in Supabase
+  // Added saveUsers method to persist user data in Supabase with normalization to avoid PGRST102 error
   saveUsers: async (users: User[]) => {
     localStorage.setItem('la_akademia_users', JSON.stringify(users));
-    await dataService.supabaseFetch('users', 'POST', users, '?on_conflict=id');
+
+    const normalized = users.map(u => ({
+      id: u.id,
+      username: u.username,
+      password: u.password || '', // Asegurar que la llave siempre exista
+      role: u.role,
+      assignedZones: u.assignedZones || [],
+      assignedRestaurants: u.assignedRestaurants || [],
+      assignedRegions: u.assignedRegions || []
+    }));
+
+    await dataService.supabaseFetch('users', 'POST', normalized, '?on_conflict=id');
   },
 
   clearAllDataInCloud: async () => {
