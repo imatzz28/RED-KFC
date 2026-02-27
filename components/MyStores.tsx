@@ -562,17 +562,11 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
                   </div>
                 </div>
 
-                <div className="mt-auto grid grid-cols-2 gap-3">
+                <div className="mt-auto">
                   <div className="bg-slate-50 p-4 rounded-[20px] border border-slate-100 flex flex-col items-center justify-center group-hover:bg-rose-50/50 transition-colors">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Personal</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Personal de Tienda</p>
                     <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">
-                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">Personas</span>
-                    </p>
-                  </div>
-                  <div className={`p-4 rounded-[20px] border flex flex-col items-center justify-center transition-all duration-300 ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-500' : 'bg-red-50 border-red-100 group-hover:bg-red-600'}`}>
-                    <p className={`text-[8px] font-black uppercase tracking-widest mb-1.5 transition-colors ${stats.percent >= 90 ? 'text-emerald-600 group-hover:text-emerald-50' : 'text-red-600 group-hover:text-red-50'}`}>Curva Total</p>
-                    <p className={`text-2xl font-black tracking-tighter leading-none transition-colors ${stats.percent >= 90 ? 'text-emerald-700 group-hover:text-white' : 'text-red-700 group-hover:text-white'}`}>
-                      {stats.percent}%
+                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase ml-1">Personas</span>
                     </p>
                   </div>
                 </div>
