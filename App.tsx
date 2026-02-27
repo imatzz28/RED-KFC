@@ -76,18 +76,31 @@ const App: React.FC = () => {
     const assignedZones = new Set(auth.user.assignedZones || []);
     const assignedStoresSet = new Set(auth.user.assignedRestaurants || []);
 
+    // Si es Coordinador, incluimos empleados cuya tienda actual O histórico de tiendas esté en sus regiones asignadas
     if (auth.user.role === UserRole.COORDINATOR) {
       const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id, r]));
       return employees.filter(e => {
-        const store = restaurantMap.get(e.restaurant_id);
-        return store && assignedRegions.has(store.region);
+        // En alcance si su tienda actual está en la región
+        const currentStore = restaurantMap.get(e.restaurant_id);
+        if (currentStore && assignedRegions.has(currentStore.region)) return true;
+
+        // O si alguna vez estuvo en una tienda de la región (historial)
+        return e.history?.some(h => {
+          const histStore = restaurants.find(r => r.id === h.restaurantName || r.name === h.restaurantName);
+          return histStore && assignedRegions.has(histStore.region);
+        });
       });
     }
 
-    return employees.filter(e =>
-      assignedZones.has(e.zone) ||
-      assignedStoresSet.has(e.restaurant_id)
-    );
+    // Para Especialistas o Gerentes, revisamos zonas/tiendas asignadas
+    return employees.filter(e => {
+      if (assignedZones.has(e.zone) || assignedStoresSet.has(e.restaurant_id)) return true;
+
+      return e.history?.some(h => {
+        const histStore = restaurants.find(r => r.id === h.restaurantName || r.name === h.restaurantName);
+        return histStore && (assignedZones.has(histStore.zone) || assignedStoresSet.has(histStore.id));
+      });
+    });
   }, [employees, restaurants, auth.user]);
 
   if (!auth.isAuthenticated) {

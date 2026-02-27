@@ -4,7 +4,7 @@ import { GradeEntry, Employee, User, Restaurant, UserRole } from '../types';
 import { dataService } from '../dataService';
 import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText } from 'lucide-react';
+import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText, ArrowUpCircle, ArrowDownCircle, RefreshCw, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface DashboardProps {
@@ -89,13 +89,14 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
     const isCoordinator = user.role === UserRole.COORDINATOR;
     const assignedRegions = user.assignedRegions || [];
 
-    const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id, r]));
+    const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id.trim().toUpperCase(), r]));
 
     return employeesWithEffectiveGrades.filter(e => {
       const matchPerson = searchPerson === '' || e.name.toLowerCase().includes(searchLower) || e.id.includes(searchPerson);
       if (!matchPerson) return false;
 
-      const store = restaurantMap.get(e.storeIdAtPeriod);
+      const normalizedStoreId = String(e.storeIdAtPeriod || '').trim().toUpperCase();
+      const store = restaurantMap.get(normalizedStoreId);
 
       const matchRegion = filterRegion === 'all'
         ? (isCoordinator ? assignedRegions.includes(store?.region || '') : true)
@@ -105,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
       const matchZone = filterZone === 'all' ? true : store?.zone === filterZone;
       if (!matchZone) return false;
 
-      const matchStore = filterStore === 'all' ? true : e.storeIdAtPeriod === filterStore;
+      const matchStore = filterStore === 'all' ? true : normalizedStoreId === String(filterStore).trim().toUpperCase();
       return matchStore;
     });
   }, [employeesWithEffectiveGrades, searchPerson, filterStore, filterZone, filterRegion, restaurants, user]);
@@ -135,13 +136,75 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
       };
     });
 
+    const globalProgress = filteredData.length > 0
+      ? Math.round(filteredData.reduce((acc, e) => acc + (e.avg || 0), 0) / filteredData.length)
+      : 0;
+
+    // --- Cálculo de Ingresos, Retiros, Rotación y Retención (Filtrado) ---
+    const isSpecialist = user.role === UserRole.SPECIALIST;
+    const isCoordinator = user.role === UserRole.COORDINATOR;
+    const assignedRegions = user.assignedRegions || [];
+
+    // Pre-calculamos el set de tiendas en alcance para velocidad
+    const scopeStoresSet = new Set(restaurants
+      .filter(r => {
+        const matchRegion = filterRegion === 'all'
+          ? (isCoordinator ? assignedRegions.includes(r.region) : true)
+          : r.region === filterRegion;
+        const matchZone = filterZone === 'all' ? true : r.zone === filterZone;
+        const matchStore = filterStore === 'all' ? true : r.id === filterStore;
+        return matchRegion && matchZone && matchStore;
+      })
+      .map(r => r.id.trim().toUpperCase())
+    );
+
+    const isInScope = (idOrName: string) => {
+      if (!idOrName) return false;
+      const search = idOrName.trim().toUpperCase();
+      // Buscamos si es un ID directo en el set
+      if (scopeStoresSet.has(search)) return true;
+      // Si es un nombre, buscamos el ID correspondiente en la lista global de tiendas
+      const store = restaurants.find(r => r.name.trim().toUpperCase() === search);
+      return store ? scopeStoresSet.has(store.id.trim().toUpperCase()) : false;
+    };
+
+    const entries = initialEmployees.reduce((acc, emp) => {
+      const hasHistoryIngreso = emp.history?.some(h =>
+        h.action === 'INGRESO' && h.date.startsWith(selectedMonth) && isInScope(h.restaurantName)
+      );
+      if (hasHistoryIngreso) return acc + 1;
+
+      const matchesJoinDate = emp.join_date?.startsWith(selectedMonth) && isInScope(emp.restaurant_id);
+      return matchesJoinDate ? acc + 1 : acc;
+    }, 0);
+
+    const exits = initialEmployees.reduce((acc, emp) => {
+      const hasHistoryRetiro = emp.history?.some(h =>
+        h.action === 'RETIRO' && h.date.startsWith(selectedMonth) && isInScope(h.restaurantName)
+      );
+      if (hasHistoryRetiro) return acc + 1;
+
+      const matchesExitDate = emp.exit_date?.startsWith(selectedMonth) && isInScope(emp.restaurant_id);
+      return matchesExitDate ? acc + 1 : acc;
+    }, 0);
+
+    const activeInScope = filteredData.length;
+    const rotationRate = activeInScope > 0 ? (exits / activeInScope) * 100 : 0;
+    const empsInicio = (activeInScope - entries + exits);
+    const retentionRate = empsInicio > 0 ? ((activeInScope - entries) / empsInicio) * 100 : 0;
+
     return {
       totalEmployees: filteredData.length,
       approvedCount,
       pendingCount,
-      groupAvgs
+      groupAvgs,
+      globalProgress,
+      entries,
+      exits,
+      rotation: rotationRate.toFixed(1),
+      retention: Math.min(100, retentionRate).toFixed(1)
     };
-  }, [filteredData]);
+  }, [filteredData, initialEmployees, selectedMonth, filterRegion, filterZone, filterStore, restaurants, user.assignedRegions, user.role]);
 
   const handleExportFinal = async () => {
     let allGradesForMonth: GradeEntry[] = [];
@@ -224,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
   const selectClasses = "w-full p-3 bg-white border-2 border-slate-100 rounded-xl text-xs font-black uppercase text-slate-800 outline-none focus:border-red-500 transition-all shadow-sm";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-slate-50/50 -m-8 p-8 min-h-screen">
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
         {(user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR) && (
           <div className="space-y-2">
@@ -258,11 +321,21 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={<Users className="w-6 h-6" />} label="Equipo" value={stats.totalEmployees} subValue={`Trabajadores en alcance`} />
-        <StatCard icon={<Award className="w-6 h-6" />} label="Certificados" value={stats.approvedCount} subValue="Nivel de Excelencia" color="green" />
-        <StatCard icon={<TrendingUp className="w-6 h-6" />} label="Promedio" value={`${stats.groupAvgs.length > 0 ? Math.round(stats.groupAvgs.reduce((s, g) => s + g.avg, 0) / stats.groupAvgs.length) : 0}%`} subValue="General" color="blue" />
-        <StatCard icon={<XCircle className="w-6 h-6" />} label="Pendientes" value={filteredData.filter(e => e.isPending).length} subValue="Sin ninguna nota" color="red" />
+      {/* Panel de Indicadores Principales */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
+          <StatCard icon={<Award className="w-5 h-5" />} label="Certificados" value={stats.approvedCount} color="green" />
+          <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
+          <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={filteredData.filter(e => e.isPending).length} color="red" />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard icon={<ArrowUpCircle className="w-5 h-5" />} label="Ingresos" value={stats.entries} color="green" />
+          <StatCard icon={<ArrowDownCircle className="w-5 h-5" />} label="Retiros" value={stats.exits} color="red" />
+          <StatCard icon={<RefreshCw className="w-5 h-5" />} label="Rotación" value={`${stats.rotation}%`} color="amber" />
+          <StatCard icon={<UserCheck className="w-5 h-5" />} label="Retención" value={`${stats.retention}%`} color="blue" />
+        </div>
       </div>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
@@ -361,17 +434,30 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, subValue: string, color?: string }> = ({ icon, label, value, subValue, color = 'gray' }) => {
-  const colorMap: { [key: string]: string } = { red: 'bg-red-50 text-red-600', green: 'bg-emerald-50 text-emerald-600', blue: 'bg-blue-50 text-blue-600', gray: 'bg-slate-50 text-slate-600' };
+const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, color?: string }> = ({ icon, label, value, color = 'gray' }) => {
+  const colorMap: { [key: string]: string } = {
+    red: 'bg-red-50 text-red-600 border-red-100',
+    green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    gray: 'bg-slate-50 text-slate-500 border-slate-100'
+  };
+
   return (
-    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 transition-transform hover:scale-[1.02]">
-      <div className="flex items-center space-x-5">
-        <div className={`p-4 rounded-2xl ${colorMap[color]}`}>{icon}</div>
-        <div>
-          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">{label}</p>
-          <h4 className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{value}</h4>
-          <p className="text-[10px] text-slate-400 font-bold mt-2">{subValue}</p>
-        </div>
+    <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/60 transition-all hover:shadow-md group flex items-center gap-4">
+      <div className={`p-3 rounded-xl shrink-0 ${colorMap[color]}`}>{icon}</div>
+      <div className="min-w-0">
+        <h4 className="text-xl font-black text-slate-800 tracking-tighter leading-none mb-1 truncate">{value}</h4>
+        <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.1em] leading-none">{label}</p>
+
+        {label === 'Curva Global' && (
+          <div className="w-16 bg-slate-100 h-1 rounded-full overflow-hidden mt-1.5">
+            <div
+              className={`h-full transition-all duration-1000 ${parseInt(String(value)) >= 90 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+              style={{ width: `${parseInt(String(value)) || 0}%` }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

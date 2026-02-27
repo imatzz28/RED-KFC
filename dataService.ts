@@ -5,6 +5,11 @@ import * as XLSX from 'xlsx';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error("❌ ERROR: Las variables de entorno de Supabase no están configuradas. Verifica tu archivo .env o la configuración de tu hosting.");
+}
+
+
 const parseExcelDate = (serial: number | string) => {
   if (!serial) return '';
   if (typeof serial === 'string') return serial;

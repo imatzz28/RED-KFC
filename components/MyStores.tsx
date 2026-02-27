@@ -7,6 +7,9 @@ import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT, EVALUATION_GROUPS } from '.
 import GradeEditor from './GradeEditor';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { APP_LOGO_B64 } from '../logo_final';
+
+
 
 interface MyStoresProps {
   user: User;
@@ -156,18 +159,21 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
       });
 
       const groupStats: Record<string, { avg: number, approvalRate: number }> = {};
+      let totalAvgSum = 0;
       Object.keys(EVALUATION_GROUPS).forEach(gid => {
         const avg = groupData[gid].scores.length > 0 ? groupData[gid].scores.reduce((a, b) => a + b, 0) / groupData[gid].scores.length : 0;
         const rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
-        groupStats[gid] = { avg: Math.round(avg), approvalRate: Math.round(rate) };
+        const roundedAvg = Math.round(avg);
+        groupStats[gid] = { avg: roundedAvg, approvalRate: Math.round(rate) };
+        totalAvgSum += roundedAvg;
       });
 
       return {
         ...store,
         stats: {
           total: storeEmps.length,
-          approved: storeApprovedCount,
-          percent: Math.round((storeApprovedCount / storeEmps.length) * 100),
+          approved: storeApprovedCount, // Contador de personas con >90% global
+          percent: Math.round(totalAvgSum / Object.keys(EVALUATION_GROUPS).length), // Promedio de promedios para la "Curva Global"
           groupStats,
           cargoCounts
         }
@@ -233,13 +239,16 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
     });
 
     const groupStats: Record<string, { avg: number, approvalRate: number }> = {};
+    let totalAvgSum = 0;
     Object.keys(EVALUATION_GROUPS).forEach(gid => {
       const avg = groupData[gid].scores.length > 0 ? groupData[gid].scores.reduce((a, b) => a + b, 0) / groupData[gid].scores.length : 0;
       const rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
-      groupStats[gid] = { avg: Math.round(avg), approvalRate: Math.round(rate) };
+      const roundedAvg = Math.round(avg);
+      groupStats[gid] = { avg: roundedAvg, approvalRate: Math.round(rate) };
+      totalAvgSum += roundedAvg;
     });
 
-    return { total: storeEmps.length, approved: storeApprovedCount, percent: Math.round((storeApprovedCount / storeEmps.length) * 100), groupStats, cargoCounts };
+    return { total: storeEmps.length, approved: storeApprovedCount, percent: Math.round(totalAvgSum / Object.keys(EVALUATION_GROUPS).length), groupStats, cargoCounts };
   };
 
   const getSeniorityMonths = (joinDate: string, targetMonth: string) => {
@@ -248,6 +257,16 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
     const end = new Date(targetMonth + "-01");
     const diff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
     return Math.max(0, diff);
+  };
+
+  const getMonthText = (monthStr: string) => {
+    if (!monthStr) return '';
+    const [year, month] = monthStr.split('-');
+    const months = [
+      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+    ];
+    return `${months[parseInt(month) - 1]} ${year}`;
   };
 
   const handleGeneratePDF = async () => {
@@ -266,27 +285,22 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
           emerald: [16, 185, 129]
         };
 
-        doc.setFillColor(colors.kfcRed[0], colors.kfcRed[1], colors.kfcRed[2]);
-        doc.rect(0, 0, 210, 50, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text('CURVAS DE ENTRENAMIENTO', 20, 15);
-        doc.setFontSize(26);
-        doc.text(selectedStore.name.toUpperCase(), 20, 30);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`CECO: ${selectedStore.id} | REGIÓN: ${selectedStore.region} | PERIODO: ${pdfMonth}`, 20, 38);
+        const drawHeader = (d: typeof doc) => {
+          d.setFillColor(colors.kfcRed[0], colors.kfcRed[1], colors.kfcRed[2]);
+          d.rect(0, 0, 210, 50, 'F');
+          d.setTextColor(255, 255, 255);
+          d.setFont('helvetica', 'bold');
+          d.setFontSize(9);
+          d.text('CURVAS DE ENTRENAMIENTO', 20, 15);
+          d.setFontSize(22);
+          d.text(selectedStore.name.toUpperCase(), 20, 28);
+          d.setFontSize(9);
+          d.setFont('helvetica', 'normal');
+          d.text(`CECO: ${selectedStore.id} | REGIÓN: ${selectedStore.region} | PERIODO: ${getMonthText(pdfMonth)}`, 20, 38);
+          d.addImage(APP_LOGO_B64, 'PNG', 165, 8, 30, 30);
+        };
 
-        // Logo Circular en lugar del porcentaje
-        doc.setFillColor(255, 255, 255);
-        doc.circle(170, 25, 18, 'F');
-        doc.setTextColor(colors.kfcRed[0], colors.kfcRed[1], colors.kfcRed[2]);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.text('EX', 170, 26, { align: 'center' });
-        doc.setFontSize(6);
-        doc.text('CURVAS', 170, 32, { align: 'center' });
+        drawHeader(doc);
 
         doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
         doc.setFontSize(11);
@@ -327,39 +341,40 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
         let barY = 70;
         Object.entries(EVALUATION_GROUPS).forEach(([gid, config]) => {
           const rate = stats.groupStats[gid]?.approvalRate || 0;
-          doc.setFontSize(7);
-          doc.setTextColor(100);
-          doc.text(config.name.toUpperCase(), 110, barY + 4);
-          doc.setFillColor(240, 240, 240);
-          doc.roundedRect(110, barY + 6, 80, 4, 1, 1, 'F');
-          const barColor = rate >= 90 ? colors.emerald : colors.kfcRed;
+          doc.setFontSize(6.5);
+          doc.setTextColor(80);
+          doc.text(config.name.toUpperCase(), 110, barY + 3);
+          doc.setFillColor(245, 245, 245);
+          doc.roundedRect(110, barY + 5, 75, 3, 1, 1, 'F');
+          const barColor = rate >= APPROVAL_THRESHOLD ? colors.emerald : colors.kfcRed;
           doc.setFillColor(barColor[0], barColor[1], barColor[2]);
-          doc.roundedRect(110, barY + 6, (rate / 100) * 80, 4, 1, 1, 'F');
+          doc.roundedRect(110, barY + 5, (rate / 100) * 75, 3, 1, 1, 'F');
           doc.setTextColor(barColor[0], barColor[1], barColor[2]);
           doc.setFont('helvetica', 'bold');
-          doc.text(`${rate}%`, 192, barY + 9.5);
-          barY += 15;
+          doc.text(`${rate}%`, 188, barY + 7.5);
+          barY += 10; // Más compacto
         });
 
+        // Forzar salto de página para la tabla detallada
         doc.addPage();
-        doc.setFillColor(colors.dark[0], colors.dark[1], colors.dark[2]);
-        doc.rect(0, 0, 210, 15, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(9);
-        doc.text(`DESGLOSE DETALLADO DE CALIFICACIONES - ${pdfMonth}`, 15, 10);
+        drawHeader(doc);
+
+        const startTableY = 60;
+        doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`DESGLOSE DETALLADO DE CALIFICACIONES`, 20, startTableY - 5);
 
         const tableData = storeEmps
           .sort((a, b) => (JobHierarchy[a.title] || 99) - (JobHierarchy[b.title] || 99))
           .map(emp => {
             const effective = dataService.getEffectiveGrades(emp.id, pdfMonth);
-            const sum = effective.reduce((s, g) => s + g.score, 0);
-            const avg = Math.round(sum / TOTAL_CATEGORIES_COUNT);
-            const isCert = avg >= APPROVAL_THRESHOLD;
             const getScore = (gid: string) => {
               const gGrades = effective.filter(g => g.group === gid);
               const gConf = EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS];
               return gGrades.length > 0 ? `${Math.round(gGrades.reduce((s, g) => s + g.score, 0) / gConf.categories.length)}%` : '0%';
             };
+
             return [
               emp.id,
               emp.name.toUpperCase(),
@@ -369,17 +384,35 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
             ];
           });
 
+        // Fuente más pequeña para la tabla detallada para ganar espacio y limpieza
+        let dynamicFontSize = 6;
+        if (tableData.length > 50) dynamicFontSize = 5.5;
+        if (tableData.length > 80) dynamicFontSize = 5;
+
         autoTable(doc, {
-          startY: 20,
+          startY: startTableY,
           head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'BAS.', 'STAR', 'ALLS.', 'SST', 'VAUL.']],
           body: tableData,
           theme: 'grid',
-          styles: { fontSize: 7, halign: 'center', cellPadding: 2 },
+          styles: {
+            fontSize: dynamicFontSize,
+            halign: 'center',
+            cellPadding: 0.8, // Más pequeño para ganar espacio
+            overflow: 'linebreak'
+          },
           headStyles: { fillColor: colors.kfcRed, textColor: 255 },
           columnStyles: {
-            1: { halign: 'left', cellWidth: 35 },
-            2: { halign: 'center', cellWidth: 20 },
-            3: { halign: 'left', cellWidth: 30 }
+            0: { cellWidth: 23 }, // ID - Suficiente para 10-11 dígitos
+            1: { halign: 'left', cellWidth: 46 }, // NOMBRE
+            2: { cellWidth: 18 }, // INGRESO
+            3: { halign: 'left', cellWidth: 38 }, // CARGO
+            4: { cellWidth: 11 }, 5: { cellWidth: 11 }, 6: { cellWidth: 11 }, 7: { cellWidth: 11 }, 8: { cellWidth: 11 }
+          },
+          margin: { top: 60, bottom: 15 },
+          didDrawPage: (data) => {
+            if (data.pageNumber > 2) {
+              drawHeader(doc);
+            }
           }
         });
 
@@ -440,21 +473,24 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
           <DetailStatCard icon={<TrendingUp className="w-6 h-6" />} label="Curva Global" value={`${stats.percent}%`} color="red" />
         </div>
 
+
+
         {/* Widgets de Cumplimiento por Grupo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {Object.entries(EVALUATION_GROUPS).map(([id, group]) => {
             const groupAvg = stats.groupStats[id]?.avg || 0;
             return (
-              <div key={id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                <div className={`p-2 rounded-xl mb-2 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              <div key={id} className="bg-white p-5 rounded-[32px] border-2 border-slate-50 shadow-sm flex flex-col items-center text-center hover:border-red-200 transition-all group">
+                <div className={`p-2.5 rounded-2xl mb-3 transition-transform group-hover:scale-110 group-hover:rotate-6 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600 shadow-[inset_0_2px_10px_rgba(16,185,129,0.1)]' : 'bg-red-50 text-red-600 shadow-[inset_0_2px_10px_rgba(227,24,55,0.1)]'}`}>
                   {GroupIcons[id]}
                 </div>
-                <p className="text-[8px] font-black uppercase text-slate-400 tracking-tighter mb-1 truncate w-full">{group.name}</p>
-                <p className={`text-lg font-black tracking-tighter ${groupAvg >= 90 ? 'text-emerald-700' : 'text-red-700'}`}>{groupAvg}%</p>
+                <p className="text-[9px] font-black uppercase text-slate-400 tracking-tight mb-1 truncate w-full">{group.name}</p>
+                <p className={`text-xl font-black italic tracking-tighter ${groupAvg >= 90 ? 'text-emerald-700' : 'text-red-700'}`}>{groupAvg}%</p>
               </div>
             );
           })}
         </div>
+
 
         <div className="bg-white rounded-[32px] md:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden">
           <div className="p-6 md:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
@@ -633,13 +669,26 @@ const DetailStatCard: React.FC<{ icon: React.ReactNode, label: string, value: st
     green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     red: 'bg-red-50 text-red-600 border-red-100'
   };
+
+  const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
+
   return (
-    <div className={`bg-white p-6 rounded-[32px] border-2 shadow-sm flex items-center space-x-5 transition-transform hover:scale-[1.03] ${colorMap[color]}`}>
-      <div className={`p-4 rounded-2xl bg-white shadow-lg`}>{icon}</div>
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{label}</p>
-        <h4 className="text-3xl font-black tracking-tighter leading-none mt-1">{value}</h4>
+    <div className={`bg-white p-6 rounded-[32px] border-2 shadow-sm flex flex-col transition-transform hover:scale-[1.03] ${colorMap[color]}`}>
+      <div className="flex items-center space-x-5 mb-4">
+        <div className={`p-4 rounded-2xl bg-white shadow-lg`}>{icon}</div>
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{label}</p>
+          <h4 className="text-3xl font-black tracking-tighter leading-none mt-1">{value}</h4>
+        </div>
       </div>
+      {label.includes('Curva') && (
+        <div className="w-full bg-black/5 h-2 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-1000 ${numericValue >= 90 ? 'bg-emerald-500' : 'bg-red-500'}`}
+            style={{ width: `${numericValue}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 };

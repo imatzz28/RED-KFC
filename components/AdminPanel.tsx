@@ -90,6 +90,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onEmployeesImporte
     if (currentUser.role === UserRole.ADMIN) return users;
     return users.filter(u => {
       if (u.role !== UserRole.SPECIALIST) return false;
+
+      // Un coordinador ve a todos los especialistas que compartan al menos una región con él
+      const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
+      if (hasSharedRegion) return true;
+
       const coordRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
       const coordZones = coordRegions.flatMap(r => r.zones.map(z => z.name));
       return (u.assignedZones || []).some(z => coordZones.includes(z)) ||
@@ -99,6 +104,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onEmployeesImporte
         });
     });
   }, [users, currentUser, hierarchy, restaurants]);
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'employees' | 'hierarchy') => {
     const file = e.target.files?.[0];
