@@ -8,7 +8,7 @@
             "headers": [
                 {
                     "key": "Content-Security-Policy",
-                    "value": "frame-ancestors 'self' https://laakademiakfc.clapuser.com https://laakademiakfc.clap.training"
+                    "value": "frame-ancestors 'self' https://laakademiakfc.clapuser.com https://laakademiakfc.clap.training https://*.clapuser.com https://*.clap.training"
                 }
             ]
         }
