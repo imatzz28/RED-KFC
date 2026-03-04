@@ -71,34 +71,45 @@ const App: React.FC = () => {
     if (!auth.user) return [];
     if (auth.user.role === UserRole.ADMIN) return employees;
 
-    // Convertir arreglos a Sets para búsquedas O(1)
-    const assignedRegions = new Set(auth.user.assignedRegions || []);
-    const assignedZones = new Set(auth.user.assignedZones || []);
-    const assignedStoresSet = new Set(auth.user.assignedRestaurants || []);
+    // Convertir arreglos a Sets normalizados (uppercase, trim) para búsquedas consistentes
+    const assignedRegions = new Set((auth.user.assignedRegions || []).map(r => r.trim().toUpperCase()));
+    const assignedZones = new Set((auth.user.assignedZones || []).map(z => z.trim().toUpperCase()));
+    const assignedStoresSet = new Set((auth.user.assignedRestaurants || []).map(s => s.trim().toUpperCase()));
 
     // Si es Coordinador, incluimos empleados cuya tienda actual O histórico de tiendas esté en sus regiones asignadas
     if (auth.user.role === UserRole.COORDINATOR) {
-      const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id, r]));
+      const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id.trim().toUpperCase(), r]));
       return employees.filter(e => {
         // En alcance si su tienda actual está en la región
-        const currentStore = restaurantMap.get(e.restaurant_id);
-        if (currentStore && assignedRegions.has(currentStore.region)) return true;
+        const currentStore = restaurantMap.get(e.restaurant_id.trim().toUpperCase());
+        if (currentStore && assignedRegions.has((currentStore.region || '').trim().toUpperCase())) return true;
 
         // O si alguna vez estuvo en una tienda de la región (historial)
         return e.history?.some(h => {
-          const histStore = restaurants.find(r => r.id === h.restaurantName || r.name === h.restaurantName);
-          return histStore && assignedRegions.has(histStore.region);
+          const histStoreName = (h.restaurantName || '').trim().toUpperCase();
+          const histStore = restaurants.find(r =>
+            r.id.trim().toUpperCase() === histStoreName ||
+            r.name.trim().toUpperCase() === histStoreName
+          );
+          return histStore && assignedRegions.has((histStore.region || '').trim().toUpperCase());
         });
       });
     }
 
     // Para Especialistas o Gerentes, revisamos zonas/tiendas asignadas
     return employees.filter(e => {
-      if (assignedZones.has(e.zone) || assignedStoresSet.has(e.restaurant_id)) return true;
+      const empStoreId = e.restaurant_id.trim().toUpperCase();
+      const empZone = (e.zone || '').trim().toUpperCase();
+
+      if (assignedZones.has(empZone) || assignedStoresSet.has(empStoreId)) return true;
 
       return e.history?.some(h => {
-        const histStore = restaurants.find(r => r.id === h.restaurantName || r.name === h.restaurantName);
-        return histStore && (assignedZones.has(histStore.zone) || assignedStoresSet.has(histStore.id));
+        const histStoreName = (h.restaurantName || '').trim().toUpperCase();
+        const histStore = restaurants.find(r =>
+          r.id.trim().toUpperCase() === histStoreName ||
+          r.name.trim().toUpperCase() === histStoreName
+        );
+        return histStore && (assignedZones.has((histStore.zone || '').trim().toUpperCase()) || assignedStoresSet.has(histStore.id.trim().toUpperCase()));
       });
     });
   }, [employees, restaurants, auth.user]);

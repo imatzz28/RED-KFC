@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Employee, Restaurant } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, UserCheck } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, UserCheck, Search } from 'lucide-react';
 
 interface EntriesExitsReportProps {
   employees: Employee[];
@@ -21,15 +21,22 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
 
   // Filtro de cargo para el listado detallado
   const [selectedTitleFilter, setSelectedTitleFilter] = useState<string>('all');
+  // Buscador de trabajador
+  const [searchPerson, setSearchPerson] = useState('');
 
   const selectedMonthStr = `${selectedYear}-${selectedMonthPart}`;
 
-  const dynamicRegions = useMemo(() => Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort(), [restaurants]);
+  // === FILTROS DINÁMICOS (copia exacta de Dashboard.tsx) ===
+  const dynamicRegions = useMemo(() => {
+    return Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
+  }, [restaurants]);
+
   const dynamicZones = useMemo(() => {
     let base = restaurants;
     if (filterRegion !== 'all') base = base.filter(r => r.region === filterRegion);
     return Array.from(new Set(base.map(r => r.zone))).filter(Boolean).sort();
   }, [restaurants, filterRegion]);
+
   const dynamicStores = useMemo(() => {
     let base = restaurants;
     if (filterRegion !== 'all') base = base.filter(r => r.region === filterRegion);
@@ -37,23 +44,76 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
     return base.sort((a, b) => a.name.localeCompare(b.name));
   }, [restaurants, filterRegion, filterZone]);
 
+  // === LÓGICA DE FILTRADO - Copiada del Dashboard.tsx ===
+  // Paso 1: Crear mapa de restaurantes para búsqueda rápida por ID y por nombre
+  const restaurantMap = useMemo(() => {
+    const byId = new Map<string, Restaurant>();
+    const byName = new Map<string, Restaurant>();
+    restaurants.forEach(r => {
+      byId.set(r.id.trim().toUpperCase(), r);
+      byName.set(r.name.trim().toUpperCase(), r);
+    });
+    return { byId, byName };
+  }, [restaurants]);
+
+  // Función que resuelve un restaurantName del historial (formato "K049 - ANTARES SOACHA") al objeto Restaurant
+  const resolveRestaurant = useMemo(() => {
+    return (idOrName: string): Restaurant | undefined => {
+      if (!idOrName) return undefined;
+      const search = idOrName.trim().toUpperCase();
+
+      // 1. Buscar directamente por ID
+      let store = restaurantMap.byId.get(search);
+      if (store) return store;
+
+      // 2. Buscar por nombre completo
+      store = restaurantMap.byName.get(search);
+      if (store) return store;
+
+      // 3. El historial a veces usa formato "K049 - ANTARES SOACHA": extraer la parte antes del " - "
+      if (search.includes(' - ')) {
+        const idPart = search.split(' - ')[0].trim();
+        store = restaurantMap.byId.get(idPart);
+        if (store) return store;
+      }
+
+      // 4. Buscar si el string contiene algún ID conocido
+      for (const [id, r] of restaurantMap.byId) {
+        if (search.startsWith(id + ' ') || search.startsWith(id + '-')) return r;
+      }
+
+      return undefined;
+    };
+  }, [restaurantMap]);
+
+  // Paso 2: Función que determina si un restaurante está en el alcance de los filtros
+  const matchesFilters = useMemo(() => {
+    return (restaurantIdOrName: string): boolean => {
+      const store = resolveRestaurant(restaurantIdOrName);
+
+      // Si no hay filtros activos, incluir todo (incluso sin tienda asociada)
+      if (filterRegion === 'all' && filterZone === 'all' && filterStore === 'all') return true;
+
+      // Si hay algún filtro activo pero no se encontró la tienda, excluir
+      if (!store) return false;
+
+      const matchRegion = filterRegion === 'all' || store.region === filterRegion;
+      const matchZone = filterZone === 'all' || store.zone === filterZone;
+      const matchStore = filterStore === 'all' || store.id.trim().toUpperCase() === String(filterStore).trim().toUpperCase();
+      return matchRegion && matchZone && matchStore;
+    };
+  }, [resolveRestaurant, filterRegion, filterZone, filterStore]);
+
+  // === RECOLECCIÓN DE EVENTOS ===
   const historyEvents = useMemo(() => {
     const events: { employeeName: string; employeeTitle: string; month: string; year: string; date: string; action: "INGRESO" | "RETIRO"; restaurantName: string; }[] = [];
 
     employees.forEach(emp => {
-      // 1. Process explicit history
-      emp.history?.forEach(h => {
-        if (h.action === 'INGRESO' || h.action === 'RETIRO') {
-          const search = (h.restaurantName || '').trim().toUpperCase();
-          const store = restaurants.find(r =>
-            r.id.trim().toUpperCase() === search ||
-            r.name.trim().toUpperCase() === search
-          );
-          const matchRegion = filterRegion === 'all' || store?.region === filterRegion;
-          const matchZone = filterZone === 'all' || store?.zone === filterZone;
-          const matchStore = filterStore === 'all' || store?.id === filterStore;
-
-          if (matchRegion && matchZone && matchStore) {
+      // --- INGRESOS ---
+      const historyIngresos = (emp.history || []).filter(h => h.action === 'INGRESO' && h.date.startsWith(selectedYear));
+      if (historyIngresos.length > 0) {
+        historyIngresos.forEach(h => {
+          if (matchesFilters(h.restaurantName)) {
             events.push({
               ...h,
               employeeName: emp.name,
@@ -62,61 +122,47 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
               year: h.date.slice(0, 4)
             });
           }
-        }
-      });
-
-      // 2. Fallback: If no history INGRESO for the month, but join_date matches, count it
-      if (emp.join_date?.startsWith(selectedYear)) { // Check year first to optimize
-        const mStr = emp.join_date.slice(0, 7);
-        const alreadyHasHistory = emp.history?.some(h => h.action === 'INGRESO' && h.date.startsWith(mStr));
-
-        if (!alreadyHasHistory) {
-          const store = restaurants.find(r => r.id === emp.restaurant_id);
-          const matchRegion = filterRegion === 'all' || store?.region === filterRegion;
-          const matchZone = filterZone === 'all' || store?.zone === filterZone;
-          const matchStore = filterStore === 'all' || store?.id === filterStore;
-
-          if (matchRegion && matchZone && matchStore) {
-            events.push({
-              date: emp.join_date,
-              action: 'INGRESO',
-              restaurantName: emp.restaurant_id,
-              employeeName: emp.name,
-              employeeTitle: emp.title,
-              month: mStr,
-              year: emp.join_date.slice(0, 4)
-            });
-          }
-        }
+        });
+      } else if (emp.join_date?.startsWith(selectedYear) && matchesFilters(emp.restaurant_id)) {
+        events.push({
+          date: emp.join_date,
+          action: 'INGRESO',
+          restaurantName: emp.restaurant_id,
+          employeeName: emp.name,
+          employeeTitle: emp.title,
+          month: emp.join_date.slice(0, 7),
+          year: emp.join_date.slice(0, 4)
+        });
       }
 
-      // 3. Fallback: If no history RETIRO for the month, but exit_date matches, count it
-      if (emp.exit_date?.startsWith(selectedYear)) {
-        const mStr = emp.exit_date.slice(0, 7);
-        const alreadyHasHistory = emp.history?.some(h => h.action === 'RETIRO' && h.date.startsWith(mStr));
-
-        if (!alreadyHasHistory) {
-          const store = restaurants.find(r => r.id === emp.restaurant_id);
-          const matchRegion = filterRegion === 'all' || store?.region === filterRegion;
-          const matchZone = filterZone === 'all' || store?.zone === filterZone;
-          const matchStore = filterStore === 'all' || store?.id === filterStore;
-
-          if (matchRegion && matchZone && matchStore) {
+      // --- RETIROS ---
+      const historyRetiros = (emp.history || []).filter(h => h.action === 'RETIRO' && h.date.startsWith(selectedYear));
+      if (historyRetiros.length > 0) {
+        historyRetiros.forEach(h => {
+          if (matchesFilters(h.restaurantName)) {
             events.push({
-              date: emp.exit_date,
-              action: 'RETIRO',
-              restaurantName: emp.restaurant_id,
+              ...h,
               employeeName: emp.name,
               employeeTitle: emp.title,
-              month: mStr,
-              year: emp.exit_date.slice(0, 4)
+              month: h.date.slice(0, 7),
+              year: h.date.slice(0, 4)
             });
           }
-        }
+        });
+      } else if (emp.exit_date?.startsWith(selectedYear) && matchesFilters(emp.restaurant_id)) {
+        events.push({
+          date: emp.exit_date,
+          action: 'RETIRO',
+          restaurantName: emp.restaurant_id,
+          employeeName: emp.name,
+          employeeTitle: emp.title,
+          month: emp.exit_date.slice(0, 7),
+          year: emp.exit_date.slice(0, 4)
+        });
       }
     });
     return events;
-  }, [employees, restaurants, filterRegion, filterZone, filterStore, selectedYear]);
+  }, [employees, matchesFilters, selectedYear]);
 
   const statsByCargo = useMemo(() => {
     const cargoMap: Record<string, { cargo: string, ingresos: number, retiros: number }> = {};
@@ -133,17 +179,9 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
     const entries = historyEvents.filter(e => e.month === selectedMonthStr && e.action === 'INGRESO').length;
     const exits = historyEvents.filter(e => e.month === selectedMonthStr && e.action === 'RETIRO').length;
 
-    // Calcular total personal actual en el alcance de filtros
-    const activeInScope = employees.filter(e => {
-      const search = (e.restaurant_id || '').trim().toUpperCase();
-      const store = restaurants.find(r => r.id.trim().toUpperCase() === search);
-      const matchRegion = filterRegion === 'all' || store?.region === filterRegion;
-      const matchZone = filterZone === 'all' || store?.zone === filterZone;
-      const matchStore = filterStore === 'all' || store?.id === filterStore;
-      return e.active && matchRegion && matchZone && matchStore;
-    }).length;
+    // Personal activo en el alcance de filtros (para Rotación/Retención)
+    const activeInScope = employees.filter(e => e.active && matchesFilters(e.restaurant_id)).length;
 
-    // Fórmulas de Rotación y Retención
     const rotationRate = activeInScope > 0 ? (exits / activeInScope) * 100 : 0;
     const empsInicio = (activeInScope - entries + exits);
     const retentionRate = empsInicio > 0 ? ((activeInScope - entries) / empsInicio) * 100 : 0;
@@ -154,7 +192,7 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
       rotation: rotationRate.toFixed(1),
       retention: Math.min(100, retentionRate).toFixed(1)
     };
-  }, [historyEvents, selectedMonthStr, employees, restaurants, filterRegion, filterZone, filterStore]);
+  }, [historyEvents, selectedMonthStr, employees, matchesFilters]);
 
   const yearChartData = useMemo(() => {
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -173,12 +211,14 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
 
   const filteredHistoryEventsList = useMemo(() => {
     const action = viewDetail === 'entries' ? 'INGRESO' : 'RETIRO';
+    const searchLower = searchPerson.toLowerCase();
     return historyEvents.filter(e =>
       e.month === selectedMonthStr &&
       e.action === action &&
-      (selectedTitleFilter === 'all' || e.employeeTitle === selectedTitleFilter)
+      (selectedTitleFilter === 'all' || e.employeeTitle === selectedTitleFilter) &&
+      (searchPerson === '' || e.employeeName.toLowerCase().includes(searchLower) || e.restaurantName.toLowerCase().includes(searchLower))
     );
-  }, [historyEvents, selectedMonthStr, viewDetail, selectedTitleFilter]);
+  }, [historyEvents, selectedMonthStr, viewDetail, selectedTitleFilter, searchPerson]);
 
   const selectStyle = "w-full px-4 py-2.5 bg-white border-2 border-slate-300 rounded-xl text-[11px] font-black text-slate-800 uppercase tracking-widest outline-none focus:border-red-500 transition-colors shadow-sm appearance-none cursor-pointer";
 
@@ -212,7 +252,15 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
           <div className="space-y-1.5">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Región</label>
             <div className="relative">
-              <select className={selectStyle} value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
+              <select
+                className={selectStyle}
+                value={filterRegion}
+                onChange={e => {
+                  setFilterRegion(e.target.value);
+                  setFilterZone('all');
+                  setFilterStore('all');
+                }}
+              >
                 <option value="all">Todas las Regiones</option>
                 {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -222,7 +270,14 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
           <div className="space-y-1.5">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Zona</label>
             <div className="relative">
-              <select className={selectStyle} value={filterZone} onChange={e => setFilterZone(e.target.value)}>
+              <select
+                className={selectStyle}
+                value={filterZone}
+                onChange={e => {
+                  setFilterZone(e.target.value);
+                  setFilterStore('all');
+                }}
+              >
                 <option value="all">Todas las Zonas</option>
                 {dynamicZones.map(z => <option key={z} value={z}>{z}</option>)}
               </select>
@@ -370,21 +425,31 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
               </h3>
             </div>
 
-            {/* Filtro por cargo dentro del listado detallado */}
+            {/* Filtro por cargo y buscador de persona */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-56">
+              <div className="relative flex-1 sm:w-52">
+                <Search className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar persona..."
+                  value={searchPerson}
+                  onChange={e => setSearchPerson(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-800 outline-none focus:border-red-500 transition-all shadow-sm"
+                />
+              </div>
+              <div className="relative flex-1 sm:w-52">
                 <Briefcase className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <select
                   value={selectedTitleFilter}
                   onChange={e => setSelectedTitleFilter(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-800 outline-none focus:border-red-500 transition-all shadow-sm appearance-none cursor-pointer"
                 >
-                  <option value="all">Filtrar por Cargo: Todos</option>
+                  <option value="all">Cargo: Todos</option>
                   {availableTitlesForList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <ChevronDown className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <button onClick={() => setViewDetail('none')} className="p-2 text-slate-400 hover:text-red-600 transition-all"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setViewDetail('none'); setSearchPerson(''); }} className="p-2 text-slate-400 hover:text-red-600 transition-all"><X className="w-5 h-5" /></button>
             </div>
           </div>
           <div className="max-h-[400px] overflow-y-auto no-scrollbar">
