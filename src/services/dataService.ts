@@ -1,9 +1,10 @@
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData } from './types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData } from '@/types';
 import * as XLSX from 'xlsx';
+import localforage from 'localforage';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
+const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = (import.meta as any).env.VITE_SUPABASE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error("❌ ERROR: Las variables de entorno de Supabase no están configuradas. Verifica tu archivo .env o la configuración de tu hosting.");
@@ -101,12 +102,85 @@ export const dataService = {
     return results.flat();
   },
 
+  supabaseFetchPaginated: async (table: string, queryParams: string = '', page: number = 0, limit: number = 50): Promise<{ data: any[], total: number }> => {
+    const separator = queryParams ? (queryParams.startsWith('?') ? '&' : '?') : '?';
+
+    // Primero obtenemos el total (count=exact) y la data juntos
+    const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&offset=${page * limit}&limit=${limit}`;
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'count=exact'
+      }
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Error fetching paginated [${table}]: ${txt}`);
+    }
+
+    const countRange = res.headers.get('content-range');
+    let total = 0;
+    if (countRange) {
+      total = parseInt(countRange.split('/')[1]);
+    }
+
+    const data = await res.json();
+    return { data, total };
+  },
+
+  supabaseFetchRPC: async (rpcName: string, body: any): Promise<any> => {
+    const url = `${SUPABASE_URL}/rest/v1/rpc/${rpcName}`;
+    const options: RequestInit = {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body)
+    };
+
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Error detallado de Supabase en RPC [${rpcName}]:`, errorText);
+        throw new Error(`Supabase RPC Error [${rpcName}]: ${errorText}`);
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(`Fallo de red o servidor al conectar con Supabase RPC ${rpcName}:`, err);
+      throw err;
+    }
+  },
+
   // Caché en memoria para evitar parsing repetitivo del localStorage
   _cache: {
     employees: null as Employee[] | null,
     restaurants: null as Restaurant[] | null,
     grades: null as GradeEntry[] | null,
-    gradeIndex: null as Map<string, GradeEntry[]> | null
+    gradeIndex: null as Map<string, GradeEntry[]> | null,
+    summary: null as any[] | null,
+    hierarchy: null as HierarchyData | null,
+    users: null as User[] | null
+  },
+
+  initLocalCache: async () => {
+    try {
+      dataService._cache.employees = (await localforage.getItem<Employee[]>('la_akademia_employees')) || [];
+      dataService._cache.restaurants = (await localforage.getItem<Restaurant[]>('la_akademia_stores')) || [];
+      dataService._cache.grades = (await localforage.getItem<GradeEntry[]>('la_akademia_grades')) || [];
+      dataService._cache.summary = (await localforage.getItem<any[]>('la_akademia_summary')) || [];
+      dataService._cache.hierarchy = (await localforage.getItem<HierarchyData>('la_akademia_hierarchy')) || { lockedMonths: [], regions: [] };
+      dataService._cache.users = (await localforage.getItem<User[]>('la_akademia_users')) || [];
+      dataService._cache.gradeIndex = null;
+    } catch (e) {
+      console.error("Error inicializando caché localforage:", e);
+    }
   },
 
   loadAllFromCloud: async () => {
@@ -120,16 +194,22 @@ export const dataService = {
         dataService.supabaseFetchAll('users').catch(() => [])
       ]);
 
-      localStorage.setItem('la_akademia_employees', JSON.stringify(employees || []));
-      localStorage.setItem('la_akademia_stores', JSON.stringify(restaurants || []));
-      localStorage.setItem('la_akademia_users', JSON.stringify(users || []));
+      await Promise.all([
+        localforage.setItem('la_akademia_employees', employees || []),
+        localforage.setItem('la_akademia_stores', restaurants || []),
+        localforage.setItem('la_akademia_users', users || [])
+      ]);
 
       const defaultHierarchy = { lockedMonths: [], regions: [] };
       const cloudHierarchy = (hierarchy && (hierarchy as any)[0]?.data) ? (hierarchy as any)[0].data : defaultHierarchy;
-      localStorage.setItem('la_akademia_hierarchy', JSON.stringify(cloudHierarchy));
+      await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
 
-      // Invalidar caché en memoria
-      dataService._cache = { employees: null, restaurants: null, grades: null, gradeIndex: null };
+      // Re-fill local memory cache instantly after cloud sync
+      dataService._cache.employees = (employees as Employee[]) || [];
+      dataService._cache.restaurants = (restaurants as Restaurant[]) || [];
+      dataService._cache.users = (users as User[]) || [];
+      dataService._cache.hierarchy = cloudHierarchy;
+      dataService._cache.gradeIndex = null;
 
       return true;
     } catch (e) {
@@ -141,12 +221,26 @@ export const dataService = {
   loadGradesSummary: async (month: string) => {
     try {
       const monthDate = `${month}-01`;
-      console.log(`[BigData] Cargando resúmenes mensuales para: ${month}`);
+      // Consultamos la vista de resúmenes usando 'lte' para permitir herencia en el Dashboard
+      // Ordenamos por mes descendente para capturar la nota más reciente primero
+      const allSummaries = (await dataService.supabaseFetchAll('employee_monthly_summary',
+        `?month=lte.${monthDate}&order=month.desc`)) as any[];
 
-      // Consultamos la vista de resúmenes (1 fila por empleado en vez de 20)
-      const summary = await dataService.supabaseFetchAll('employee_monthly_summary', `?month=eq.${monthDate}`);
-      localStorage.setItem('la_akademia_summary', JSON.stringify(summary));
-      dataService._cache.grades = null;
+      // Filtramos para quedarnos con el resumen más reciente de cada empleado
+      const latestMap = new Map<string, any>();
+      allSummaries.forEach(s => {
+        const empId = String(s.employee_id).trim();
+        if (!latestMap.has(empId)) {
+          latestMap.set(empId, s);
+        }
+      });
+
+      const summary = Array.from(latestMap.values());
+      await localforage.setItem('la_akademia_summary', summary);
+      dataService._cache.summary = summary;
+
+      // IMPORTANTE: NO limpiamos _cache.grades por completo aquí para permitir la herencia
+      // Solo invalidamos el índice para que se reconstruya con los nuevos datos si los hay
       dataService._cache.gradeIndex = null;
       return summary;
     } catch (e) {
@@ -187,30 +281,19 @@ export const dataService = {
   },
 
   getEmployees: (): Employee[] => {
-    if (dataService._cache.employees) return dataService._cache.employees;
-    const data: Employee[] = JSON.parse(localStorage.getItem('la_akademia_employees') || '[]');
-    const normalized = data.map(e => ({ ...e, id: String(e.id).trim(), restaurant_id: String(e.restaurant_id).trim() }));
-    dataService._cache.employees = normalized;
-    return normalized;
+    return dataService._cache.employees || [];
   },
 
   getRestaurants: (): Restaurant[] => {
-    if (dataService._cache.restaurants) return dataService._cache.restaurants;
-    const data = JSON.parse(localStorage.getItem('la_akademia_stores') || '[]');
-    dataService._cache.restaurants = data;
-    return data;
+    return dataService._cache.restaurants || [];
   },
 
   getGrades: (): GradeEntry[] => {
-    if (dataService._cache.grades) return dataService._cache.grades;
-    const data: GradeEntry[] = JSON.parse(localStorage.getItem('la_akademia_grades') || '[]');
-    const normalized = data.map(g => ({ ...g, employeeId: String(g.employeeId).trim(), restaurantId: String(g.restaurantId).trim() }));
-    dataService._cache.grades = normalized;
-    return normalized;
+    return dataService._cache.grades || [];
   },
 
   getGradesSummary: (): any[] => {
-    return JSON.parse(localStorage.getItem('la_akademia_summary') || '[]');
+    return dataService._cache.summary || [];
   },
 
   // Nuevo: Indexador de notas para búsqueda O(1)
@@ -230,29 +313,36 @@ export const dataService = {
     const gradeIndex = dataService.getGradeIndex();
     const empGradesRaw = gradeIndex.get(employeeId) || [];
 
-    // Filtrar con el índice ya reducido por empleado
+    // Si no hay notas históricas pero hay un resumen cargado, 
+    // podríamos intentar reconstruir notas desde el resumen si es el mes actual.
+    // Pero aquí priorizamos la herencia real del historial de notas.
+
     const empGrades = empGradesRaw.filter(g => {
       const gradeMonth = g.month ? g.month.substring(0, 7) : '';
       if (gradeMonth > upToMonth) return false;
+
+      // GRUPO D: Solo vigente si es del mismo mes (No hereda)
       if (g.group === 'D' && gradeMonth !== upToMonth) return false;
+
       return true;
     });
 
     const latestMap = new Map<string, GradeEntry>();
-    empGrades.forEach(g => {
+
+    // Ordenar por fecha para asegurar que la última nota pise a las anteriores
+    const sorted = [...empGrades].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
+
+    sorted.forEach(g => {
       const key = `${g.group}-${g.category}`;
-      const existing = latestMap.get(key);
-      if (!existing || g.month > existing.month) {
-        latestMap.set(key, g);
-      }
+      latestMap.set(key, g);
     });
 
     return Array.from(latestMap.values());
   },
 
-  getHierarchy: (): HierarchyData => JSON.parse(localStorage.getItem('la_akademia_hierarchy') || '{"lockedMonths":[], "regions":[]}'),
+  getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
   getUsers: (): User[] => {
-    const local: User[] = JSON.parse(localStorage.getItem('la_akademia_users') || '[]');
+    const local: User[] = dataService._cache.users || [];
     const adminExists = local.some((u: User) => u.username === 'admin');
     if (!adminExists) {
       const admin: User = { id: 'admin-master', username: 'admin', password: '123', role: UserRole.ADMIN, assignedZones: [], assignedRestaurants: [], assignedRegions: [] };
@@ -262,8 +352,8 @@ export const dataService = {
   },
 
   saveEmployees: async (employees: Employee[]) => {
-    localStorage.setItem('la_akademia_employees', JSON.stringify(employees));
-    dataService._cache.employees = null; // Invalidate cache
+    await localforage.setItem('la_akademia_employees', employees);
+    dataService._cache.employees = employees;
     // Normalizar para evitar error PGRST102 (llaves faltantes en objetos del array)
     const normalized = employees.map(e => ({
       id: e.id,
@@ -283,14 +373,15 @@ export const dataService = {
   },
 
   saveRestaurants: async (restaurants: Restaurant[]) => {
-    localStorage.setItem('la_akademia_stores', JSON.stringify(restaurants));
-    dataService._cache.restaurants = null; // Invalidate cache
+    await localforage.setItem('la_akademia_stores', restaurants);
+    dataService._cache.restaurants = restaurants;
     await dataService.supabaseFetch('restaurants', 'POST', restaurants, '?on_conflict=id');
   },
 
   // Added saveUsers method to persist user data in Supabase with normalization to avoid PGRST102 error
   saveUsers: async (users: User[]) => {
-    localStorage.setItem('la_akademia_users', JSON.stringify(users));
+    await localforage.setItem('la_akademia_users', users);
+    dataService._cache.users = users;
 
     const normalized = users.map(u => ({
       id: u.id,
@@ -309,8 +400,10 @@ export const dataService = {
     // IMPORTANTE: Primero borrar notas (hijas) y luego empleados (padres) por integridad referencial
     await dataService.supabaseFetch('grades', 'DELETE', null, '?employee_id=not.is.null');
     await dataService.supabaseFetch('employees', 'DELETE', null, '?id=not.is.null');
-    localStorage.setItem('la_akademia_employees', '[]');
-    localStorage.setItem('la_akademia_grades', '[]');
+    await localforage.setItem('la_akademia_employees', []);
+    await localforage.setItem('la_akademia_grades', []);
+    dataService._cache.employees = [];
+    dataService._cache.grades = [];
   },
 
   saveEmployeeGrades: async (employeeId: string, month: string, grades: GradeEntry[]) => {
@@ -340,14 +433,14 @@ export const dataService = {
     const allGrades = dataService.getGrades().filter(g => !(g.employeeId === employeeId && g.month && g.month.startsWith(month)));
     const gradesWithContext = grades.map(g => ({ ...g, month: monthDate, restaurantId: currentCeco }));
     const updated = [...allGrades, ...gradesWithContext];
-    localStorage.setItem('la_akademia_grades', JSON.stringify(updated));
-    // Invalidar caché en memoria para que se reflejen los cambios inmediatamente
-    dataService._cache.grades = null;
+    await localforage.setItem('la_akademia_grades', updated);
+    dataService._cache.grades = updated;
     dataService._cache.gradeIndex = null;
   },
 
   saveHierarchy: async (hierarchy: HierarchyData) => {
-    localStorage.setItem('la_akademia_hierarchy', JSON.stringify(hierarchy));
+    await localforage.setItem('la_akademia_hierarchy', hierarchy);
+    dataService._cache.hierarchy = hierarchy;
     await dataService.supabaseFetch('hierarchy', 'POST', { id: 1, data: hierarchy }, '?on_conflict=id');
   },
 
@@ -359,7 +452,8 @@ export const dataService = {
     });
     if (!res.ok) throw new Error('No se pudo eliminar el usuario');
     const current = dataService.getUsers().filter(u => u.id !== userId);
-    localStorage.setItem('la_akademia_users', JSON.stringify(current));
+    await localforage.setItem('la_akademia_users', current);
+    dataService._cache.users = current;
   },
 
   importHierarchyExcel: async (rawData: Record<string, unknown>[]) => {
@@ -406,20 +500,20 @@ export const dataService = {
 
     const importedIds = new Set();
     const filteredRawData = rawData.filter(item => {
-      const storeId = String(item.Nombre_Ceco || item.nombre_ceco || '').trim().toUpperCase();
+      const storeId = String((item.Nombre_Ceco as string) || (item.nombre_ceco as string) || '').trim().toUpperCase();
       return storeId !== '' && !storeId.startsWith('H');
     });
 
     const importedEmployees = filteredRawData.map(item => {
-      const storeId = String(item.Nombre_Ceco || item.nombre_ceco || 'SIN_CECO').trim().toUpperCase();
-      const docId = String(item.Documento || item.documento || item.id || item.ID || '').trim();
+      const storeId = String((item.Nombre_Ceco as string) || (item.nombre_ceco as string) || 'SIN_CECO').trim().toUpperCase();
+      const docId = String((item.Documento as string) || (item.documento as string) || (item.id as string) || (item.ID as string) || '').trim();
       if (!docId) return null;
       importedIds.add(docId);
 
       const existing = currentEmployees.find(e => e.id === docId);
 
       const rawFechaFin = item["Fecha fin"] || item.fecha_fin || item["Fecha retiro"] || item.fecha_retiro || item.FECHA_FIN;
-      const parsedFechaFin = rawFechaFin ? parseExcelDate(rawFechaFin) : null;
+      const parsedFechaFin = rawFechaFin ? parseExcelDate(rawFechaFin as string | number) : null;
 
       const isActiveInExcel = !parsedFechaFin;
 
@@ -439,7 +533,7 @@ export const dataService = {
       const emp: Employee = {
         id: docId,
         name: String(item["Nombre completo"] || item.nombre || 'Sin Nombre').trim(),
-        join_date: parseExcelDate(item["Fecha de ingreso"] || item.fecha_de_ingreso),
+        join_date: parseExcelDate((item["Fecha de ingreso"] as string) || (item.fecha_de_ingreso as string)),
         title: finalTitle,
         restaurant_id: storeId,
         zone: currentStores.find(s => s.id === storeId)?.zone || (existing?.zone || 'Sin Clasificar'),
@@ -470,6 +564,10 @@ export const dataService = {
 
     const uniqueStoresInExcel = new Set(filteredRawData.map(item => String(item.Nombre_Ceco || item.nombre_ceco || '').trim().toUpperCase()));
 
+    // La lógica de retiros implícitos se desactiva por solicitud del usuario:
+    // "si el ID del usuario no aparece en el siguiente activos y retirados, la app no lo debera marcar como retirado"
+    const implicitRetires: Employee[] = [];
+    /*
     const implicitRetires = currentEmployees
       .filter(e => !importedIds.has(e.id) && e.active && uniqueStoresInExcel.has(e.restaurant_id))
       .map(e => ({
@@ -478,6 +576,7 @@ export const dataService = {
         exit_date: today,
         history: [...(e.history || []), { date: today, restaurantName: e.restaurant_id, action: 'RETIRO' as const }]
       }));
+    */
 
     const allProcessedMap = new Map<string, Employee>();
     importedEmployees.forEach(e => allProcessedMap.set(e.id, e));

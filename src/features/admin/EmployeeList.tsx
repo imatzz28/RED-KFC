@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
-import { Employee, Restaurant, JobHierarchy, User, UserRole } from '../types';
+import { Employee, Restaurant, JobHierarchy, User, UserRole } from '@/types';
 import { Search, Edit3, Users } from 'lucide-react';
-import GradeEditor from './GradeEditor';
-import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '../constants';
-import { dataService } from '../dataService';
+import GradeEditor from '@/features/dashboard/GradeEditor';
+import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '@/utils/constants';
+import { dataService } from '@/services/dataService';
 
 interface EmployeeListProps {
   employees: Employee[];

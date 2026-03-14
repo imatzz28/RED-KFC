@@ -1,18 +1,16 @@
 
 import React from 'react';
-import { UserRole } from '../types';
+import { UserRole } from '@/types';
 import { LayoutDashboard, ShieldAlert, LogOut, GraduationCap, X, Store, ArrowUpDown, Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 
-interface SidebarProps {
-  activeTab: 'dashboard' | 'my-stores' | 'admin' | 'entries-exits';
-  setActiveTab: (tab: 'dashboard' | 'my-stores' | 'admin' | 'entries-exits') => void;
-  role: UserRole;
-  onLogout: () => void;
-  isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
-}
+import { useAppStore } from '@/store/useAppStore';
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, onLogout, isOpen, setIsOpen }) => {
+const Sidebar: React.FC = () => {
+  const { auth, handleLogout: onLogout, isSidebarOpen: isOpen, setIsSidebarOpen: setIsOpen } = useAppStore();
+  const role = auth.user!.role;
+  const location = useLocation();
+  const activeTab = location.pathname.substring(1) || 'dashboard';
   const sidebarClasses = `
     fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col transition-transform duration-300 ease-in-out transform
     lg:relative lg:translate-x-0 
@@ -35,38 +33,42 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, onLogo
       </div>
 
       <nav className="flex-1 p-4 space-y-2 mt-4">
-        <button
-          onClick={() => setActiveTab('dashboard')}
+        <Link
+          to="/dashboard"
+          onClick={() => setIsOpen(false)}
           className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'dashboard' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
             }`}
         >
           <LayoutDashboard className="w-5 h-5" />
           <span className="font-bold text-sm uppercase tracking-tight">Dashboard</span>
-        </button>
+        </Link>
 
-        <button
-          onClick={() => setActiveTab('my-stores')}
+        <Link
+          to="/my-stores"
+          onClick={() => setIsOpen(false)}
           className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'my-stores' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
             }`}
         >
           <Store className="w-5 h-5" />
           <span className="font-bold text-sm uppercase tracking-tight">Mis tiendas</span>
-        </button>
+        </Link>
 
         {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
-          <button
-            onClick={() => setActiveTab('entries-exits')}
+          <Link
+            to="/entries-exits"
+            onClick={() => setIsOpen(false)}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'entries-exits' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
               }`}
           >
             <ArrowUpDown className="w-5 h-5" />
             <span className="font-bold text-sm uppercase tracking-tight">Ingresos y Retiros</span>
-          </button>
+          </Link>
         )}
 
         {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
-          <button
-            onClick={() => setActiveTab('admin')}
+          <Link
+            to="/admin"
+            onClick={() => setIsOpen(false)}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'admin' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
               }`}
           >
@@ -74,7 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role, onLogo
             <span className="font-bold text-sm uppercase tracking-tight">
               {role === UserRole.ADMIN ? 'Administración' : 'Gestión Equipo'}
             </span>
-          </button>
+          </Link>
         )}
       </nav>
 

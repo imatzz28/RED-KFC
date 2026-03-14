@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
-import { dataService } from '../dataService';
+import { User } from '@/types';
+import { dataService } from '@/services/dataService';
 import { LogIn, RefreshCw, GraduationCap } from 'lucide-react';
 
 interface LoginProps {

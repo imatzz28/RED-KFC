@@ -10,15 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
     "jspdf": "2.5.1",
     "jspdf-autotable": "3.8.2",
+    "localforage": "^1.10.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-router-dom": "^7.13.1",
+    "react-window": "^2.2.7",
     "recharts": "^3.6.0",
-    "xlsx": "0.18.5"
+    "xlsx": "0.18.5",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.91.3",
     "@types/node": "^22.14.0",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",

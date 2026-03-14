@@ -1,20 +1,20 @@
 
 import React, { useMemo, useState } from 'react';
-import { GradeEntry, Employee, User, Restaurant, UserRole } from '../types';
-import { dataService } from '../dataService';
-import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '../constants';
+import { useQuery } from '@tanstack/react-query';
+import { GradeEntry, Employee, User, Restaurant, UserRole } from '@/types';
+import { dataService } from '@/services/dataService';
+import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '@/utils/constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText, ArrowUpCircle, ArrowDownCircle, RefreshCw, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ExportWorker from '@/workers/exportWorker?worker';
 
-interface DashboardProps {
-  employees: Employee[];
-  restaurants: Restaurant[];
-  selectedMonth: string;
-  user: User;
-}
+import { useAppStore } from '@/store/useAppStore';
 
-const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, restaurants, selectedMonth, user }) => {
+const Dashboard: React.FC = () => {
+  const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth } = useAppStore();
+  const [isExporting, setIsExporting] = useState(false);
+  const user = auth.user!;
   const [searchPerson, setSearchPerson] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterZone, setFilterZone] = useState('all');
@@ -58,95 +58,13 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
     return baseStores.sort((a, b) => a.name.localeCompare(b.name));
   }, [restaurants, filterRegion, filterZone, user]);
 
-  const employeesWithEffectiveGrades = useMemo(() => {
-    const summaries = dataService.getGradesSummary();
-    const summaryMap = new Map(summaries.map(s => [String(s.employee_id).trim(), s]));
 
-    return initialEmployees.map(emp => {
-      const empId = String(emp.id).trim();
-      const summary = summaryMap.get(empId);
 
-      const avg = summary ? Math.round(summary.avg_score) : 0;
-      const isApproved = summary ? summary.is_approved : false;
-      const isPending = !summary;
-      const storeIdAtPeriod = summary ? summary.restaurant_id : emp.restaurant_id;
-
-      return {
-        ...emp,
-        effectiveGrades: [], // En vista global no cargamos detalle de categorías
-        summary, // Guardamos el resumen para las barras
-        storeIdAtPeriod,
-        avg,
-        isApproved,
-        isPending
-      };
-    });
-  }, [initialEmployees, selectedMonth]);
-
-  const filteredData = useMemo(() => {
-    const searchLower = searchPerson.toLowerCase();
-    const isSpecialist = user.role === UserRole.SPECIALIST;
+  const scopeStoresSet = useMemo(() => {
     const isCoordinator = user.role === UserRole.COORDINATOR;
     const assignedRegions = user.assignedRegions || [];
 
-    const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id.trim().toUpperCase(), r]));
-
-    return employeesWithEffectiveGrades.filter(e => {
-      const matchPerson = searchPerson === '' || e.name.toLowerCase().includes(searchLower) || e.id.includes(searchPerson);
-      if (!matchPerson) return false;
-
-      const normalizedStoreId = String(e.storeIdAtPeriod || '').trim().toUpperCase();
-      const store = restaurantMap.get(normalizedStoreId);
-
-      const matchRegion = filterRegion === 'all'
-        ? (isCoordinator ? assignedRegions.includes(store?.region || '') : true)
-        : store?.region === filterRegion;
-      if (!matchRegion) return false;
-
-      const matchZone = filterZone === 'all' ? true : store?.zone === filterZone;
-      if (!matchZone) return false;
-
-      const matchStore = filterStore === 'all' ? true : normalizedStoreId === String(filterStore).trim().toUpperCase();
-      return matchStore;
-    });
-  }, [employeesWithEffectiveGrades, searchPerson, filterStore, filterZone, filterRegion, restaurants, user]);
-
-  const stats = useMemo(() => {
-    let approvedCount = 0;
-    let pendingCount = 0;
-
-    filteredData.forEach(e => {
-      if (e.isApproved) approvedCount++;
-      if (e.isPending) pendingCount++;
-    });
-
-    const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => {
-      const gCert = filteredData.filter(e => {
-        if (e.isPending || !e.summary) return false;
-        const val = e.summary[`avg_${gid.toLowerCase()}`];
-        return val !== null && val !== undefined && val >= APPROVAL_THRESHOLD;
-      }).length;
-
-      const gTotal = filteredData.length; // Total de trabajadores activos del periodo
-
-      return {
-        id: gid,
-        name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name,
-        avg: gTotal > 0 ? Math.round((gCert / gTotal) * 100) : 0
-      };
-    });
-
-    const globalProgress = filteredData.length > 0
-      ? Math.round(filteredData.reduce((acc, e) => acc + (e.avg || 0), 0) / filteredData.length)
-      : 0;
-
-    // --- Cálculo de Ingresos, Retiros, Rotación y Retención (Filtrado) ---
-    const isSpecialist = user.role === UserRole.SPECIALIST;
-    const isCoordinator = user.role === UserRole.COORDINATOR;
-    const assignedRegions = user.assignedRegions || [];
-
-    // Pre-calculamos el set de tiendas en alcance para velocidad
-    const scopeStoresSet = new Set(restaurants
+    return new Set(restaurants
       .filter(r => {
         const matchRegion = filterRegion === 'all'
           ? (isCoordinator ? assignedRegions.includes(r.region) : true)
@@ -157,56 +75,40 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
       })
       .map(r => r.id.trim().toUpperCase())
     );
+  }, [restaurants, filterRegion, filterZone, filterStore, user]);
 
-    const isInScope = (idOrName: string) => {
-      if (!idOrName) return false;
-      const search = idOrName.trim().toUpperCase();
-      // Buscamos si es un ID directo en el set
-      if (scopeStoresSet.has(search)) return true;
-      // Si es un nombre, buscamos el ID correspondiente en la lista global de tiendas
-      const store = restaurants.find(r => r.name.trim().toUpperCase() === search);
-      return store ? scopeStoresSet.has(store.id.trim().toUpperCase()) : false;
-    };
+  const { data: statsMap, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['dashboard-stats', selectedMonth, filterRegion, filterZone, filterStore],
+    queryFn: async () => {
+      const storeIds = Array.from(scopeStoresSet);
+      const storeNames = storeIds.map(id => restaurants.find(r => r.id.trim().toUpperCase() === id)?.name || id);
 
-    const entries = initialEmployees.reduce((acc, emp) => {
-      const hasHistoryIngreso = emp.history?.some(h =>
-        h.action === 'INGRESO' && h.date.startsWith(selectedMonth) && isInScope(h.restaurantName)
-      );
-      if (hasHistoryIngreso) return acc + 1;
+      const metrics = await dataService.supabaseFetchRPC('get_dashboard_metrics', {
+        p_month_prefix: selectedMonth,
+        p_month_date: `${selectedMonth}-01`,
+        p_store_ids: storeIds,
+        p_store_names: storeNames
+      });
 
-      const matchesJoinDate = emp.join_date?.startsWith(selectedMonth) && isInScope(emp.restaurant_id);
-      return matchesJoinDate ? acc + 1 : acc;
-    }, 0);
+      return metrics;
+    },
+    staleTime: 60 * 1000
+  });
 
-    const exits = initialEmployees.reduce((acc, emp) => {
-      const hasHistoryRetiro = emp.history?.some(h =>
-        h.action === 'RETIRO' && h.date.startsWith(selectedMonth) && isInScope(h.restaurantName)
-      );
-      if (hasHistoryRetiro) return acc + 1;
-
-      const matchesExitDate = emp.exit_date?.startsWith(selectedMonth) && isInScope(emp.restaurant_id);
-      return matchesExitDate ? acc + 1 : acc;
-    }, 0);
-
-    const activeInScope = filteredData.length;
-    const rotationRate = activeInScope > 0 ? (exits / activeInScope) * 100 : 0;
-    const empsInicio = (activeInScope - entries + exits);
-    const retentionRate = empsInicio > 0 ? ((activeInScope - entries) / empsInicio) * 100 : 0;
-
-    return {
-      totalEmployees: filteredData.length,
-      approvedCount,
-      pendingCount,
-      groupAvgs,
-      globalProgress,
-      entries,
-      exits,
-      rotation: rotationRate.toFixed(1),
-      retention: Math.min(100, retentionRate).toFixed(1)
-    };
-  }, [filteredData, initialEmployees, selectedMonth, filterRegion, filterZone, filterStore, restaurants, user.assignedRegions, user.role]);
+  const stats = statsMap || {
+    totalEmployees: 0,
+    approvedCount: 0,
+    pendingCount: 0,
+    entries: 0,
+    exits: 0,
+    globalProgress: 0,
+    rotation: '0.0',
+    retention: '0.0',
+    groupAvgs: Object.keys(EVALUATION_GROUPS).map(gid => ({ id: gid, name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name, avg: 0 }))
+  };
 
   const handleExportFinal = async () => {
+    setIsExporting(true);
     let allGradesForMonth: GradeEntry[] = [];
 
     // Si se requiere detalle, traemos toda la base de datos de notas de ese mes una sola vez
@@ -222,66 +124,53 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
       }));
     }
 
-    const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [r.id, r]));
-    const gradeIndex = new Map<string, GradeEntry[]>();
+    const summaries = dataService.getGradesSummary();
 
-    if (exportConfig.includeDetails) {
-      allGradesForMonth.forEach(g => {
-        if (!gradeIndex.has(g.employeeId)) gradeIndex.set(g.employeeId, []);
-        gradeIndex.get(g.employeeId)!.push(g);
-      });
-    }
-
-    const exportData = filteredData.map(emp => {
-      const empStore = restaurantMap.get(emp.storeIdAtPeriod);
-      const dynamicColumns: { [key: string]: string } = {};
-      const empId = String(emp.id).trim();
-
-      exportConfig.groups.forEach(gid => {
-        const gConfig = EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS];
-
-        // Usar promedio del resumen para la columna general del grupo
-        const groupAvg = emp.summary ? Math.round(emp.summary[`avg_${gid.toLowerCase()}`] || 0) : 0;
-        dynamicColumns[`${gConfig.name} %`] = `${groupAvg}%`;
-
-        if (exportConfig.includeDetails) {
-          const empGrades = gradeIndex.get(empId) || [];
-          const gGrades = empGrades.filter(g => g.group === gid);
-
-          gConfig.categories.forEach((cat: string, index: number) => {
-            let catName = cat;
-            if (gid === 'D') {
-              const cfg = hierarchy.groupDConfig?.[selectedMonth];
-              if (index === 0) catName = cfg?.cat1 || "Guías Plan de Capacitación";
-              if (index === 1) catName = cfg?.cat2 || "Guías de SST";
-            }
-            const grade = gGrades.find(g => g.category === cat);
-            dynamicColumns[`[${gConfig.name}] ${catName}`] = grade ? `${grade.score}%` : '0%';
-          });
-        }
-      });
-
-      return {
-        "Documento": emp.id,
-        "Nombre completo": emp.name,
-        "Estado": emp.active ? "Activo" : "Retirado",
-        "Cargo": emp.title,
-        "Tienda Reportada": empStore?.name || emp.storeIdAtPeriod,
-        "Ceco": emp.storeIdAtPeriod,
-        "Jefe de area": empStore?.zone || emp.zone,
-        "Mes Reporte": selectedMonth,
-        "Promedio General": `${emp.avg}%`,
-        "Certificación": emp.isPending ? 'Pendiente' : (emp.isApproved ? 'Aprobado' : 'No Cumple'),
-        "Origen Nota": emp.isPending ? 'N/A' : (emp.summary ? 'Registrada' : 'S/N'),
-        ...dynamicColumns
-      };
+    const worker = new ExportWorker();
+    worker.postMessage({
+      initialEmployees,
+      restaurants,
+      summaries,
+      allGradesForMonth,
+      exportConfig,
+      selectedMonth,
+      filterRegion,
+      filterZone,
+      filterStore,
+      searchPerson,
+      userRole: user.role,
+      assignedRegions: user.assignedRegions || [],
+      evaluationGroups: EVALUATION_GROUPS,
+      hierarchy: dataService.getHierarchy()
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte_Akademia");
-    XLSX.writeFile(wb, `Reporte_Akademia_${selectedMonth}.xlsx`);
-    setShowExportModal(false);
+    worker.onmessage = (e) => {
+      setIsExporting(false);
+      if (e.data.success) {
+        // e.data.data is the ArrayBuffer holding the XLSX
+        const blob = new Blob([e.data.data], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Reporte_Akademia_${selectedMonth}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setShowExportModal(false);
+      } else {
+        console.error("Error en Web Worker de Exportación:", e.data.error);
+        alert("Ocurrió un error al exportar el archivo. Revisa la consola.");
+      }
+      worker.terminate();
+    };
+
+    worker.onerror = (err) => {
+      setIsExporting(false);
+      console.error("Worker fatal error:", err);
+      alert("Error crítico en el proceso de exportación.");
+      worker.terminate();
+    };
   };
 
   const selectClasses = "w-full p-3 bg-white border-2 border-slate-100 rounded-xl text-xs font-black uppercase text-slate-800 outline-none focus:border-red-500 transition-all shadow-sm";
@@ -327,7 +216,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
           <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
           <StatCard icon={<Award className="w-5 h-5" />} label="Certificados" value={stats.approvedCount} color="green" />
           <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
-          <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={filteredData.filter(e => e.isPending).length} color="red" />
+          <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={stats.pendingCount} color="red" />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -355,6 +244,8 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
           </ResponsiveContainer>
         </div>
       </div>
+
+
 
       {showExportModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
@@ -421,10 +312,15 @@ const Dashboard: React.FC<DashboardProps> = ({ employees: initialEmployees, rest
 
               <button
                 onClick={handleExportFinal}
-                className="w-full py-6 bg-red-600 text-white font-black rounded-[32px] hover:bg-red-700 shadow-2xl transition-all uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-4 group"
+                disabled={isExporting}
+                className={`w-full py-6 text-white font-black rounded-[32px] shadow-2xl transition-all uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-4 group ${isExporting ? 'bg-slate-400 cursor-not-allowed opacity-70' : 'bg-red-600 hover:bg-red-700 hover:-translate-y-1'}`}
               >
-                <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-                Generar Reporte Excel
+                {isExporting ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+                )}
+                {isExporting ? 'Procesando miles de registros...' : 'Generar Reporte Excel'}
               </button>
             </div>
           </div>

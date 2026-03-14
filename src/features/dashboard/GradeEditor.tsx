@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Employee, GradeEntry } from '../types';
-import { EVALUATION_GROUPS } from '../constants';
-import { dataService } from '../dataService';
+import { Employee, GradeEntry } from '@/types';
+import { EVALUATION_GROUPS } from '@/utils/constants';
+import { dataService } from '@/services/dataService';
 // Added MapPin to the imports from lucide-react
 import { X, Save, User, Calendar, GraduationCap, Star, Trophy, ClipboardCheck, Vault, Lock, RefreshCw, BookOpen, ArrowUp, ArrowDown, Repeat, History, Clock, MapPin } from 'lucide-react';
 

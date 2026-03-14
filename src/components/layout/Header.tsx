@@ -1,17 +1,14 @@
 
 import React, { useState, useRef } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole } from '@/types';
 import { Calendar, User as UserIcon, Menu, Lock, X, Shield, LogOut } from 'lucide-react';
 
-interface HeaderProps {
-  user: User;
-  selectedMonth: string;
-  onMonthChange: (month: string) => void;
-  onMenuClick: () => void;
-  onLogout: () => void;
-}
+import { useAppStore } from '@/store/useAppStore';
 
-const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onMenuClick, onLogout }) => {
+const Header: React.FC = () => {
+  const { auth, selectedMonth, setSelectedMonth: onMonthChange, setIsSidebarOpen, handleLogout: onLogout } = useAppStore();
+  const user = auth.user!;
+  const onMenuClick = () => setIsSidebarOpen(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
   const [passData, setPassData] = useState({ old: '', new: '' });
@@ -29,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
   };
 
   const getRoleLabel = (role: UserRole) => {
-    switch(role) {
+    switch (role) {
       case UserRole.ADMIN: return 'SUPERADMIN';
       case UserRole.COORDINATOR: return 'COORDINADOR';
       default: return 'ESPECIALISTA';
@@ -39,13 +36,13 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
   return (
     <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
       <div className="flex items-center space-x-5">
-        <button 
+        <button
           onClick={onMenuClick}
           className="lg:hidden p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition shadow-inner"
         >
           <Menu className="w-6 h-6" />
         </button>
-        
+
         <div className="flex flex-col">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 italic">Periodo Evaluación</label>
           <div className="relative group flex items-center">
@@ -72,16 +69,16 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
             {getRoleLabel(user.role)}
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-2xl flex items-center justify-center border-2 border-slate-100 shadow-sm ring-4 ring-slate-50 transition-all hover:border-red-300"
           >
             <UserIcon className="w-6 h-6 text-red-600" />
           </button>
-          
-          <button 
+
+          <button
             onClick={onLogout}
             className="w-10 h-10 md:w-11 md:h-11 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center border-2 border-red-100 shadow-sm transition-all hover:bg-red-600 hover:text-white group"
             title="Cerrar Sesión"
@@ -92,7 +89,7 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
 
         {showProfileMenu && (
           <div className="absolute right-8 top-16 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 animate-in fade-in slide-in-from-top-2">
-            <button 
+            <button
               onClick={() => { setShowPassModal(true); setShowProfileMenu(false); }}
               className="w-full flex items-center space-x-3 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition"
             >
@@ -100,7 +97,7 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
               <span>Cambiar Contraseña</span>
             </button>
             <div className="h-px bg-slate-100 my-1" />
-            <button 
+            <button
               onClick={onLogout}
               className="w-full flex items-center space-x-3 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition"
             >
@@ -116,16 +113,16 @@ const Header: React.FC<HeaderProps> = ({ user, selectedMonth, onMonthChange, onM
           <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden border-2 border-slate-100">
             <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
               <h3 className="font-black uppercase tracking-tighter flex items-center italic text-lg"><Shield className="w-5 h-5 mr-3 text-red-500" /> Seguridad</h3>
-              <button onClick={() => setShowPassModal(false)}><X className="w-6 h-6"/></button>
+              <button onClick={() => setShowPassModal(false)}><X className="w-6 h-6" /></button>
             </div>
             <div className="p-8 space-y-5">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Contraseña Actual</label>
-                <input type="password" value={passData.old} onChange={e => setPassData({...passData, old: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
+                <input type="password" value={passData.old} onChange={e => setPassData({ ...passData, old: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Nueva Contraseña</label>
-                <input type="password" value={passData.new} onChange={e => setPassData({...passData, new: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
+                <input type="password" value={passData.new} onChange={e => setPassData({ ...passData, new: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
               </div>
               <button className="w-full py-5 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 shadow-xl transition-all uppercase tracking-[0.2em] text-[10px] mt-4">Actualizar Clave</button>
             </div>

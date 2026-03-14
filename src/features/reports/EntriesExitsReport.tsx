@@ -1,15 +1,13 @@
 
 import React, { useMemo, useState } from 'react';
-import { Employee, Restaurant } from '../types';
+import { Employee, Restaurant } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, UserCheck, Search } from 'lucide-react';
 
-interface EntriesExitsReportProps {
-  employees: Employee[];
-  restaurants: Restaurant[];
-}
+import { useAppStore } from '@/store/useAppStore';
 
-const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, restaurants }) => {
+const EntriesExitsReport: React.FC = () => {
+  const { filteredEmployees: employees, restaurants } = useAppStore();
   const currentYear = new Date().getFullYear();
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterZone, setFilterZone] = useState('all');
@@ -106,7 +104,7 @@ const EntriesExitsReport: React.FC<EntriesExitsReportProps> = ({ employees, rest
 
   // === RECOLECCIÓN DE EVENTOS ===
   const historyEvents = useMemo(() => {
-    const events: { employeeName: string; employeeTitle: string; month: string; year: string; date: string; action: "INGRESO" | "RETIRO"; restaurantName: string; }[] = [];
+    const events: { employeeName: string; employeeTitle: string; month: string; year: string; date: string; action: "INGRESO" | "RETIRO" | "TRASLADO"; restaurantName: string; }[] = [];
 
     employees.forEach(emp => {
       // --- INGRESOS ---

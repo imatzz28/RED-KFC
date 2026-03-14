@@ -1,23 +1,15 @@
 
 import React, { useMemo, useState } from 'react';
-import { User, Restaurant, Employee, UserRole, JobHierarchy, JobTitle } from '../types';
+import { User, Restaurant, Employee, UserRole, JobHierarchy, JobTitle } from '@/types';
 import { Store, MapPin, Users, Award, ArrowLeft, TrendingUp, Search, Edit3, LineChart, Download, X, Calendar, RefreshCw, ChevronRight, Activity, BookOpen, GraduationCap, Star, Trophy, ClipboardCheck, Vault } from 'lucide-react';
-import { dataService } from '../dataService';
-import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT, EVALUATION_GROUPS } from '../constants';
-import GradeEditor from './GradeEditor';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { APP_LOGO_B64 } from '../logo_final';
+import { dataService } from '@/services/dataService';
+import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT, EVALUATION_GROUPS } from '@/utils/constants';
+import GradeEditor from '@/features/dashboard/GradeEditor';
+import { generateStorePdf } from './utils/pdfGenerator';
+import { getSeniorityMonths, normalizeRole } from './utils/storeUtils';
 
 
-
-interface MyStoresProps {
-  user: User;
-  restaurants: Restaurant[];
-  employees: Employee[];
-  selectedMonth: string;
-  onUpdate: () => void;
-}
+import { useAppStore } from '@/store/useAppStore';
 
 const GroupIcons: Record<string, React.ReactNode> = {
   'AK': <BookOpen className="w-4 h-4" />,
@@ -28,18 +20,11 @@ const GroupIcons: Record<string, React.ReactNode> = {
   'E': <Vault className="w-4 h-4" />,
 };
 
-const normalizeRole = (title: string): string => {
-  const upper = (title || '').toUpperCase();
-  if (upper.includes('SUBGERENTE')) return JobTitle.SUBGERENTE;
-  if (upper.includes('GERENTE')) return JobTitle.GERENTE;
-  if (upper.includes('LÍDER') || upper.includes('LIDER')) return JobTitle.LIDER_TURNO;
-  if (upper.includes('ENTRENADOR')) return JobTitle.ENTRENADOR;
-  if (upper.includes('DOMICILIARIO')) return JobTitle.DOMICILIARIO;
-  if (upper.includes('ROLEX') || upper.includes('FDS') || upper.includes('HRS') || upper.includes('FIN DE SEMANA')) return JobTitle.MIEMBRO_EQUIPO_ROLEX;
-  return JobTitle.MIEMBRO_EQUIPO_FULL;
-};
 
-const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selectedMonth, onUpdate }) => {
+
+const MyStores: React.FC = () => {
+  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate } = useAppStore();
+  const user = auth.user!;
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
@@ -251,180 +236,22 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
     return { total: storeEmps.length, approved: storeApprovedCount, percent: Math.round(totalAvgSum / Object.keys(EVALUATION_GROUPS).length), groupStats, cargoCounts };
   };
 
-  const getSeniorityMonths = (joinDate: string, targetMonth: string) => {
-    if (!joinDate) return 0;
-    const start = new Date(joinDate);
-    const end = new Date(targetMonth + "-01");
-    const diff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-    return Math.max(0, diff);
-  };
 
-  const getMonthText = (monthStr: string) => {
-    if (!monthStr) return '';
-    const [year, month] = monthStr.split('-');
-    const months = [
-      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
-      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
-    ];
-    return `${months[parseInt(month) - 1]} ${year}`;
-  };
 
   const handleGeneratePDF = async () => {
     if (!selectedStore || isGeneratingPdf) return;
     setIsGeneratingPdf(true);
 
-    setTimeout(async () => {
-      try {
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const stats = getStoreStatsForMonth(selectedStore.id, pdfMonth);
-        const storeEmps = employees.filter(e => e.restaurant_id === selectedStore.id && e.active);
-
-        const colors: Record<string, [number, number, number]> = {
-          kfcRed: [227, 24, 55],
-          dark: [26, 32, 44],
-          emerald: [16, 185, 129]
-        };
-
-        const drawHeader = (d: typeof doc) => {
-          d.setFillColor(colors.kfcRed[0], colors.kfcRed[1], colors.kfcRed[2]);
-          d.rect(0, 0, 210, 50, 'F');
-          d.setTextColor(255, 255, 255);
-          d.setFont('helvetica', 'bold');
-          d.setFontSize(9);
-          d.text('CURVAS DE ENTRENAMIENTO', 20, 15);
-          d.setFontSize(22);
-          d.text(selectedStore.name.toUpperCase(), 20, 28);
-          d.setFontSize(9);
-          d.setFont('helvetica', 'normal');
-          d.text(`CECO: ${selectedStore.id} | REGIÓN: ${selectedStore.region} | PERIODO: ${getMonthText(pdfMonth)}`, 20, 38);
-          d.addImage(APP_LOGO_B64, 'PNG', 165, 8, 30, 30);
-        };
-
-        drawHeader(doc);
-
-        doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text('CENSO DE EQUIPO (ESTRUCTURA DE MANDO)', 20, 65);
-
-        const roleData = [
-          [JobTitle.GERENTE, stats.cargoCounts[JobTitle.GERENTE] || 0],
-          [JobTitle.SUBGERENTE, stats.cargoCounts[JobTitle.SUBGERENTE] || 0],
-          [JobTitle.LIDER_TURNO, stats.cargoCounts[JobTitle.LIDER_TURNO] || 0],
-          [JobTitle.ENTRENADOR, stats.cargoCounts[JobTitle.ENTRENADOR] || 0],
-          [JobTitle.MIEMBRO_EQUIPO_FULL, stats.cargoCounts[JobTitle.MIEMBRO_EQUIPO_FULL] || 0],
-          [JobTitle.MIEMBRO_EQUIPO_ROLEX, stats.cargoCounts[JobTitle.MIEMBRO_EQUIPO_ROLEX] || 0],
-          [JobTitle.DOMICILIARIO, stats.cargoCounts[JobTitle.DOMICILIARIO] || 0],
-          [{ content: 'TOTAL PERSONAL ACTIVO', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, { content: stats.total, styles: { fontStyle: 'bold', fillColor: colors.kfcRed, textColor: 255 } }]
-        ].map(row => {
-          if (Array.isArray(row) && typeof row[0] === 'string') {
-            return [row[0].toUpperCase(), row[1]];
-          }
-          return row;
-        });
-
-        autoTable(doc, {
-          startY: 70,
-          head: [['CARGO EN TIENDA', 'CANTIDAD']],
-          body: roleData as any,
-          theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 2, halign: 'center' },
-          headStyles: { fillColor: colors.dark, textColor: 255 },
-          margin: { left: 20, right: 110 }
-        });
-
-        doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PORCENTAJE DE APROBACIÓN POR CURVA', 110, 65);
-
-        let barY = 70;
-        Object.entries(EVALUATION_GROUPS).forEach(([gid, config]) => {
-          const rate = stats.groupStats[gid]?.approvalRate || 0;
-          doc.setFontSize(6.5);
-          doc.setTextColor(80);
-          doc.text(config.name.toUpperCase(), 110, barY + 3);
-          doc.setFillColor(245, 245, 245);
-          doc.roundedRect(110, barY + 5, 75, 3, 1, 1, 'F');
-          const barColor = rate >= APPROVAL_THRESHOLD ? colors.emerald : colors.kfcRed;
-          doc.setFillColor(barColor[0], barColor[1], barColor[2]);
-          doc.roundedRect(110, barY + 5, (rate / 100) * 75, 3, 1, 1, 'F');
-          doc.setTextColor(barColor[0], barColor[1], barColor[2]);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${rate}%`, 188, barY + 7.5);
-          barY += 10; // Más compacto
-        });
-
-        // Forzar salto de página para la tabla detallada
-        doc.addPage();
-        drawHeader(doc);
-
-        const startTableY = 60;
-        doc.setTextColor(colors.dark[0], colors.dark[1], colors.dark[2]);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`DESGLOSE DETALLADO DE CALIFICACIONES`, 20, startTableY - 5);
-
-        const tableData = storeEmps
-          .sort((a, b) => (JobHierarchy[a.title] || 99) - (JobHierarchy[b.title] || 99))
-          .map(emp => {
-            const effective = dataService.getEffectiveGrades(emp.id, pdfMonth);
-            const getScore = (gid: string) => {
-              const gGrades = effective.filter(g => g.group === gid);
-              const gConf = EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS];
-              return gGrades.length > 0 ? `${Math.round(gGrades.reduce((s, g) => s + g.score, 0) / gConf.categories.length)}%` : '0%';
-            };
-
-            return [
-              emp.id,
-              emp.name.toUpperCase(),
-              emp.join_date,
-              emp.title.toUpperCase(),
-              getScore('A'), getScore('B'), getScore('C'), getScore('D'), getScore('E')
-            ];
-          });
-
-        // Fuente más pequeña para la tabla detallada para ganar espacio y limpieza
-        let dynamicFontSize = 6;
-        if (tableData.length > 50) dynamicFontSize = 5.5;
-        if (tableData.length > 80) dynamicFontSize = 5;
-
-        autoTable(doc, {
-          startY: startTableY,
-          head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'BAS.', 'STAR', 'ALLS.', 'SST', 'VAUL.']],
-          body: tableData,
-          theme: 'grid',
-          styles: {
-            fontSize: dynamicFontSize,
-            halign: 'center',
-            cellPadding: 0.8, // Más pequeño para ganar espacio
-            overflow: 'linebreak'
-          },
-          headStyles: { fillColor: colors.kfcRed, textColor: 255 },
-          columnStyles: {
-            0: { cellWidth: 23 }, // ID - Suficiente para 10-11 dígitos
-            1: { halign: 'left', cellWidth: 46 }, // NOMBRE
-            2: { cellWidth: 18 }, // INGRESO
-            3: { halign: 'left', cellWidth: 38 }, // CARGO
-            4: { cellWidth: 11 }, 5: { cellWidth: 11 }, 6: { cellWidth: 11 }, 7: { cellWidth: 11 }, 8: { cellWidth: 11 }
-          },
-          margin: { top: 60, bottom: 15 },
-          didDrawPage: (data) => {
-            if (data.pageNumber > 2) {
-              drawHeader(doc);
-            }
-          }
-        });
-
-        doc.save(`Curvas_Certificacion_${selectedStore.id}_${pdfMonth}.pdf`);
-        setShowPdfModal(false);
-      } catch (err) {
-        console.error(err);
-        alert("Error al generar el reporte PDF.");
-      } finally {
-        setIsGeneratingPdf(false);
-      }
-    }, 200);
+    try {
+      const stats = getStoreStatsForMonth(selectedStore.id, pdfMonth);
+      await generateStorePdf(selectedStore, pdfMonth, employees, stats);
+      setShowPdfModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error al generar el reporte PDF.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const selectClasses = "p-3 bg-white border-2 border-slate-100 rounded-xl text-[10px] font-black uppercase text-slate-800 outline-none focus:border-red-500 transition-all shadow-sm";
@@ -467,25 +294,32 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <DetailStatCard icon={<Users className="w-6 h-6" />} label="Estructura Total" value={stats.total} color="blue" />
-          <DetailStatCard icon={<Award className="w-6 h-6" />} label="Certificados" value={stats.approved} color="green" />
-          <DetailStatCard icon={<TrendingUp className="w-6 h-6" />} label="Curva Global" value={`${stats.percent}%`} color="red" />
+          <DetailStatCard icon={<TrendingUp className="w-6 h-6" />} label="Curva Global" value={`${stats.percent}%`} color="dark" />
         </div>
 
 
 
         {/* Widgets de Cumplimiento por Grupo */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {Object.entries(EVALUATION_GROUPS).map(([id, group]) => {
             const groupAvg = stats.groupStats[id]?.avg || 0;
             return (
-              <div key={id} className="bg-white p-5 rounded-[32px] border-2 border-slate-50 shadow-sm flex flex-col items-center text-center hover:border-red-200 transition-all group">
-                <div className={`p-2.5 rounded-2xl mb-3 transition-transform group-hover:scale-110 group-hover:rotate-6 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600 shadow-[inset_0_2px_10px_rgba(16,185,129,0.1)]' : 'bg-red-50 text-red-600 shadow-[inset_0_2px_10px_rgba(227,24,55,0.1)]'}`}>
-                  {GroupIcons[id]}
+              <div key={id} className={`bg-white p-5 rounded-[28px] border flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-lg hover:-translate-y-0.5 transition-all group ${groupAvg >= 90 ? 'hover:border-emerald-200 border-slate-100' : 'hover:border-slate-300 border-slate-100'}`}>
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-2xl transition-transform group-hover:scale-110 shadow-sm shrink-0 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                    {React.cloneElement(GroupIcons[id] as React.ReactElement, { className: 'w-5 h-5' })}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.15em] truncate pr-2">{group.name}</p>
+                    <p className={`text-2xl font-black italic tracking-tighter leading-none mt-1 ${groupAvg >= 90 ? 'text-emerald-700' : 'text-slate-800'}`}>{groupAvg}%</p>
+                  </div>
                 </div>
-                <p className="text-[9px] font-black uppercase text-slate-400 tracking-tight mb-1 truncate w-full">{group.name}</p>
-                <p className={`text-xl font-black italic tracking-tighter ${groupAvg >= 90 ? 'text-emerald-700' : 'text-red-700'}`}>{groupAvg}%</p>
+
+                <div className="w-full md:w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0 mt-2 md:mt-0 relative" title={`${groupAvg}% completado`}>
+                  <div className={`absolute top-0 left-0 bottom-0 transition-all duration-1000 ${groupAvg >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400'}`} style={{ width: `${groupAvg}%` }} />
+                </div>
               </div>
             );
           })}
@@ -630,27 +464,33 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
         {assigned.map(store => {
           const stats = getStoreStatsForMonth(store.id, selectedMonth);
           return (
-            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[32px] shadow-sm hover:shadow-2xl border-2 border-slate-100 hover:border-red-500 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 to-rose-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[24px] shadow-sm hover:shadow-xl border-2 border-slate-100 hover:border-red-500 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden relative">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              <div className="p-7 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-8">
+              <div className="p-5 flex-1 flex flex-col">
+                <div className="flex justify-between items-start mb-5">
                   <div className="flex gap-4">
-                    <div className="w-14 h-14 bg-red-50 rounded-[20px] flex shrink-0 items-center justify-center text-red-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                      <Store className="w-7 h-7" />
+                    <div className="w-12 h-12 bg-red-50 rounded-[16px] flex shrink-0 items-center justify-center text-red-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                      <Store className="w-6 h-6" />
                     </div>
                     <div className="min-w-0 pr-2">
-                      <h3 className="font-black text-slate-900 text-xl uppercase tracking-tighter leading-none italic group-hover:text-red-700 transition-colors truncate">{store.name}</h3>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3 text-red-400 shrink-0" /> {store.region} • {store.zone}</p>
+                      <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter leading-none italic group-hover:text-red-700 transition-colors truncate">{store.name}</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3 text-red-400 shrink-0" /> {store.region} • {store.zone}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-auto">
-                  <div className="bg-slate-50 p-4 rounded-[20px] border border-slate-100 flex flex-col items-center justify-center group-hover:bg-rose-50/50 transition-colors">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Personal de Tienda</p>
-                    <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">
-                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase ml-1">Personas</span>
+                <div className="mt-auto grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-3.5 rounded-[16px] border border-slate-100 flex flex-col items-center justify-center group-hover:bg-rose-50/50 transition-colors">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Personal</p>
+                    <p className="text-xl font-black text-slate-800 tracking-tighter leading-none">
+                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase ml-0.5">Pers.</span>
+                    </p>
+                  </div>
+                  <div className={`p-3.5 rounded-[16px] border flex flex-col items-center justify-center transition-colors ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-100/50' : 'bg-slate-900 border-slate-800 group-hover:bg-slate-800'}`}>
+                    <p className={`text-[8px] font-black uppercase tracking-widest mb-1 text-center ${stats.percent >= 90 ? 'text-emerald-600' : 'text-slate-400'}`}>Curva Global</p>
+                    <p className={`text-xl font-black tracking-tighter leading-none ${stats.percent >= 90 ? 'text-emerald-700' : 'text-white'}`}>
+                      {stats.percent}%
                     </p>
                   </div>
                 </div>
@@ -665,30 +505,34 @@ const MyStores: React.FC<MyStoresProps> = ({ user, restaurants, employees, selec
 
 const DetailStatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, color: string }> = ({ icon, label, value, color }) => {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    red: 'bg-red-50 text-red-600 border-red-100'
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    slate: 'bg-slate-50 text-slate-700 border-slate-200',
+    dark: 'bg-slate-900 text-white border-slate-800 shadow-xl'
   };
 
   const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
 
   return (
-    <div className={`bg-white p-6 rounded-[32px] border-2 shadow-sm flex flex-col transition-transform hover:scale-[1.03] ${colorMap[color]}`}>
-      <div className="flex items-center space-x-5 mb-4">
-        <div className={`p-4 rounded-2xl bg-white shadow-lg`}>{icon}</div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{label}</p>
-          <h4 className="text-3xl font-black tracking-tighter leading-none mt-1">{value}</h4>
+    <div className={`p-6 md:p-8 rounded-[32px] border flex flex-col justify-center transition-transform hover:-translate-y-1 ${colorMap[color]}`}>
+      <div className="flex items-center space-x-5">
+        <div className={`p-4 rounded-2xl shadow-sm ring-1 ${color === 'dark' ? 'bg-slate-800 text-slate-300 ring-white/10' : 'bg-white ring-black/5'}`}>{React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}</div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{label}</p>
+          <div className="flex items-baseline gap-3 mt-1">
+            <h4 className="text-3xl font-black tracking-tighter leading-none truncate">{value}</h4>
+            {label.includes('Curva') && (
+              <div className={`w-20 h-1.5 rounded-full overflow-hidden ${color === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+                <div
+                  className={`h-full transition-all duration-1000 ${numericValue >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400'}`}
+                  style={{ width: `${numericValue}%` }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      {label.includes('Curva') && (
-        <div className="w-full bg-black/5 h-2 rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-1000 ${numericValue >= 90 ? 'bg-emerald-500' : 'bg-red-500'}`}
-            style={{ width: `${numericValue}%` }}
-          />
-        </div>
-      )}
     </div>
   );
 };
