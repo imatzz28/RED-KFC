@@ -487,7 +487,7 @@ const MyStores: React.FC = () => {
                       {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase ml-0.5">Pers.</span>
                     </p>
                   </div>
-                  <div className={`p-3.5 rounded-[16px] border flex flex-col items-center justify-center transition-colors ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-100/50' : 'bg-slate-900 border-slate-800 group-hover:bg-slate-800'}`}>
+                  <div className={`p-3.5 rounded-[16px] border flex flex-col items-center justify-center transition-colors ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-100/50' : 'bg-slate-800 border-slate-700 group-hover:bg-slate-700'}`}>
                     <p className={`text-[8px] font-black uppercase tracking-widest mb-1 text-center ${stats.percent >= 90 ? 'text-emerald-600' : 'text-slate-400'}`}>Curva Global</p>
                     <p className={`text-xl font-black tracking-tighter leading-none ${stats.percent >= 90 ? 'text-emerald-700' : 'text-white'}`}>
                       {stats.percent}%
@@ -509,7 +509,7 @@ const DetailStatCard: React.FC<{ icon: React.ReactNode, label: string, value: st
     green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     red: 'bg-red-50 text-red-700 border-red-100',
     slate: 'bg-slate-50 text-slate-700 border-slate-200',
-    dark: 'bg-slate-900 text-white border-slate-800 shadow-xl'
+    dark: 'bg-slate-800 text-white border-slate-700 shadow-xl'
   };
 
   const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;

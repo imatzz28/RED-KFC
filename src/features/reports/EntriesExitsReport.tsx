@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Employee, JobTitle, Restaurant } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, Search, HardHat, Crown } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, Search, HardHat, Crown, MapPin } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 // Normaliza texto: minúsculas + sin tildes + sin espacios extra
@@ -223,104 +223,125 @@ const EntriesExitsReport: React.FC = () => {
           <Filter className="w-4 h-4 mr-2 text-red-600" /> Filtros de Movimientos
         </h3>
 
-        {/* ── Todos los filtros en una fila: Año | Mes | Región | Zona | Tienda ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        {/* ── Sección de Filtros Refinada ── */}
+        <div className="flex flex-col xl:flex-row gap-8 mb-10">
+          
+          {/* Grupo: Periodo */}
+          <div className="flex-1 lg:flex-[0.4] bg-slate-50/50 p-5 rounded-3xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1.5 bg-red-50 rounded-lg text-red-600">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selección de Periodo</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Año */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Año</label>
+                <div className="relative">
+                  <select className={sel} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+                    {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
 
-          {/* Año */}
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Año</label>
-            <div className="relative">
-              <select className={sel} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
-                {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* Mes — dropdown multi-selección */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Mes(es)</label>
+                <div className="relative">
+                  <button
+                    onClick={() => setIsMonthDropdownOpen(p => !p)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-white border-2 border-slate-300 rounded-xl text-[11px] font-black text-slate-800 uppercase tracking-widest hover:border-red-400 transition-colors shadow-sm"
+                  >
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">
+                        {selectedMonths.length === 1
+                          ? MONTH_NAMES[parseInt(selectedMonths[0]) - 1]
+                          : `${selectedMonths.length} meses`}
+                      </span>
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isMonthDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsMonthDropdownOpen(false)} />
+                      <div className="absolute top-full mt-2 left-0 w-64 bg-white border-2 border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                        <div className="flex border-b border-slate-100">
+                          <button onClick={() => setSelectedMonths([...ALL_MONTHS])} className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100">Todos</button>
+                          <button onClick={() => setSelectedMonths([ALL_MONTHS[new Date().getMonth()]])} className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors">Actual</button>
+                        </div>
+                        <div className="grid grid-cols-3">
+                          {ALL_MONTHS.map((m, idx) => {
+                            const isSel = selectedMonths.includes(m);
+                            return (
+                              <button key={m} onClick={() => toggleMonth(m)} className={`flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-wide transition-all border-b border-slate-50 ${isSel ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                <div className={`w-3 h-3 rounded border-2 shrink-0 flex items-center justify-center ${isSel ? 'bg-white border-white' : 'border-slate-300'}`}>
+                                  {isSel && <div className="w-1.5 h-1.5 bg-red-600 rounded-sm" />}
+                                </div>
+                                {MONTH_SHORT[idx]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+                          <button onClick={() => setIsMonthDropdownOpen(false)} className="px-4 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-black transition-colors">Aplicar</button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Mes — dropdown multi-selección */}
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
-              <Calendar className="w-3 h-3" /> Mes(es)
-            </label>
-            <div className="relative">
-              <button
-                onClick={() => setIsMonthDropdownOpen(p => !p)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-white border-2 border-slate-300 rounded-xl text-[11px] font-black text-slate-800 uppercase tracking-widest hover:border-red-400 transition-colors shadow-sm"
-              >
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <Calendar className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                  <span className="truncate">
-                    {selectedMonths.length === 1
-                      ? MONTH_NAMES[parseInt(selectedMonths[0]) - 1]
-                      : `${selectedMonths.length} meses`}
-                  </span>
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isMonthDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsMonthDropdownOpen(false)} />
-                  <div className="absolute top-full mt-2 left-0 w-64 bg-white border-2 border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
-                    <div className="flex border-b border-slate-100">
-                      <button onClick={() => setSelectedMonths([...ALL_MONTHS])} className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100">Todos</button>
-                      <button onClick={() => setSelectedMonths([ALL_MONTHS[new Date().getMonth()]])} className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors">Actual</button>
-                    </div>
-                    <div className="grid grid-cols-3">
-                      {ALL_MONTHS.map((m, idx) => {
-                        const isSel = selectedMonths.includes(m);
-                        return (
-                          <button key={m} onClick={() => toggleMonth(m)} className={`flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-wide transition-all border-b border-slate-50 ${isSel ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-                            <div className={`w-3 h-3 rounded border-2 shrink-0 flex items-center justify-center ${isSel ? 'bg-white border-white' : 'border-slate-300'}`}>
-                              {isSel && <div className="w-1.5 h-1.5 bg-red-600 rounded-sm" />}
-                            </div>
-                            {MONTH_SHORT[idx]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
-                      <button onClick={() => setIsMonthDropdownOpen(false)} className="px-4 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-black transition-colors">Aplicar</button>
-                    </div>
-                  </div>
-                </>
-              )}
+          {/* Grupo: Ubicación */}
+          <div className="flex-1 lg:flex-[0.6] bg-slate-50/50 p-5 rounded-3xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
+                <MapPin className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtros de Ubicación</span>
             </div>
-          </div>
 
-          {/* Región */}
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Región</label>
-            <div className="relative">
-              <select className={sel} value={filterRegion} onChange={e => { setFilterRegion(e.target.value); setFilterZone('all'); setFilterStore('all'); }}>
-                <option value="all">Todas</option>
-                {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Región */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Región</label>
+                <div className="relative">
+                  <select className={sel} value={filterRegion} onChange={e => { setFilterRegion(e.target.value); setFilterZone('all'); setFilterStore('all'); }}>
+                    <option value="all">Todas</option>
+                    {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
 
-          {/* Zona */}
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Zona</label>
-            <div className="relative">
-              <select className={sel} value={filterZone} onChange={e => { setFilterZone(e.target.value); setFilterStore('all'); }}>
-                <option value="all">Todas</option>
-                {dynamicZones.map(z => <option key={z} value={z}>{z}</option>)}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
+              {/* Zona */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Zona</label>
+                <div className="relative">
+                  <select className={sel} value={filterZone} onChange={e => { setFilterZone(e.target.value); setFilterStore('all'); }}>
+                    <option value="all">Todas</option>
+                    {dynamicZones.map(z => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
 
-          {/* Tienda */}
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Tienda</label>
-            <div className="relative">
-              <select className={sel} value={filterStore} onChange={e => setFilterStore(e.target.value)}>
-                <option value="all">Todas</option>
-                {dynamicStores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* Tienda */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Tienda</label>
+                <div className="relative">
+                  <select className={sel} value={filterStore} onChange={e => setFilterStore(e.target.value)}>
+                    <option value="all">Todas</option>
+                    {dynamicStores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
