@@ -5,19 +5,28 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, Search, HardHat, Crown } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
-const OPERATIVE_TITLES: string[] = [
-  JobTitle.MIEMBRO_EQUIPO_FULL,
-  JobTitle.MIEMBRO_EQUIPO_ROLEX,
-  JobTitle.DOMICILIARIO,
-  JobTitle.ENTRENADOR,
-];
+// Normaliza texto: minúsculas + sin tildes + sin espacios extra
+const norm = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-const ADMIN_TITLES: string[] = [
-  JobTitle.LIDER_TURNO,
-  JobTitle.SUBGERENTE,
-  JobTitle.GERENTE,
-];
+// Cargos operativos
+const OPERATIVE_KEYS = [
+  'miembro de equipo full',
+  'miembro de equipo rolex',
+  'domiciliario',
+  'entrenador',
+].map(norm);
 
+// Cargos administrativos (incluye variantes reales de BD)
+const ADMIN_KEYS = [
+  'lider de turno',
+  'subgerente',
+  'gerente',
+  'gerente de restaurante',
+  'lider de area',
+].map(norm);
+
+const isOperative = (title: string) => OPERATIVE_KEYS.includes(norm(title));
+const isAdmin = (title: string) => ADMIN_KEYS.includes(norm(title));
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const ALL_MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
@@ -152,7 +161,7 @@ const EntriesExitsReport: React.FC = () => {
       if (e.action === 'RETIRO') map[e.employeeTitle].retiros++;
     });
     return Object.values(map).map(item => {
-      const active = employees.filter(e => e.active && matchesFilters(e.restaurant_id) && e.title === item.cargo).length;
+      const active = employees.filter(e => e.active && matchesFilters(e.restaurant_id) && norm(e.title) === norm(item.cargo)).length;
       return { ...item, active, rotacion: active > 0 ? ((item.retiros / active) * 100).toFixed(1) : '0.0' };
     }).sort((a, b) => (b.ingresos + b.retiros) - (a.ingresos + a.retiros));
   }, [historyEvents, selectedMonthStrs, employees, matchesFilters]);
@@ -163,10 +172,10 @@ const EntriesExitsReport: React.FC = () => {
     const entries = range.filter(e => e.action === 'INGRESO').length;
     const exits = range.filter(e => e.action === 'RETIRO').length;
     const activeInScope = employees.filter(e => e.active && matchesFilters(e.restaurant_id));
-    const exOp = range.filter(e => e.action === 'RETIRO' && OPERATIVE_TITLES.includes(e.employeeTitle as JobTitle)).length;
-    const exAd = range.filter(e => e.action === 'RETIRO' && ADMIN_TITLES.includes(e.employeeTitle as JobTitle)).length;
-    const acOp = activeInScope.filter(e => OPERATIVE_TITLES.includes(e.title as JobTitle)).length;
-    const acAd = activeInScope.filter(e => ADMIN_TITLES.includes(e.title as JobTitle)).length;
+    const exOp = range.filter(e => e.action === 'RETIRO' && isOperative(e.employeeTitle)).length;
+    const exAd = range.filter(e => e.action === 'RETIRO' && isAdmin(e.employeeTitle)).length;
+    const acOp = activeInScope.filter(e => isOperative(e.title)).length;
+    const acAd = activeInScope.filter(e => isAdmin(e.title)).length;
     return {
       entries, exits,
       rotationOperative: acOp > 0 ? ((exOp / acOp) * 100).toFixed(1) : '0.0',
