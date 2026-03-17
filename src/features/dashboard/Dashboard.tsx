@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GradeEntry, Employee, User, Restaurant, UserRole } from '@/types';
+import { GradeEntry, Employee, JobTitle, User, Restaurant, UserRole } from '@/types';
 import { dataService } from '@/services/dataService';
 import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '@/utils/constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
@@ -10,6 +10,20 @@ import * as XLSX from 'xlsx';
 import ExportWorker from '@/workers/exportWorker?worker';
 
 import { useAppStore } from '@/store/useAppStore';
+
+// Clasificación de cargos para rotación operativa vs administrativa
+const OPERATIVE_TITLES: string[] = [
+  JobTitle.MIEMBRO_EQUIPO_FULL,
+  JobTitle.MIEMBRO_EQUIPO_ROLEX,
+  JobTitle.DOMICILIARIO,
+  JobTitle.ENTRENADOR,
+];
+
+const ADMIN_TITLES: string[] = [
+  JobTitle.LIDER_TURNO,
+  JobTitle.SUBGERENTE,
+  JobTitle.GERENTE,
+];
 
 const Dashboard: React.FC = () => {
   const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth } = useAppStore();
@@ -90,7 +104,32 @@ const Dashboard: React.FC = () => {
         p_store_names: storeNames
       });
 
-      return metrics;
+      // Calcular rotaciones operativa/administrativa en cliente
+      // usando los empleados filtrados y el scope de tiendas
+      const scopeIds = storeIds;
+      const scopeEmps = initialEmployees.filter(e => scopeIds.includes(e.restaurant_id.trim().toUpperCase()));
+      const activeInScope = scopeEmps.filter(e => e.active);
+
+      const activeOperative = activeInScope.filter(e => OPERATIVE_TITLES.includes(e.title)).length;
+      const activeAdmin = activeInScope.filter(e => ADMIN_TITLES.includes(e.title)).length;
+
+      // Retiros del mes desde el historial
+      const monthPrefix = selectedMonth;
+      const retrirosOpMonth = activeInScope.filter(e =>
+        (e.history || []).some(h => h.action === 'RETIRO' && h.date.startsWith(monthPrefix)) ||
+        (e.exit_date?.startsWith(monthPrefix) && !e.active)
+      ).filter(e => OPERATIVE_TITLES.includes(e.title)).length;
+
+      const retirosAdminMonth = activeInScope.filter(e =>
+        (e.history || []).some(h => h.action === 'RETIRO' && h.date.startsWith(monthPrefix)) ||
+        (e.exit_date?.startsWith(monthPrefix) && !e.active)
+      ).filter(e => ADMIN_TITLES.includes(e.title)).length;
+
+      return {
+        ...metrics,
+        rotationOperative: activeOperative > 0 ? ((retrirosOpMonth / activeOperative) * 100).toFixed(1) : '0.0',
+        rotationAdmin: activeAdmin > 0 ? ((retirosAdminMonth / activeAdmin) * 100).toFixed(1) : '0.0',
+      };
     },
     staleTime: 60 * 1000
   });
@@ -104,6 +143,8 @@ const Dashboard: React.FC = () => {
     globalProgress: 0,
     rotation: '0.0',
     retention: '0.0',
+    rotationOperative: '0.0',
+    rotationAdmin: '0.0',
     groupAvgs: Object.keys(EVALUATION_GROUPS).map(gid => ({ id: gid, name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name, avg: 0 }))
   };
 
@@ -222,8 +263,20 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard icon={<ArrowUpCircle className="w-5 h-5" />} label="Ingresos" value={stats.entries} color="green" />
           <StatCard icon={<ArrowDownCircle className="w-5 h-5" />} label="Retiros" value={stats.exits} color="red" />
-          <StatCard icon={<RefreshCw className="w-5 h-5" />} label="Rotación" value={`${stats.rotation}%`} color="amber" />
-          <StatCard icon={<UserCheck className="w-5 h-5" />} label="Retención" value={`${stats.retention}%`} color="blue" />
+          <StatCard
+            icon={<RefreshCw className="w-5 h-5" />}
+            label="Rot. Operativa"
+            sublabel="M.Equipo · Domiciliarios · Entrenadores"
+            value={`${stats.rotationOperative}%`}
+            color="amber"
+          />
+          <StatCard
+            icon={<UserCheck className="w-5 h-5" />}
+            label="Rot. Administrativa"
+            sublabel="Líderes · Subgerentes · Gerentes"
+            value={`${stats.rotationAdmin}%`}
+            color="violet"
+          />
         </div>
       </div>
 
@@ -330,12 +383,13 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, color?: string }> = ({ icon, label, value, color = 'gray' }) => {
+const StatCard: React.FC<{ icon: React.ReactNode, label: string, sublabel?: string, value: string | number, color?: string }> = ({ icon, label, sublabel, value, color = 'gray' }) => {
   const colorMap: { [key: string]: string } = {
     red: 'bg-red-50 text-red-600 border-red-100',
     green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
     amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    violet: 'bg-violet-50 text-violet-600 border-violet-100',
     gray: 'bg-slate-50 text-slate-500 border-slate-100'
   };
 
@@ -343,8 +397,9 @@ const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string |
     <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/60 transition-all hover:shadow-md group flex items-center gap-4">
       <div className={`p-3 rounded-xl shrink-0 ${colorMap[color]}`}>{icon}</div>
       <div className="min-w-0">
-        <h4 className="text-xl font-black text-slate-800 tracking-tighter leading-none mb-1 truncate">{value}</h4>
+        <h4 className="text-xl font-black text-slate-800 tracking-tighter leading-none mb-0.5 truncate">{value}</h4>
         <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.1em] leading-none">{label}</p>
+        {sublabel && <p className="text-[7px] text-slate-300 font-bold uppercase tracking-wide leading-none mt-0.5 truncate">{sublabel}</p>}
 
         {label === 'Curva Global' && (
           <div className="w-16 bg-slate-100 h-1 rounded-full overflow-hidden mt-1.5">
