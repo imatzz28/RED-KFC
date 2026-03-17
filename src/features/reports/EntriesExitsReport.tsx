@@ -12,6 +12,7 @@ const norm = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/
 const OPERATIVE_KEYS = [
   'miembro de equipo full',
   'miembro de equipo rolex',
+  'miembro de equipo hrs',
   'domiciliario',
   'entrenador',
 ].map(norm);
