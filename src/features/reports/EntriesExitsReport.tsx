@@ -13,6 +13,9 @@ const OPERATIVE_KEYS = [
   'miembro de equipo full',
   'miembro de equipo rolex',
   'miembro de equipo hrs',
+  'miembro de equipo of. varios',
+  'miembro de equipo fds',
+  'miembro de equipo pt',
   'domiciliario',
   'entrenador',
 ].map(norm);
@@ -129,7 +132,12 @@ const EntriesExitsReport: React.FC = () => {
       restaurantName: string;
     }[] = [];
 
-    const mapTitle = (t: string) => norm(t) === 'miembro de equipo hrs' ? 'Miembro de equipo Rolex' : t;
+    const mapTitle = (t: string): string => {
+      const n = norm(t);
+      if (n === 'miembro de equipo hrs' || n === 'miembro de equipo fds' || n === 'miembro de equipo pt') return JobTitle.MIEMBRO_EQUIPO_ROLEX;
+      if (n === 'miembro de equipo of. varios') return JobTitle.MIEMBRO_EQUIPO_FULL;
+      return t;
+    };
 
     employees.forEach(emp => {
       const displayTitle = mapTitle(emp.title);
@@ -166,7 +174,11 @@ const EntriesExitsReport: React.FC = () => {
     });
     return Object.values(map).map(item => {
       const active = employees.filter(e => {
-        const displayTitle = norm(e.title) === 'miembro de equipo hrs' ? 'Miembro de equipo Rolex' : e.title;
+        const n = norm(e.title);
+        let displayTitle: string = e.title;
+        if (n === 'miembro de equipo hrs' || n === 'miembro de equipo fds' || n === 'miembro de equipo pt') displayTitle = JobTitle.MIEMBRO_EQUIPO_ROLEX;
+        if (n === 'miembro de equipo of. varios') displayTitle = JobTitle.MIEMBRO_EQUIPO_FULL;
+        
         return e.active && matchesFilters(e.restaurant_id) && norm(displayTitle) === norm(item.cargo);
       }).length;
       return { ...item, active, rotacion: active > 0 ? ((item.retiros / active) * 100).toFixed(1) : '0.0' };
