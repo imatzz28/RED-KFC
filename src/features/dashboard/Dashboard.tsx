@@ -104,32 +104,7 @@ const Dashboard: React.FC = () => {
         p_store_names: storeNames
       });
 
-      // Calcular rotaciones operativa/administrativa en cliente
-      // usando los empleados filtrados y el scope de tiendas
-      const scopeIds = storeIds;
-      const scopeEmps = initialEmployees.filter(e => scopeIds.includes(e.restaurant_id.trim().toUpperCase()));
-      const activeInScope = scopeEmps.filter(e => e.active);
-
-      const activeOperative = activeInScope.filter(e => OPERATIVE_TITLES.includes(e.title)).length;
-      const activeAdmin = activeInScope.filter(e => ADMIN_TITLES.includes(e.title)).length;
-
-      // Retiros del mes desde el historial
-      const monthPrefix = selectedMonth;
-      const retrirosOpMonth = activeInScope.filter(e =>
-        (e.history || []).some(h => h.action === 'RETIRO' && h.date.startsWith(monthPrefix)) ||
-        (e.exit_date?.startsWith(monthPrefix) && !e.active)
-      ).filter(e => OPERATIVE_TITLES.includes(e.title)).length;
-
-      const retirosAdminMonth = activeInScope.filter(e =>
-        (e.history || []).some(h => h.action === 'RETIRO' && h.date.startsWith(monthPrefix)) ||
-        (e.exit_date?.startsWith(monthPrefix) && !e.active)
-      ).filter(e => ADMIN_TITLES.includes(e.title)).length;
-
-      return {
-        ...metrics,
-        rotationOperative: activeOperative > 0 ? ((retrirosOpMonth / activeOperative) * 100).toFixed(1) : '0.0',
-        rotationAdmin: activeAdmin > 0 ? ((retirosAdminMonth / activeAdmin) * 100).toFixed(1) : '0.0',
-      };
+      return metrics;
     },
     staleTime: 60 * 1000
   });
@@ -138,13 +113,7 @@ const Dashboard: React.FC = () => {
     totalEmployees: 0,
     approvedCount: 0,
     pendingCount: 0,
-    entries: 0,
-    exits: 0,
     globalProgress: 0,
-    rotation: '0.0',
-    retention: '0.0',
-    rotationOperative: '0.0',
-    rotationAdmin: '0.0',
     groupAvgs: Object.keys(EVALUATION_GROUPS).map(gid => ({ id: gid, name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name, avg: 0 }))
   };
 
@@ -252,32 +221,11 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Panel de Indicadores Principales */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
-          <StatCard icon={<Award className="w-5 h-5" />} label="Certificados" value={stats.approvedCount} color="green" />
-          <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
-          <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={stats.pendingCount} color="red" />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard icon={<ArrowUpCircle className="w-5 h-5" />} label="Ingresos" value={stats.entries} color="green" />
-          <StatCard icon={<ArrowDownCircle className="w-5 h-5" />} label="Retiros" value={stats.exits} color="red" />
-          <StatCard
-            icon={<RefreshCw className="w-5 h-5" />}
-            label="Rot. Operativa"
-            sublabel="M.Equipo · Domiciliarios · Entrenadores"
-            value={`${stats.rotationOperative}%`}
-            color="amber"
-          />
-          <StatCard
-            icon={<UserCheck className="w-5 h-5" />}
-            label="Rot. Administrativa"
-            sublabel="Líderes · Subgerentes · Gerentes"
-            value={`${stats.rotationAdmin}%`}
-            color="violet"
-          />
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
+        <StatCard icon={<Award className="w-5 h-5" />} label="Certificados" value={stats.approvedCount} color="green" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
+        <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={stats.pendingCount} color="red" />
       </div>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">

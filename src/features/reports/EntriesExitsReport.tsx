@@ -3,7 +3,6 @@ import React, { useMemo, useState } from 'react';
 import { Employee, JobTitle, Restaurant } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, Search, HardHat, Crown } from 'lucide-react';
-
 import { useAppStore } from '@/store/useAppStore';
 
 // Clasificación de cargos operativos vs administrativos
@@ -33,40 +32,37 @@ const EntriesExitsReport: React.FC = () => {
   const [filterZone, setFilterZone] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
-  // Multi-month: array of month strings like ['01', '03']
+  // Multi-month selection
   const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [viewDetail, setViewDetail] = useState<'entries' | 'exits' | 'none'>('none');
   const [showCargoModal, setShowCargoModal] = useState(false);
-
-  // Filtro de cargo para el listado detallado
   const [selectedTitleFilter, setSelectedTitleFilter] = useState<string>('all');
-  // Buscador de trabajador
   const [searchPerson, setSearchPerson] = useState('');
 
-  // Derived: set of selected month strings like '2026-03'
+  // Set of selected month strings like '2026-03'
   const selectedMonthStrs = useMemo(() =>
     selectedMonths.map(m => `${selectedYear}-${m}`),
     [selectedYear, selectedMonths]
   );
 
-  // For single-month display (for detail panel header)
   const singleMonthLabel = selectedMonths.length === 1
     ? `${MONTH_NAMES[parseInt(selectedMonths[0]) - 1]} ${selectedYear}`
     : `${selectedMonths.length} meses · ${selectedYear}`;
 
-  // Toggle month selection
   const toggleMonth = (m: string) => {
     setSelectedMonths(prev =>
       prev.includes(m)
-        ? prev.length > 1 ? prev.filter(x => x !== m) : prev // keep at least 1
+        ? prev.length > 1 ? prev.filter(x => x !== m) : prev
         : [...prev, m]
     );
   };
 
   // === FILTROS DINÁMICOS ===
-  const dynamicRegions = useMemo(() => {
-    return Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
-  }, [restaurants]);
+  const dynamicRegions = useMemo(() =>
+    Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort(),
+    [restaurants]
+  );
 
   const dynamicZones = useMemo(() => {
     let base = restaurants;
@@ -81,7 +77,7 @@ const EntriesExitsReport: React.FC = () => {
     return base.sort((a, b) => a.name.localeCompare(b.name));
   }, [restaurants, filterRegion, filterZone]);
 
-  // === LÓGICA DE FILTRADO ===
+  // === MAPA DE RESTAURANTES ===
   const restaurantMap = useMemo(() => {
     const byId = new Map<string, Restaurant>();
     const byName = new Map<string, Restaurant>();
@@ -126,13 +122,21 @@ const EntriesExitsReport: React.FC = () => {
 
   // === RECOLECCIÓN DE EVENTOS (todo el año) ===
   const historyEvents = useMemo(() => {
-    const events: { employeeName: string; employeeTitle: string; month: string; year: string; date: string; action: "INGRESO" | "RETIRO" | "TRASLADO"; restaurantName: string; }[] = [];
+    const events: {
+      employeeName: string;
+      employeeTitle: string;
+      month: string;
+      year: string;
+      date: string;
+      action: 'INGRESO' | 'RETIRO' | 'TRASLADO';
+      restaurantName: string;
+    }[] = [];
 
     employees.forEach(emp => {
-      // --- INGRESOS ---
-      const historyIngresos = (emp.history || []).filter(h => h.action === 'INGRESO' && h.date.startsWith(selectedYear));
-      if (historyIngresos.length > 0) {
-        historyIngresos.forEach(h => {
+      // INGRESOS
+      const histIngresos = (emp.history || []).filter(h => h.action === 'INGRESO' && h.date.startsWith(selectedYear));
+      if (histIngresos.length > 0) {
+        histIngresos.forEach(h => {
           if (matchesFilters(h.restaurantName)) {
             events.push({ ...h, employeeName: emp.name, employeeTitle: emp.title, month: h.date.slice(0, 7), year: h.date.slice(0, 4) });
           }
@@ -141,10 +145,10 @@ const EntriesExitsReport: React.FC = () => {
         events.push({ date: emp.join_date, action: 'INGRESO', restaurantName: emp.restaurant_id, employeeName: emp.name, employeeTitle: emp.title, month: emp.join_date.slice(0, 7), year: emp.join_date.slice(0, 4) });
       }
 
-      // --- RETIROS ---
-      const historyRetiros = (emp.history || []).filter(h => h.action === 'RETIRO' && h.date.startsWith(selectedYear));
-      if (historyRetiros.length > 0) {
-        historyRetiros.forEach(h => {
+      // RETIROS
+      const histRetiros = (emp.history || []).filter(h => h.action === 'RETIRO' && h.date.startsWith(selectedYear));
+      if (histRetiros.length > 0) {
+        histRetiros.forEach(h => {
           if (matchesFilters(h.restaurantName)) {
             events.push({ ...h, employeeName: emp.name, employeeTitle: emp.title, month: h.date.slice(0, 7), year: h.date.slice(0, 4) });
           }
@@ -156,17 +160,15 @@ const EntriesExitsReport: React.FC = () => {
     return events;
   }, [employees, matchesFilters, selectedYear]);
 
-  // === STATS PARA EL RANGO DE MESES SELECCIONADOS ===
+  // === STATS POR CARGO ===
   const statsByCargo = useMemo(() => {
-    const cargoMap: Record<string, { cargo: string, ingresos: number, retiros: number }> = {};
+    const cargoMap: Record<string, { cargo: string; ingresos: number; retiros: number }> = {};
     historyEvents.filter(e => selectedMonthStrs.includes(e.month)).forEach(e => {
-      const groupedTitle = e.employeeTitle;
-      if (!cargoMap[groupedTitle]) cargoMap[groupedTitle] = { cargo: groupedTitle, ingresos: 0, retiros: 0 };
-      if (e.action === 'INGRESO') cargoMap[groupedTitle].ingresos++;
-      if (e.action === 'RETIRO') cargoMap[groupedTitle].retiros++;
+      if (!cargoMap[e.employeeTitle]) cargoMap[e.employeeTitle] = { cargo: e.employeeTitle, ingresos: 0, retiros: 0 };
+      if (e.action === 'INGRESO') cargoMap[e.employeeTitle].ingresos++;
+      if (e.action === 'RETIRO') cargoMap[e.employeeTitle].retiros++;
     });
 
-    // Calcular empleados activos por cargo para la rotación
     return Object.values(cargoMap).map(item => {
       const activeForCargo = employees.filter(e => e.active && matchesFilters(e.restaurant_id) && e.title === item.cargo).length;
       const rotacion = activeForCargo > 0 ? ((item.retiros / activeForCargo) * 100).toFixed(1) : '0.0';
@@ -174,46 +176,50 @@ const EntriesExitsReport: React.FC = () => {
     }).sort((a, b) => (b.ingresos + b.retiros) - (a.ingresos + a.retiros));
   }, [historyEvents, selectedMonthStrs, employees, matchesFilters]);
 
+  // === STATS GENERALES ===
   const monthStats = useMemo(() => {
     const eventsInRange = historyEvents.filter(e => selectedMonthStrs.includes(e.month));
     const entries = eventsInRange.filter(e => e.action === 'INGRESO').length;
     const exits = eventsInRange.filter(e => e.action === 'RETIRO').length;
 
+    // Denominador: activos actuales en el scope
     const activeInScope = employees.filter(e => e.active && matchesFilters(e.restaurant_id));
-    const totalActive = activeInScope.length;
 
-    // Rotación operativa
-    const activeOperative = activeInScope.filter(e => OPERATIVE_TITLES.includes(e.title as JobTitle)).length;
+    // Numerador: retiros del período ya recolectados en historyEvents (incluye inactivos)
     const exitsOperative = eventsInRange.filter(e => e.action === 'RETIRO' && OPERATIVE_TITLES.includes(e.employeeTitle as JobTitle)).length;
-    const rotationOperative = activeOperative > 0 ? ((exitsOperative / activeOperative) * 100).toFixed(1) : '0.0';
-
-    // Rotación administrativa
-    const activeAdmin = activeInScope.filter(e => ADMIN_TITLES.includes(e.title as JobTitle)).length;
     const exitsAdmin = eventsInRange.filter(e => e.action === 'RETIRO' && ADMIN_TITLES.includes(e.employeeTitle as JobTitle)).length;
-    const rotationAdmin = activeAdmin > 0 ? ((exitsAdmin / activeAdmin) * 100).toFixed(1) : '0.0';
+
+    const activeOperative = activeInScope.filter(e => OPERATIVE_TITLES.includes(e.title as JobTitle)).length;
+    const activeAdmin = activeInScope.filter(e => ADMIN_TITLES.includes(e.title as JobTitle)).length;
 
     return {
       entries,
       exits,
-      rotationOperative,
-      rotationAdmin,
-      totalActive,
+      rotationOperative: activeOperative > 0 ? ((exitsOperative / activeOperative) * 100).toFixed(1) : '0.0',
+      rotationAdmin: activeAdmin > 0 ? ((exitsAdmin / activeAdmin) * 100).toFixed(1) : '0.0',
+      totalActive: activeInScope.length,
     };
   }, [historyEvents, selectedMonthStrs, employees, matchesFilters]);
 
-  const yearChartData = useMemo(() => {
-    return MONTH_SHORT.map((name, idx) => {
+  // === CHART ANUAL ===
+  const yearChartData = useMemo(() =>
+    MONTH_SHORT.map((name, idx) => {
       const mStr = `${selectedYear}-${String(idx + 1).padStart(2, '0')}`;
-      const entries = historyEvents.filter(e => e.month === mStr && e.action === 'INGRESO').length;
-      const exits = historyEvents.filter(e => e.month === mStr && e.action === 'RETIRO').length;
-      const isSelected = selectedMonths.includes(String(idx + 1).padStart(2, '0'));
-      return { name, ingresos: entries, retiros: exits, isSelected };
-    });
-  }, [historyEvents, selectedYear, selectedMonths]);
+      return {
+        name,
+        ingresos: historyEvents.filter(e => e.month === mStr && e.action === 'INGRESO').length,
+        retiros: historyEvents.filter(e => e.month === mStr && e.action === 'RETIRO').length,
+        isSelected: selectedMonths.includes(String(idx + 1).padStart(2, '0')),
+      };
+    }),
+    [historyEvents, selectedYear, selectedMonths]
+  );
 
   const availableTitlesForList = useMemo(() => {
-    const events = historyEvents.filter(e => selectedMonthStrs.includes(e.month) && e.action === (viewDetail === 'entries' ? 'INGRESO' : 'RETIRO'));
-    return Array.from(new Set(events.map(e => e.employeeTitle))).sort();
+    const action = viewDetail === 'entries' ? 'INGRESO' : 'RETIRO';
+    return Array.from(new Set(
+      historyEvents.filter(e => selectedMonthStrs.includes(e.month) && e.action === action).map(e => e.employeeTitle)
+    )).sort();
   }, [historyEvents, selectedMonthStrs, viewDetail]);
 
   const filteredHistoryEventsList = useMemo(() => {
@@ -236,8 +242,8 @@ const EntriesExitsReport: React.FC = () => {
           <Filter className="w-4 h-4 mr-2 text-red-600" /> Filtros de Movimientos
         </h3>
 
-        {/* Filtros de región/zona/tienda/año */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Filtros: Año, Región, Zona, Tienda */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="space-y-1.5">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Año</label>
             <div className="relative">
@@ -279,31 +285,71 @@ const EntriesExitsReport: React.FC = () => {
           </div>
         </div>
 
-        {/* Selector multi-mes */}
+        {/* Selector de meses: dropdown desplegable con multi-selección */}
         <div className="mb-8">
-          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-3 block flex items-center gap-1">
-            <Calendar className="w-3 h-3" /> Meses ({selectedMonths.length} seleccionado{selectedMonths.length !== 1 ? 's' : ''})
+          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 flex items-center gap-1">
+            <Calendar className="w-3 h-3" /> Mes(es)
           </label>
-          <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
-            {ALL_MONTHS.map((m, idx) => {
-              const isSelected = selectedMonths.includes(m);
-              return (
-                <button
-                  key={m}
-                  onClick={() => toggleMonth(m)}
-                  className={`py-2 px-1 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all border-2 ${isSelected
-                    ? 'bg-red-600 text-white border-red-600 shadow-md scale-105'
-                    : 'bg-slate-50 text-slate-500 border-transparent hover:border-red-200 hover:bg-red-50 hover:text-red-600'
-                    }`}
-                >
-                  {MONTH_SHORT[idx]}
-                </button>
-              );
-            })}
+          <div className="relative">
+            <button
+              onClick={() => setIsMonthDropdownOpen(p => !p)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-white border-2 border-slate-300 rounded-xl text-[11px] font-black text-slate-800 uppercase tracking-widest hover:border-red-400 transition-colors shadow-sm"
+            >
+              <span className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-red-600 shrink-0" />
+                {selectedMonths.length === 1
+                  ? MONTH_NAMES[parseInt(selectedMonths[0]) - 1]
+                  : `${selectedMonths.length} meses seleccionados`}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isMonthDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsMonthDropdownOpen(false)} />
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white border-2 border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                  {/* Acciones rápidas */}
+                  <div className="flex border-b border-slate-100">
+                    <button
+                      onClick={() => setSelectedMonths([...ALL_MONTHS])}
+                      className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors border-r border-slate-100"
+                    >Todos</button>
+                    <button
+                      onClick={() => setSelectedMonths([ALL_MONTHS[new Date().getMonth()]])}
+                      className="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors"
+                    >Mes Actual</button>
+                  </div>
+                  {/* Grid de meses */}
+                  <div className="grid grid-cols-3">
+                    {ALL_MONTHS.map((m, idx) => {
+                      const isSelected = selectedMonths.includes(m);
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => toggleMonth(m)}
+                          className={`flex items-center gap-2.5 px-4 py-3 text-[10px] font-black uppercase tracking-wide transition-all border-b border-slate-50 ${isSelected ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <div className={`w-3.5 h-3.5 rounded border-2 shrink-0 flex items-center justify-center transition-all ${isSelected ? 'bg-white border-white' : 'border-slate-300'}`}>
+                            {isSelected && <div className="w-1.5 h-1.5 bg-red-600 rounded-sm" />}
+                          </div>
+                          {MONTH_SHORT[idx]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button
+                      onClick={() => setIsMonthDropdownOpen(false)}
+                      className="px-5 py-2 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-black transition-colors"
+                    >Aplicar</button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Tarjetas de métricas — sin retención, con 2 rotaciones */}
+        {/* Tarjetas de métricas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <MetricCard
             icon={<ArrowUpCircle className="w-5 h-5" />}
@@ -335,6 +381,7 @@ const EntriesExitsReport: React.FC = () => {
           />
         </div>
 
+        {/* Análisis y Gráfico */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
             <button
@@ -359,7 +406,9 @@ const EntriesExitsReport: React.FC = () => {
               <TrendingUp className="w-8 h-8 text-red-600 mb-4" />
               <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-1">Resumen del Período</p>
               <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">
-                {monthStats.entries} ingresos y {monthStats.exits} retiros en {singleMonthLabel}. Rotación operativa del <span className="text-amber-600">{monthStats.rotationOperative}%</span> y administrativa del <span className="text-violet-600">{monthStats.rotationAdmin}%</span>.
+                {monthStats.entries} ingresos y {monthStats.exits} retiros en {singleMonthLabel}. Rotación operativa del{' '}
+                <span className="text-amber-600">{monthStats.rotationOperative}%</span> y administrativa del{' '}
+                <span className="text-violet-600">{monthStats.rotationAdmin}%</span>.
               </p>
             </div>
           </div>
@@ -372,15 +421,15 @@ const EntriesExitsReport: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={yearChartData} margin={{ left: -10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false}
-                  tick={(props) => {
-                    const isSelected = yearChartData[props.index]?.isSelected;
-                    return (
-                      <text x={props.x} y={props.y + 10} textAnchor="middle" fontSize={10} fontWeight={900} fill={isSelected ? '#dc2626' : '#64748b'}>
-                        {props.value}
-                      </text>
-                    );
-                  }}
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={(props: any) => (
+                    <text x={props.x} y={props.y + 10} textAnchor="middle" fontSize={10} fontWeight={900} fill={yearChartData[props.index]?.isSelected ? '#dc2626' : '#64748b'}>
+                      {props.value}
+                    </text>
+                  )}
                 />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
                 <Tooltip contentStyle={{ borderRadius: '16px', fontSize: '11px', fontWeight: '900', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
@@ -428,7 +477,7 @@ const EntriesExitsReport: React.FC = () => {
                           <p className="text-[10px] font-black text-slate-400 uppercase mt-0.5 tracking-widest">{total} Movimientos · {item.active} Activos</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6 pr-4">
+                      <div className="flex items-center gap-5 pr-2">
                         <div className="text-center">
                           <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Ingresos</p>
                           <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{item.ingresos}</p>
@@ -455,8 +504,8 @@ const EntriesExitsReport: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-8 bg-slate-50 border-t border-slate-100 text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Rotación = Retiros / Activos por cargo · Cargos operacionales y administrativos</p>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Rotación = Retiros / Activos por cargo</p>
             </div>
           </div>
         </div>
@@ -474,7 +523,6 @@ const EntriesExitsReport: React.FC = () => {
                 Detalle de {viewDetail === 'entries' ? 'Ingresos' : 'Retiros'} — {singleMonthLabel}
               </h3>
             </div>
-
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-52">
                 <Search className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -498,14 +546,16 @@ const EntriesExitsReport: React.FC = () => {
                 </select>
                 <ChevronDown className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <button onClick={() => { setViewDetail('none'); setSearchPerson(''); }} className="p-2 text-slate-400 hover:text-red-600 transition-all"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setViewDetail('none'); setSearchPerson(''); }} className="p-2 text-slate-400 hover:text-red-600 transition-all">
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
           <div className="max-h-[400px] overflow-y-auto no-scrollbar">
             <table className="w-full text-left">
               <thead className="sticky top-0 bg-white shadow-sm z-10">
                 <tr className="border-b border-slate-100">
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha Evento</th>
+                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
                   <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
                   <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tienda / CECO</th>
                   <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cargo</th>
@@ -518,9 +568,7 @@ const EntriesExitsReport: React.FC = () => {
                     <td className="p-5 font-black uppercase italic text-slate-900 text-[11px]">{e.employeeName}</td>
                     <td className="p-5 text-slate-600 font-black uppercase text-[10px]">{e.restaurantName}</td>
                     <td className="p-5">
-                      <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[9px] font-black rounded-lg uppercase">
-                        {e.employeeTitle}
-                      </span>
+                      <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[9px] font-black rounded-lg uppercase">{e.employeeTitle}</span>
                     </td>
                   </tr>
                 ))}
@@ -560,12 +608,12 @@ const MetricCard: React.FC<{
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`p-6 rounded-[28px] border-2 transition-all flex items-center gap-4 text-left ${colorMap[color]} ${onClick ? 'cursor-pointer hover:shadow-lg active:scale-95' : 'cursor-default'}`}
+      className={`p-6 rounded-[28px] border-2 transition-all flex items-center gap-4 text-left w-full ${colorMap[color]} ${onClick ? 'cursor-pointer hover:shadow-lg active:scale-95' : 'cursor-default'}`}
     >
-      <div className={`p-3 rounded-2xl bg-white shadow-sm shrink-0`}>{icon}</div>
+      <div className="p-3 rounded-2xl bg-white shadow-sm shrink-0">{icon}</div>
       <div className="min-w-0">
         <p className="text-[9px] font-black uppercase tracking-widest opacity-60 leading-none">{label}</p>
-        {sublabel && <p className="text-[8px] font-bold text-current opacity-40 uppercase tracking-wide mt-0.5 leading-tight truncate">{sublabel}</p>}
+        {sublabel && <p className="text-[8px] font-bold opacity-40 uppercase tracking-wide mt-0.5 leading-tight truncate">{sublabel}</p>}
         <p className="text-xl font-black tracking-tighter leading-none mt-1">{value}</p>
       </div>
     </button>
