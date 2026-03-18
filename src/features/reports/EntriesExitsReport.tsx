@@ -139,30 +139,65 @@ const EntriesExitsReport: React.FC = () => {
       return t;
     };
 
+    const getStoreLabel = (idOrName: string) => {
+      const store = resolveRestaurant(idOrName);
+      return store ? `${store.id} - ${store.name}` : idOrName;
+    };
+
     employees.forEach(emp => {
       const displayTitle = mapTitle(emp.title);
       const histIn = (emp.history || []).filter(h => h.action === 'INGRESO' && h.date.startsWith(selectedYear));
       if (histIn.length > 0) {
         histIn.forEach(h => {
           if (matchesFilters(h.restaurantName))
-            events.push({ ...h, employeeName: emp.name, employeeTitle: displayTitle, month: h.date.slice(0, 7), year: h.date.slice(0, 4) });
+            events.push({ 
+              ...h, 
+              restaurantName: getStoreLabel(h.restaurantName),
+              employeeName: emp.name, 
+              employeeTitle: displayTitle, 
+              month: h.date.slice(0, 7), 
+              year: h.date.slice(0, 4) 
+            });
         });
       } else if (emp.join_date?.startsWith(selectedYear) && matchesFilters(emp.restaurant_id)) {
-        events.push({ date: emp.join_date, action: 'INGRESO', restaurantName: emp.restaurant_id, employeeName: emp.name, employeeTitle: displayTitle, month: emp.join_date.slice(0, 7), year: emp.join_date.slice(0, 4) });
+        events.push({ 
+          date: emp.join_date, 
+          action: 'INGRESO', 
+          restaurantName: getStoreLabel(emp.restaurant_id), 
+          employeeName: emp.name, 
+          employeeTitle: displayTitle, 
+          month: emp.join_date.slice(0, 7), 
+          year: emp.join_date.slice(0, 4) 
+        });
       }
 
       const histOut = (emp.history || []).filter(h => h.action === 'RETIRO' && h.date.startsWith(selectedYear));
       if (histOut.length > 0) {
         histOut.forEach(h => {
           if (matchesFilters(h.restaurantName))
-            events.push({ ...h, employeeName: emp.name, employeeTitle: displayTitle, month: h.date.slice(0, 7), year: h.date.slice(0, 4) });
+            events.push({ 
+              ...h, 
+              restaurantName: getStoreLabel(h.restaurantName),
+              employeeName: emp.name, 
+              employeeTitle: displayTitle, 
+              month: h.date.slice(0, 7), 
+              year: h.date.slice(0, 4) 
+            });
         });
       } else if (emp.exit_date?.startsWith(selectedYear) && matchesFilters(emp.restaurant_id)) {
-        events.push({ date: emp.exit_date, action: 'RETIRO', restaurantName: emp.restaurant_id, employeeName: emp.name, employeeTitle: displayTitle, month: emp.exit_date.slice(0, 7), year: emp.exit_date.slice(0, 4) });
+        events.push({ 
+          date: emp.exit_date, 
+          action: 'RETIRO', 
+          restaurantName: getStoreLabel(emp.restaurant_id), 
+          employeeName: emp.name, 
+          employeeTitle: displayTitle, 
+          month: emp.exit_date.slice(0, 7), 
+          year: emp.exit_date.slice(0, 4) 
+        });
       }
     });
     return events;
-  }, [employees, matchesFilters, selectedYear]);
+  }, [employees, matchesFilters, resolveRestaurant, selectedYear]);
 
   // ── Stats por cargo ────────────────────────────────────────────────────
   const statsByCargo = useMemo(() => {
