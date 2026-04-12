@@ -162,8 +162,11 @@ export const dataService = {
   _cache: {
     employees: null as Employee[] | null,
     restaurants: null as Restaurant[] | null,
-    grades: null as GradeEntry[] | null,
+    // Mapa keyed: 'storeId::month' -> GradeEntry[]
+    gradesByKey: new Map<string, GradeEntry[]>() as Map<string, GradeEntry[]>,
+    grades: null as GradeEntry[] | null, // backup fallback (notas guardadas localmente)
     gradeIndex: null as Map<string, GradeEntry[]> | null,
+    activeStoreKey: null as string | null,
     summary: null as any[] | null,
     hierarchy: null as HierarchyData | null,
     users: null as User[] | null
@@ -250,33 +253,82 @@ export const dataService = {
   },
 
   loadGradesForStore: async (storeId: string, month: string) => {
+    const monthDate = `${month}-01`;
+    console.log(`[Grades] Cargando notas robustas para tienda: ${storeId}, mes: ${month}`);
+
+    // Utilidad de reintento con backoff exponencial
+    const fetchWithRetry = async (fn: () => Promise<any>, retries = 3): Promise<any> => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await fn();
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          const delay = 300 * Math.pow(2, i); // 300ms, 600ms, 1200ms
+          console.warn(`[Grades] Reintento ${i + 1}/${retries} en ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    };
+
     try {
-      const monthDate = `${month}-01`;
-      console.log(`[BigData] Cargando detalle quirúrgico para tienda: ${storeId}`);
+      // 1. Obtener empleados activos de esta tienda
+      const storeEmployees = (dataService._cache.employees || []).filter(
+        e => e.restaurant_id.trim().toUpperCase() === storeId.trim().toUpperCase()
+      );
+      const employeeIds = storeEmployees.map(e => String(e.id).trim());
 
-      // Solo cargamos las notas de ESTA tienda y ESTE mes (herencia incluida via lte si es necesario)
-      const rawGrades = await dataService.supabaseFetchAll('grades', `?restaurant_id=eq.${storeId}&month=lte.${monthDate}`);
+      // 2. Fetch A: Por restaurant_id (el path normal)
+      const fetchByStore = () => dataService.supabaseFetchAll(
+        'grades',
+        `?restaurant_id=eq.${storeId}&month=lte.${monthDate}`
+      );
 
-      const grades: GradeEntry[] = (rawGrades || []).map((g: any) => ({
+      // 3. Fetch B: Por employee IDs (seguro ante diferencias de formato de CECO)
+      const fetchByEmployees = async () => {
+        if (employeeIds.length === 0) return [];
+        // Supabase 'in' filter: ?employee_id=in.(id1,id2,...)
+        const inFilter = `(${employeeIds.join(',')})` ;
+        return dataService.supabaseFetchAll(
+          'grades',
+          `?employee_id=in.${inFilter}&month=lte.${monthDate}`
+        );
+      };
+
+      // 4. Ejecutar ambos fetches en paralelo con retry
+      const [byStore, byEmployee] = await Promise.all([
+        fetchWithRetry(fetchByStore),
+        fetchWithRetry(fetchByEmployees)
+      ]);
+
+      // 5. Deduplicar resultados: usar clave employee_id+month+group+category
+      const dedupeMap = new Map<string, any>();
+      const mergeRaw = [...(byStore || []), ...(byEmployee || [])];
+      mergeRaw.forEach((g: any) => {
+        const key = `${g.employee_id}|${g.month}|${g.group}|${g.category}`;
+        dedupeMap.set(key, g);
+      });
+
+      const grades: GradeEntry[] = Array.from(dedupeMap.values()).map((g: any) => ({
         employeeId: String(g.employee_id).trim(),
-        restaurantId: String(g.restaurant_id || '').trim(),
+        restaurantId: String(g.restaurant_id || storeId).trim(),
         month: g.month,
         group: g.group,
         category: g.category,
         score: g.score
       }));
 
-      const currentGrades = dataService._cache.grades || [];
-      // Filtrar para no duplicar si el usuario recarga la misma tienda
-      const filtered = currentGrades.filter(g => g.restaurantId !== storeId);
-      const updated = [...filtered, ...grades];
-
-      dataService._cache.grades = updated;
-      dataService._cache.gradeIndex = null;
-      return updated;
+      // 6. Guardar en caché keyed por tienda+mes (totalmente aislado)
+      const cacheKey = `${storeId.trim().toUpperCase()}::${month}`;
+      dataService._cache.gradesByKey.set(cacheKey, grades);
+      dataService._cache.activeStoreKey = cacheKey;
+      dataService._cache.gradeIndex = null; // Invalidar índice para que se reconstruya
+      console.log(`[Grades] ${grades.length} notas (únicas: ${dedupeMap.size}) guardadas en clave: ${cacheKey}`);
+      return grades;
     } catch (e) {
-      console.error("Error en carga quirúrgica de tienda:", e);
-      return [];
+      console.error('[Grades] Error crítico en carga de tienda:', e);
+      // Retornar el bucket existente si ya había algo cargado
+      const cacheKey = `${storeId.trim().toUpperCase()}::${month}`;
+      return dataService._cache.gradesByKey.get(cacheKey) || [];
     }
   },
 
@@ -289,6 +341,11 @@ export const dataService = {
   },
 
   getGrades: (): GradeEntry[] => {
+    // Retorna las notas activas del key actual (tienda+mes) si existen, o el fallback de notas locales
+    const key = dataService._cache.activeStoreKey;
+    if (key && dataService._cache.gradesByKey.has(key)) {
+      return dataService._cache.gradesByKey.get(key)!;
+    }
     return dataService._cache.grades || [];
   },
 
@@ -311,30 +368,20 @@ export const dataService = {
 
   getEffectiveGrades: (employeeId: string, upToMonth: string): GradeEntry[] => {
     const gradeIndex = dataService.getGradeIndex();
-    const empGradesRaw = gradeIndex.get(employeeId) || [];
-
-    // Si no hay notas históricas pero hay un resumen cargado, 
-    // podríamos intentar reconstruir notas desde el resumen si es el mes actual.
-    // Pero aquí priorizamos la herencia real del historial de notas.
+    const empGradesRaw = gradeIndex.get(String(employeeId).trim()) || [];
 
     const empGrades = empGradesRaw.filter(g => {
       const gradeMonth = g.month ? g.month.substring(0, 7) : '';
       if (gradeMonth > upToMonth) return false;
-
-      // GRUPO D: Solo vigente si es del mismo mes (No hereda)
-      if (g.group === 'D' && gradeMonth !== upToMonth) return false;
-
+      // Grupos no heredables: solo valen para su propio mes
+      if ((g.group === 'D' || g.group === 'F') && gradeMonth !== upToMonth) return false;
       return true;
     });
 
     const latestMap = new Map<string, GradeEntry>();
-
-    // Ordenar por fecha para asegurar que la última nota pise a las anteriores
     const sorted = [...empGrades].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
-
     sorted.forEach(g => {
-      const key = `${g.group}-${g.category}`;
-      latestMap.set(key, g);
+      latestMap.set(`${g.group}-${g.category}`, g);
     });
 
     return Array.from(latestMap.values());

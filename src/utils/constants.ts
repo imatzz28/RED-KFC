@@ -14,11 +14,15 @@ export const EVALUATION_GROUPS = {
   },
   'C': {
     name: 'All-Star',
-    categories: ['Equipos', 'Producción', 'Servicio', 'Ensamble', 'Domicilios', 'Heladería']
+    categories: ['All-Star']
   },
   'D': {
-    name: 'Plan de Capacitación y SST',
-    categories: ['Guías Plan de Capacitación', 'Guías de SST']
+    name: 'Plan de Capacitación',
+    categories: ['Guías Plan de Capacitación']
+  },
+  'F': {
+    name: 'SST',
+    categories: ['Guías de SST']
   },
   'E': {
     name: 'The Vault',

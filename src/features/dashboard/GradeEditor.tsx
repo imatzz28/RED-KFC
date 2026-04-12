@@ -4,7 +4,7 @@ import { Employee, GradeEntry } from '@/types';
 import { EVALUATION_GROUPS } from '@/utils/constants';
 import { dataService } from '@/services/dataService';
 // Added MapPin to the imports from lucide-react
-import { X, Save, User, Calendar, GraduationCap, Star, Trophy, ClipboardCheck, Vault, Lock, RefreshCw, BookOpen, ArrowUp, ArrowDown, Repeat, History, Clock, MapPin } from 'lucide-react';
+import { X, Save, User, Calendar, GraduationCap, Star, Trophy, ClipboardCheck, Vault, Lock, RefreshCw, BookOpen, ArrowUp, ArrowDown, Repeat, History, Clock, MapPin, Activity } from 'lucide-react';
 
 interface GradeEditorProps {
   employee: Employee;
@@ -19,6 +19,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
   'C': <Trophy className="w-5 h-5" />,
   'D': <ClipboardCheck className="w-5 h-5" />,
   'E': <Vault className="w-5 h-5" />,
+  'F': <Activity className="w-5 h-5" />,
 };
 
 const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) => {
@@ -85,13 +86,10 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
     }
   };
 
-  // Función para obtener nombres dinámicos de categorías del Grupo D
   const getCategoryName = (groupId: string, defaultName: string, index: number) => {
-    if (groupId === 'D') {
-      const cfg = hierarchy.groupDConfig?.[month];
-      if (index === 0) return cfg?.cat1 || "Guías Plan de Capacitación";
-      if (index === 1) return cfg?.cat2 || "Guías de SST";
-    }
+    const cfg = hierarchy.groupDConfig?.[month];
+    if (groupId === 'D') return cfg?.cat1 || "Guías Plan de Capacitación";
+    if (groupId === 'F') return cfg?.cat2 || "Guías de SST";
     return defaultName;
   };
 

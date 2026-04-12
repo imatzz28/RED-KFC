@@ -18,6 +18,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
   'C': <Trophy className="w-4 h-4" />,
   'D': <ClipboardCheck className="w-4 h-4" />,
   'E': <Vault className="w-4 h-4" />,
+  'F': <Activity className="w-4 h-4" />,
 };
 
 
@@ -35,12 +36,23 @@ const MyStores: React.FC = () => {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfMonth, setPdfMonth] = useState(selectedMonth);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isLoadingGrades, setIsLoadingGrades] = useState(false);
+  const [gradeVersion, setGradeVersion] = useState(0); // Trigger re-render tras carga async
 
   React.useEffect(() => {
     if (selectedStore) {
+      // Activar la clave del bucket correcto de forma SINCRÓNICA
+      // para que cualquier render que ocurra durante la carga apunte al store+mes correcto
+      const cacheKey = `${selectedStore.id.trim().toUpperCase()}::${selectedMonth}`;
+      dataService._cache.activeStoreKey = cacheKey;
+      dataService._cache.gradeIndex = null;
+
+      setIsLoadingGrades(true);
       dataService.loadGradesForStore(selectedStore.id, selectedMonth).then(() => {
         onUpdate();
-      });
+        setGradeVersion(v => v + 1); // Fuerza re-computacion de efectivos
+        setIsLoadingGrades(false);
+      }).catch(() => setIsLoadingGrades(false));
     }
   }, [selectedStore, selectedMonth]);
 
@@ -164,7 +176,7 @@ const MyStores: React.FC = () => {
         }
       };
     });
-  }, [assigned, employees, selectedMonth]);
+  }, [assigned, employees, selectedMonth, gradeVersion]);
 
   const getStoreStatsForMonth = (storeId: string, month: string) => {
     // Si es el mes seleccionado, usamos la versión memoizada
@@ -326,12 +338,26 @@ const MyStores: React.FC = () => {
         </div>
 
 
-        <div className="bg-white rounded-[32px] md:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-[32px] md:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden relative">
           <div className="p-6 md:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
             <h3 className="text-[10px] font-black uppercase italic tracking-widest flex items-center">
               <Activity className="w-4 h-4 mr-2 text-red-600" /> Registro de Notas
             </h3>
           </div>
+
+          {/* Overlay bloqueador durante carga */}
+          {isLoadingGrades && (
+            <div className="absolute inset-0 z-10 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4 rounded-[32px] md:rounded-[40px]">
+              <div className="p-5 bg-slate-900 rounded-3xl shadow-2xl flex items-center gap-4">
+                <RefreshCw className="w-5 h-5 text-red-500 animate-spin" />
+                <div>
+                  <p className="text-[11px] font-black text-white uppercase tracking-widest leading-none">Cargando historial de notas</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide mt-1.5">Sincronizando con la base de datos...</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>

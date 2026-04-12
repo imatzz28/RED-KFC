@@ -173,7 +173,7 @@ export const generateStorePdf = async (
                             emp.name.toUpperCase(),
                             emp.join_date,
                             emp.title.toUpperCase(),
-                            getScore('AK'), getScore('A'), getScore('B'), getScore('C'), getScore('D'), getScore('E')
+                            getScore('AK'), getScore('A'), getScore('B'), getScore('C'), getScore('D'), getScore('F'), getScore('E')
                         ];
                     });
 
@@ -189,7 +189,7 @@ export const generateStorePdf = async (
 
                 autoTable(doc, {
                     startY: startTableY,
-                    head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'AKAD', 'BAS.', 'STAR', 'ALLS.', 'SST', 'VAUL.']],
+                    head: [['ID', 'NOMBRE', 'INGRESO', 'CARGO', 'AKAD', 'BAS.', 'STAR', 'ALLS.', 'P. CAP', 'SST', 'VAUL.']],
                     body: tableData,
                     theme: 'grid',
                     styles: {
@@ -203,11 +203,11 @@ export const generateStorePdf = async (
                     headStyles: { fillColor: [227, 24, 55], textColor: 255, fontStyle: 'bold' },
                     alternateRowStyles: { fillColor: [252, 252, 252] },
                     columnStyles: {
-                        0: { cellWidth: 25 },
-                        1: { halign: 'left', cellWidth: 60 },
-                        2: { cellWidth: 22 },
-                        3: { halign: 'left', cellWidth: 50 },
-                        4: { cellWidth: 15 }, 5: { cellWidth: 15 }, 6: { cellWidth: 15 }, 7: { cellWidth: 15 }, 8: { cellWidth: 15 }, 9: { cellWidth: 15 }
+                        0: { cellWidth: 23 },
+                        1: { halign: 'left', cellWidth: 58 },
+                        2: { cellWidth: 20 },
+                        3: { halign: 'left', cellWidth: 48 },
+                        4: { cellWidth: 14 }, 5: { cellWidth: 14 }, 6: { cellWidth: 14 }, 7: { cellWidth: 14 }, 8: { cellWidth: 14 }, 9: { cellWidth: 14 }, 10: { cellWidth: 14 }
                     },
                     margin: { top: 18, bottom: 2, left: 25, right: 25 },
                     pageBreak: 'auto', // Cambiado a 'auto' para que si falla por 1mm no salte TODA la tabla

@@ -19,7 +19,7 @@ self.onmessage = (e) => {
     } = e.data;
 
     try {
-        const restaurantMap = new Map(restaurants.map((r: any) => [r.id, r]));
+        const restaurantMap = new Map<string, any>(restaurants.map((r: any) => [r.id, r]));
         const gradeIndex = new Map<string, any[]>();
 
         if (exportConfig.includeDetails) {
@@ -29,7 +29,7 @@ self.onmessage = (e) => {
             });
         }
 
-        const summaryMap = new Map(summaries.map((s: any) => [String(s.employee_id).trim(), s]));
+        const summaryMap = new Map<string, any>(summaries.map((s: any) => [String(s.employee_id).trim(), s]));
 
         const searchLower = (searchPerson || '').toLowerCase();
         const isCoordinator = userRole === 'COORDINATOR';
@@ -84,11 +84,9 @@ self.onmessage = (e) => {
 
                         gConfig.categories.forEach((cat: string, index: number) => {
                             let catName = cat;
-                            if (gid === 'D') {
-                                const cfg = hierarchy?.groupDConfig?.[selectedMonth];
-                                if (index === 0) catName = cfg?.cat1 || "Guías Plan de Capacitación";
-                                if (index === 1) catName = cfg?.cat2 || "Guías de SST";
-                            }
+                            const cfg = hierarchy?.groupDConfig?.[selectedMonth];
+                            if (gid === 'D') catName = cfg?.cat1 || "Guías Plan de Capacitación";
+                            if (gid === 'F') catName = cfg?.cat2 || "Guías de SST";
                             const grade = gGrades.find(g => g.category === cat);
                             dynamicColumns[`[${gConfig.name}] ${catName}`] = grade ? `${grade.score}%` : '0%';
                         });
