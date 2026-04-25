@@ -28,3 +28,4 @@ export default tseslint.config(
     ignores: ["dist/", "eslint.config.js"],
   }
 );
+
