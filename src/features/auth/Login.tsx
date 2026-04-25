@@ -38,18 +38,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-red-600 rounded-full blur-[120px] opacity-20" />
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-96 h-96 bg-red-600 rounded-full blur-[120px] opacity-10" />
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        backgroundColor: '#e60000',
+        backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 60px, transparent 60px, transparent 120px)'
+      }}
+    >
+      {/* Background Decor - Removed the red blur as the background is already red, we can add a dark vignette or keep it clean */}
+      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-black rounded-full blur-[120px] opacity-20" />
+      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-96 h-96 bg-black rounded-full blur-[120px] opacity-10" />
 
       <div className="bg-white p-8 md:p-12 rounded-[48px] shadow-2xl w-full max-w-md relative z-10 border border-white/20">
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 bg-red-50 rounded-[28px] flex items-center justify-center mb-6 shadow-xl shadow-red-50 transition-transform hover:rotate-6">
-            <GraduationCap className="text-red-600 w-10 h-10" />
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-40 h-40 flex items-center justify-center mb-0 transition-transform hover:scale-105">
+            <img src="/logo_red.png" alt="RED Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Curvas EX</h1>
-          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-2">KFC Management System</p>
+          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] text-center">RED de Entrenamiento y Desempeño</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -94,7 +99,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </form>
 
         <div className="mt-12 pt-8 border-t border-slate-50 text-center">
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">© 2024 Curvas EX KFC - Cloud Core v2.0</p>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">© 2026 RED KFC - A2M LABS</p>
         </div>
       </div>
     </div>

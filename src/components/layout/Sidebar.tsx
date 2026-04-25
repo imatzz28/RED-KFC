@@ -19,10 +19,9 @@ const Sidebar: React.FC = () => {
 
   return (
     <aside className={sidebarClasses}>
-      <div className="p-6 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center space-x-3">
-          < GraduationCap className="w-8 h-8 text-red-500" />
-          <span className="text-xl font-bold tracking-tight italic uppercase">Curvas EX</span>
+      <div className="px-4 pt-0 pb-2 flex items-center justify-between border-b border-slate-800">
+        <div className="flex items-center -mt-2">
+          <img src="/logo_horizontal.png" alt="RED Logo" className="h-32 w-auto object-contain" />
         </div>
         <button
           onClick={() => setIsOpen(false)}
@@ -32,7 +31,7 @@ const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 mt-4">
+      <nav className="flex-1 px-4 py-2 space-y-2">
         <Link
           to="/dashboard"
           onClick={() => setIsOpen(false)}
