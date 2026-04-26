@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { UserRole } from '@/types';
-import { LayoutDashboard, ShieldAlert, LogOut, GraduationCap, X, Store, ArrowUpDown, Settings } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, LogOut, GraduationCap, X, Store, ArrowUpDown, Settings, BookUser } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { useAppStore } from '@/store/useAppStore';
@@ -61,6 +61,18 @@ const Sidebar: React.FC = () => {
           >
             <ArrowUpDown className="w-5 h-5" />
             <span className="font-bold text-sm uppercase tracking-tight">Ingresos y Retiros</span>
+          </Link>
+        )}
+
+        {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
+          <Link
+            to="/banca"
+            onClick={() => setIsOpen(false)}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'banca' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+          >
+            <BookUser className="w-5 h-5" />
+            <span className="font-bold text-sm uppercase tracking-tight">Banca</span>
           </Link>
         )}
 

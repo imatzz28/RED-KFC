@@ -1,5 +1,5 @@
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -169,7 +169,8 @@ export const dataService = {
     activeStoreKey: null as string | null,
     summary: null as any[] | null,
     hierarchy: null as HierarchyData | null,
-    users: null as User[] | null
+    users: null as User[] | null,
+    banca: null as BancaData | null
   },
 
   initLocalCache: async () => {
@@ -180,6 +181,7 @@ export const dataService = {
       dataService._cache.summary = (await localforage.getItem<any[]>('la_akademia_summary')) || [];
       dataService._cache.hierarchy = (await localforage.getItem<HierarchyData>('la_akademia_hierarchy')) || { lockedMonths: [], regions: [] };
       dataService._cache.users = (await localforage.getItem<User[]>('la_akademia_users')) || [];
+      dataService._cache.banca = (await localforage.getItem<BancaData>('la_akademia_banca')) || { assignments: [] };
       dataService._cache.gradeIndex = null;
     } catch (e) {
       console.error("Error inicializando caché localforage:", e);
@@ -188,13 +190,12 @@ export const dataService = {
 
   loadAllFromCloud: async () => {
     try {
-      // Optimizamos: No cargamos TODAS las notas de la historia para evitar saturar memoria.
-      // Las notas se cargarán bajo demanda por mes.
-      const [employees, restaurants, hierarchy, users] = await Promise.all([
+      const [employees, restaurants, hierarchy, users, banca] = await Promise.all([
         dataService.supabaseFetchAll('employees'),
         dataService.supabaseFetchAll('restaurants'),
         dataService.supabaseFetch('hierarchy').catch(() => []),
-        dataService.supabaseFetchAll('users').catch(() => [])
+        dataService.supabaseFetchAll('users').catch(() => []),
+        dataService.supabaseFetch('banca').catch(() => [])
       ]);
 
       await Promise.all([
@@ -207,11 +208,15 @@ export const dataService = {
       const cloudHierarchy = (hierarchy && (hierarchy as any)[0]?.data) ? (hierarchy as any)[0].data : defaultHierarchy;
       await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
 
-      // Re-fill local memory cache instantly after cloud sync
+      const defaultBanca: BancaData = { assignments: [] };
+      const cloudBanca: BancaData = (banca && (banca as any)[0]?.data) ? (banca as any)[0].data : defaultBanca;
+      await localforage.setItem('la_akademia_banca', cloudBanca);
+
       dataService._cache.employees = (employees as Employee[]) || [];
       dataService._cache.restaurants = (restaurants as Restaurant[]) || [];
       dataService._cache.users = (users as User[]) || [];
       dataService._cache.hierarchy = cloudHierarchy;
+      dataService._cache.banca = cloudBanca;
       dataService._cache.gradeIndex = null;
 
       return true;
@@ -388,6 +393,7 @@ export const dataService = {
   },
 
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
+  getBancaData: (): BancaData => dataService._cache.banca || { assignments: [] },
   getUsers: (): User[] => {
     const local: User[] = dataService._cache.users || [];
     const adminExists = local.some((u: User) => u.username === 'admin');
@@ -396,6 +402,12 @@ export const dataService = {
       return [admin, ...local];
     }
     return local;
+  },
+
+  saveBancaData: async (banca: BancaData) => {
+    await localforage.setItem('la_akademia_banca', banca);
+    dataService._cache.banca = banca;
+    await dataService.supabaseFetch('banca', 'POST', { id: 1, data: banca }, '?on_conflict=id');
   },
 
   saveEmployees: async (employees: Employee[]) => {

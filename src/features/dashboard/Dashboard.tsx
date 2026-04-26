@@ -216,7 +216,7 @@ const Dashboard: React.FC = () => {
           <input type="text" placeholder="ID o Nombre..." value={searchPerson} onChange={(e) => setSearchPerson(e.target.value)} className="w-full p-3 bg-white border-2 border-slate-100 rounded-xl text-xs font-black uppercase text-slate-800" />
         </div>
         <button onClick={() => setShowExportModal(true)} className="w-full flex items-center justify-center space-x-2 px-4 py-3.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">
-          <Download className="w-4 h-4" /> <span>Exportar Excel</span>
+          <Download className="w-4 h-4" /> <span>Generar Reporte</span>
         </button>
       </div>
 

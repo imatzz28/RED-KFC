@@ -8,6 +8,7 @@ import AdminPanel from '@/features/admin/AdminPanel';
 import Header from '@/components/layout/Header';
 import MyStores from '@/features/stores/MyStores';
 import EntriesExitsReport from '@/features/reports/EntriesExitsReport';
+import Banca from '@/features/banca/Banca';
 import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
@@ -66,6 +67,9 @@ const App: React.FC = () => {
             <Route path="/my-stores" element={<MyStores />} />
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/entries-exits" element={<EntriesExitsReport />} />
+            )}
+            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
+              <Route path="/banca" element={<Banca />} />
             )}
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/admin" element={<AdminPanel />} />

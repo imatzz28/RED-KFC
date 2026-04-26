@@ -85,3 +85,24 @@ export interface HierarchyData {
     }[];
   }[];
 }
+
+// ── Banca ──────────────────────────────────────────────────────────────────
+export type Certification = 'GBR' | 'GAR' | 'GER';
+export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador';
+
+export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador'];
+
+export interface StoreLeader {
+  employeeId: string;
+  role: BancaRole;
+  certifications: Certification[];
+}
+
+export interface StoreAssignment {
+  restaurantId: string;
+  members: StoreLeader[];
+}
+
+export interface BancaData {
+  assignments: StoreAssignment[];
+}
