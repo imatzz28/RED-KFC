@@ -623,7 +623,7 @@ const Banca: React.FC = () => {
               </div>
             )}
             {regionsView.map(region => {
-              const allIds = region.zones.flatMap(z => z.restaurantIds);
+              const allIds = region.zones.flatMap(z => z.restaurantIds).filter(id => restaurants.some(r => r.id === id));
               const assigned = countAssigned(allIds);
               return (
                 <button key={region.name} onClick={() => { setView({ level: 'zones', region: region.name }); setSearch(''); }}
@@ -652,7 +652,8 @@ const Banca: React.FC = () => {
         {view.level === 'zones' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {zonesView.map(zone => {
-              const assigned = countAssigned(zone.restaurantIds);
+              const validIds = zone.restaurantIds.filter(id => restaurants.some(r => r.id === id));
+              const assigned = countAssigned(validIds);
               return (
                 <button key={zone.name} onClick={() => { setView({ level: 'stores', region: (view as any).region, zone: zone.name }); setSearch(''); }}
                   className="group text-left bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-red-200 transition-all overflow-hidden">
@@ -661,12 +662,12 @@ const Banca: React.FC = () => {
                       <Users className="w-5 h-5 text-white" />
                     </div>
                     <h3 className="text-sm font-black text-white uppercase tracking-tight">{zone.name}</h3>
-                    <p className="text-[10px] text-white/60 mt-0.5">{zone.restaurantIds.length} tiendas</p>
+                    <p className="text-[10px] text-white/60 mt-0.5">{validIds.length} tiendas</p>
                   </div>
                   <div className="px-4 py-3 flex items-center justify-between">
                     <div>
                       <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Asignadas</p>
-                      <p className="text-xl font-black text-slate-800">{assigned}<span className="text-xs text-slate-300 font-bold">/{zone.restaurantIds.length}</span></p>
+                      <p className="text-xl font-black text-slate-800">{assigned}<span className="text-xs text-slate-300 font-bold">/{validIds.length}</span></p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-red-500 group-hover:translate-x-1 transition-all" />
                   </div>
