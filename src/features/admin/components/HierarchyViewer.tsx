@@ -27,10 +27,12 @@ export const HierarchyViewer: React.FC<Props> = ({ hierarchy, restaurants }) => 
                 <div key={zone.name} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-red-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-black text-slate-800 uppercase italic">{zone.name}</span>
-                    <span className="text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{zone.restaurantIds.length} Tiendas</span>
+                    <span className="text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                      {zone.restaurantIds.filter(rid => restaurants.some(r => r.id === rid)).length} Tiendas
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {zone.restaurantIds.map(rid => {
+                    {zone.restaurantIds.filter(rid => restaurants.some(r => r.id === rid)).map(rid => {
                       const rest = restaurants.find(r => r.id === rid);
                       return (
                         <div key={rid} className="group relative">
