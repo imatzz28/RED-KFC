@@ -554,7 +554,8 @@ const Banca: React.FC = () => {
     const q = search.toLowerCase();
     return zone.restaurantIds.filter(id => {
       const rest = restaurants.find(r => r.id === id);
-      return !q || id.toLowerCase().includes(q) || rest?.name?.toLowerCase().includes(q);
+      if (!rest) return false;
+      return !q || id.toLowerCase().includes(q) || rest.name.toLowerCase().includes(q);
     });
   }, [hierarchy, view, restaurants, search]);
 
