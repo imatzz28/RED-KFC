@@ -3,12 +3,28 @@ import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyDa
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
+import { createClient } from '@supabase/supabase-js';
+
 const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = (import.meta as any).env.VITE_SUPABASE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error("❌ ERROR: Las variables de entorno de Supabase no están configuradas. Verifica tu archivo .env o la configuración de tu hosting.");
 }
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const getAuthHeaders = async (isUpsert: boolean = false) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || SUPABASE_KEY;
+  
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Prefer': isUpsert ? 'return=representation,resolution=merge-duplicates' : 'return=representation'
+  };
+};
 
 
 const parseExcelDate = (serial: number | string) => {
@@ -29,14 +45,10 @@ export const dataService = {
     const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}`;
     const isUpsert = queryParams.includes('on_conflict');
 
+    const headers = await getAuthHeaders(isUpsert);
     const options: RequestInit = {
       method,
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': isUpsert ? 'return=representation,resolution=merge-duplicates' : 'return=representation'
-      }
+      headers
     };
 
     if (body) options.body = JSON.stringify(body, (k, v) => v === undefined ? null : v);
@@ -59,14 +71,18 @@ export const dataService = {
   },
 
   supabaseFetchAll: async (table: string, queryParams: string = ''): Promise<unknown[]> => {
-    // 1. Obtener el conteo total con los filtros aplicados
-    const separator = queryParams ? (queryParams.startsWith('?') ? '&' : '?') : '?';
-    const countUrl = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=id&limit=1`;
+    // 1. Obtener el conteo total con los filtros aplicados (usando HEAD para evitar error de columna id en vistas)
+    const countUrl = `${SUPABASE_URL}/rest/v1/${table}${queryParams}`;
+    const headers = await getAuthHeaders();
 
     const countRes = await fetch(countUrl, {
-      method: 'GET',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'count=exact' }
+      method: 'HEAD',
+      headers: { ...headers, 'Prefer': 'count=exact' }
     });
+
+    if (!countRes.ok) {
+       console.error(`Error al hacer COUNT en ${table}: status ${countRes.status}`);
+    }
 
     const contentRange = countRes.headers.get('content-range');
     let total = 0;
@@ -75,10 +91,15 @@ export const dataService = {
     }
 
     const step = 1000;
+    const separator = queryParams ? (queryParams.startsWith('?') ? '&' : '?') : '?';
+    
     if (total <= step) {
       const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&limit=${step}`;
-      const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-      return res.ok ? await res.json() : [];
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        throw new Error(`FetchAll Error en ${table}: ${await res.text()}`);
+      }
+      return await res.json();
     }
 
     const numChunks = Math.ceil(total / step);
@@ -87,7 +108,7 @@ export const dataService = {
       const from = i * step;
       const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&offset=${from}&limit=${step}`;
       promises.push(
-        fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
+        fetch(url, { headers })
           .then(async r => {
             if (!r.ok) {
               const txt = await r.text();
@@ -108,11 +129,11 @@ export const dataService = {
     // Primero obtenemos el total (count=exact) y la data juntos
     const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&offset=${page * limit}&limit=${limit}`;
 
+    const headers = await getAuthHeaders();
     const res = await fetch(url, {
       method: 'GET',
       headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        ...headers,
         'Prefer': 'count=exact'
       }
     });
@@ -134,13 +155,10 @@ export const dataService = {
 
   supabaseFetchRPC: async (rpcName: string, body: any): Promise<any> => {
     const url = `${SUPABASE_URL}/rest/v1/rpc/${rpcName}`;
+    const headers = await getAuthHeaders();
     const options: RequestInit = {
       method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body)
     };
 
@@ -221,8 +239,23 @@ export const dataService = {
 
       return true;
     } catch (e) {
-      console.error("Error crítico al cargar desde la nube:", e);
+      console.error(e);
       return false;
+    }
+  },
+
+  getLastSettledMonth: async (): Promise<string | null> => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/employee_monthly_summary?select=month&order=month.desc&limit=1`, {
+        method: 'GET',
+        headers
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.length > 0 ? data[0].month : null;
+    } catch {
+      return null;
     }
   },
 
@@ -445,7 +478,6 @@ export const dataService = {
     const normalized = users.map(u => ({
       id: u.id,
       username: u.username,
-      password: u.password || '', // Asegurar que la llave siempre exista
       role: u.role,
       assignedZones: u.assignedZones || [],
       assignedRestaurants: u.assignedRestaurants || [],

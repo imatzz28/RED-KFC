@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User } from '@/types';
-import { dataService } from '@/services/dataService';
+import { User, UserRole } from '@/types';
+import { supabase } from '@/services/dataService';
 import { LogIn, RefreshCw, GraduationCap } from 'lucide-react';
 
 interface LoginProps {
@@ -20,16 +20,50 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      // Intentar sincronizar usuarios antes de loguear por si hay nuevos
-      await dataService.loadAllFromCloud();
-      const users = dataService.getUsers();
-      const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+      const loginEmail = username.includes('@') ? username : `${username}@kfc.co`;
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: password
+      });
 
-      if (user) {
-        onLogin(user);
-      } else {
-        setError('Credenciales incorrectas. Verifica tu usuario y clave.');
+      if (authError || !authData.user) {
+        console.error("Auth Error:", authError);
+        let errorMsg = 'Credenciales incorrectas. Verifica tu usuario y contraseña.';
+        if (authError?.message.includes('Invalid login credentials')) {
+          errorMsg = 'Usuario o contraseña incorrectos.';
+        } else if (authError?.message.includes('Email logins are disabled')) {
+          errorMsg = 'Los accesos están temporalmente deshabilitados.';
+        } else if (authError?.message.includes('rate limit')) {
+          errorMsg = 'Demasiados intentos. Intenta de nuevo más tarde.';
+        }
+        setError(errorMsg);
+        return;
       }
+
+      const baseUsername = username.includes('@') ? username.split('@')[0] : username;
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('username', baseUsername)
+        .single();
+
+      if (profileError || !profileData) {
+        console.error("Profile Error:", profileError);
+        setError('Tu usuario no tiene un perfil asignado en el sistema.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const userData: User = {
+        id: profileData.id,
+        username: profileData.username,
+        role: profileData.role as UserRole,
+        assignedRegions: profileData.assignedRegions || [],
+        assignedZones: profileData.assignedZones || [],
+        assignedRestaurants: profileData.assignedRestaurants || []
+      };
+
+      onLogin(userData);
     } catch { // Captura cualquier error, pero no usamos la variable
       setError('Error de conexión con el servidor. Reintente.');
     } finally {

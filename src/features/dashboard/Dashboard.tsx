@@ -5,7 +5,7 @@ import { GradeEntry, Employee, JobTitle, User, Restaurant, UserRole } from '@/ty
 import { dataService } from '@/services/dataService';
 import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '@/utils/constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText, ArrowUpCircle, ArrowDownCircle, RefreshCw, UserCheck } from 'lucide-react';
+import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText, ArrowUpCircle, ArrowDownCircle, RefreshCw, UserCheck, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ExportWorker from '@/workers/exportWorker?worker';
 
@@ -33,6 +33,7 @@ const Dashboard: React.FC = () => {
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterZone, setFilterZone] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
+  const [dashboardMonth, setDashboardMonth] = useState(selectedMonth);
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportConfig, setExportConfig] = useState({
@@ -92,19 +93,80 @@ const Dashboard: React.FC = () => {
   }, [restaurants, filterRegion, filterZone, filterStore, user]);
 
   const { data: statsMap, isLoading: isLoadingStats } = useQuery({
-    queryKey: ['dashboard-stats', selectedMonth, filterRegion, filterZone, filterStore],
+    queryKey: ['dashboard-stats', dashboardMonth, filterRegion, filterZone, filterStore],
     queryFn: async () => {
       const storeIds = Array.from(scopeStoresSet);
       const storeNames = storeIds.map(id => restaurants.find(r => r.id.trim().toUpperCase() === id)?.name || id);
 
-      const metrics = await dataService.supabaseFetchRPC('get_dashboard_metrics', {
-        p_month_prefix: selectedMonth,
-        p_month_date: `${selectedMonth}-01`,
-        p_store_ids: storeIds,
-        p_store_names: storeNames
+      // Obtenemos resúmenes con herencia (lte) para este mes
+      const monthDate = `${dashboardMonth}-01`;
+      const allSummaries = await dataService.supabaseFetchAll('employee_monthly_summary', `?month=lte.${monthDate}&order=month.desc`);
+      
+      const latestMap = new Map<string, any>();
+      (allSummaries || []).forEach((s: any) => {
+        const empId = String(s.employee_id).trim();
+        if (!latestMap.has(empId)) latestMap.set(empId, s);
       });
 
-      return metrics;
+      // 2. Filtramos empleados válidos (que finalizaron activos en este mes)
+      const monthEndStr = `${dashboardMonth}-31`;
+      const validEmployees = initialEmployees.filter(emp => {
+        if (!storeIds.includes(emp.restaurant_id)) return false;
+        if (!emp.active && emp.exit_date && emp.exit_date <= monthEndStr) return false;
+        return true;
+      });
+
+      // 3. Computamos métricas locales
+      let totalEmployees = validEmployees.length;
+      let approvedCount = 0;
+      let pendingCount = 0;
+      let globalSum = 0;
+      let globalCount = 0;
+
+      const groupTotals: Record<string, { sum: number, count: number }> = {};
+      Object.keys(EVALUATION_GROUPS).forEach(g => groupTotals[g] = { sum: 0, count: 0 });
+
+      validEmployees.forEach(emp => {
+        const empSummary = latestMap.get(emp.id);
+        
+        if (empSummary) {
+          let hasAnyGrade = false;
+          let totalScore = 0;
+          
+          Object.keys(EVALUATION_GROUPS).forEach(gid => {
+            const score = empSummary[`avg_${gid.toLowerCase()}`] || 0;
+            if (score > 0) hasAnyGrade = true;
+            
+            totalScore += score;
+            globalSum += score;
+            
+            groupTotals[gid].sum += score;
+          });
+
+          const avg = Math.round(totalScore / TOTAL_CATEGORIES_COUNT);
+          if (avg >= APPROVAL_THRESHOLD) {
+            approvedCount++;
+          }
+        }
+      });
+
+      pendingCount = totalEmployees - approvedCount;
+      // La curva global promedia el total sobre todos los empleados válidos
+      const globalProgress = totalEmployees > 0 ? Math.round(globalSum / (totalEmployees * TOTAL_CATEGORIES_COUNT)) : 0;
+      
+      const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => ({ 
+        id: gid, 
+        name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name, 
+        avg: totalEmployees > 0 ? Math.round(groupTotals[gid].sum / totalEmployees) : 0 
+      }));
+
+      return {
+        totalEmployees,
+        approvedCount,
+        pendingCount,
+        globalProgress,
+        groupAvgs
+      };
     },
     staleTime: 60 * 1000
   });
@@ -123,7 +185,7 @@ const Dashboard: React.FC = () => {
 
     // Si se requiere detalle, traemos toda la base de datos de notas de ese mes una sola vez
     if (exportConfig.includeDetails) {
-      const raw = await dataService.supabaseFetchAll('grades', `?month=eq.${selectedMonth}-01`);
+      const raw = await dataService.supabaseFetchAll('grades', `?month=eq.${dashboardMonth}-01`);
       allGradesForMonth = (raw || []).map((g: any) => ({
         employeeId: String(g.employee_id).trim(),
         restaurantId: String(g.restaurant_id || '').trim(),
@@ -143,7 +205,7 @@ const Dashboard: React.FC = () => {
       summaries,
       allGradesForMonth,
       exportConfig,
-      selectedMonth,
+      selectedMonth: dashboardMonth,
       filterRegion,
       filterZone,
       filterStore,
@@ -162,7 +224,7 @@ const Dashboard: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Reporte_Akademia_${selectedMonth}.xlsx`;
+        a.download = `Reporte_Akademia_${dashboardMonth}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -187,7 +249,20 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 bg-slate-50/50 -m-8 p-8 min-h-screen">
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 items-end">
+        <div className="space-y-2 col-span-1 md:col-span-2 lg:col-span-1">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Calendar className="w-3 h-3 mr-1 inline" /> Periodo</label>
+          <div className="flex gap-2">
+            <select value={dashboardMonth.split('-')[0]} onChange={(e) => setDashboardMonth(`${e.target.value}-${dashboardMonth.split('-')[1]}`)} className={selectClasses}>
+              {['2023', '2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select value={dashboardMonth.split('-')[1]} onChange={(e) => setDashboardMonth(`${dashboardMonth.split('-')[0]}-${e.target.value}`)} className={selectClasses}>
+              {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((m, idx) => (
+                <option key={m} value={m}>{['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][idx]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         {(user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR) && (
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><MapPin className="w-3 h-3 mr-1 inline" /> Región</label>
@@ -221,11 +296,9 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Panel de Indicadores Principales */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
-        <StatCard icon={<Award className="w-5 h-5" />} label="Certificados" value={stats.approvedCount} color="green" />
         <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
-        <StatCard icon={<XCircle className="w-5 h-5" />} label="Pendientes" value={stats.pendingCount} color="red" />
       </div>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">

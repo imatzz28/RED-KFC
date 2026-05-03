@@ -32,6 +32,8 @@ const MyStores: React.FC = () => {
   const [empSearch, setEmpSearch] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterZone, setFilterZone] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const STORES_PER_PAGE = 12;
 
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfMonth, setPdfMonth] = useState(selectedMonth);
@@ -94,6 +96,17 @@ const MyStores: React.FC = () => {
       return matchSearch && matchRegion && matchZone;
     });
   }, [user, restaurants, storeSearch, filterRegion, filterZone]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [storeSearch, filterRegion, filterZone]);
+
+  const totalPages = Math.ceil(assigned.length / STORES_PER_PAGE);
+  const paginatedStores = useMemo(() => {
+    const startIndex = (currentPage - 1) * STORES_PER_PAGE;
+    return assigned.slice(startIndex, startIndex + STORES_PER_PAGE);
+  }, [assigned, currentPage]);
 
   const storesWithStats = useMemo(() => {
     // Optimización: Agrupar empleados por tienda una sola vez (O(N))
@@ -487,7 +500,7 @@ const MyStores: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {assigned.map(store => {
+        {paginatedStores.map(store => {
           const stats = getStoreStatsForMonth(store.id, selectedMonth);
           return (
             <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[24px] shadow-sm hover:shadow-xl border-2 border-slate-100 hover:border-red-500 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden relative">
@@ -525,6 +538,28 @@ const MyStores: React.FC = () => {
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest border-2 border-slate-100 bg-white hover:border-red-500 hover:text-red-600 disabled:opacity-50 disabled:hover:border-slate-100 disabled:hover:text-slate-800 transition-all"
+          >
+            Anterior
+          </button>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-4">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest border-2 border-slate-100 bg-white hover:border-red-500 hover:text-red-600 disabled:opacity-50 disabled:hover:border-slate-100 disabled:hover:text-slate-800 transition-all"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 };

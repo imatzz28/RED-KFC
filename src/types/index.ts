@@ -10,6 +10,7 @@ export enum JobTitle {
   SUBGERENTE = 'Subgerente',
   LIDER_TURNO = 'Líder de turno',
   ENTRENADOR = 'Entrenador',
+  LICENCIA_EN_CURSO = 'Licencia en Curso',
   MIEMBRO_EQUIPO_FULL = 'Miembro de equipo Full',
   MIEMBRO_EQUIPO_ROLEX = 'Miembro de equipo Rolex',
   DOMICILIARIO = 'Domiciliario'
@@ -28,7 +29,6 @@ export const JobHierarchy: Record<string, number> = {
 export interface User {
   id: string;
   username: string;
-  password?: string;
   role: UserRole;
   assignedZones: string[];
   assignedRestaurants: string[];
@@ -87,10 +87,21 @@ export interface HierarchyData {
 }
 
 // ── Banca ──────────────────────────────────────────────────────────────────
-export type Certification = 'GBR' | 'GAR' | 'GER';
-export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador';
+export type Certification = 'GBR' | 'GAR' | 'GER' | 'EEA';
+export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Licencia en Curso';
 
-export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador'];
+export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Licencia en Curso'];
+
+export interface StoreIdeal {
+  gerentes: number;
+  lideresTurno: number;
+  entrenadores: number;
+}
+
+export interface BancaData {
+  assignments: StoreAssignment[];
+  storeIdeals?: Record<string, StoreIdeal>;
+}
 
 export interface StoreLeader {
   employeeId: string;
@@ -101,8 +112,4 @@ export interface StoreLeader {
 export interface StoreAssignment {
   restaurantId: string;
   members: StoreLeader[];
-}
-
-export interface BancaData {
-  assignments: StoreAssignment[];
 }

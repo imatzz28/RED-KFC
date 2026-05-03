@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { User, UserRole } from '@/types';
 import { Calendar, User as UserIcon, Menu, Lock, X, Shield, LogOut } from 'lucide-react';
 
@@ -7,6 +8,7 @@ import { useAppStore } from '@/store/useAppStore';
 
 const Header: React.FC = () => {
   const { auth, selectedMonth, setSelectedMonth: onMonthChange, setIsSidebarOpen, handleLogout: onLogout } = useAppStore();
+  const location = useLocation();
   const user = auth.user!;
   const onMenuClick = () => setIsSidebarOpen(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -43,23 +45,25 @@ const Header: React.FC = () => {
           <Menu className="w-6 h-6" />
         </button>
 
-        <div className="flex flex-col">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 italic">Periodo Evaluación</label>
-          <div className="relative group flex items-center">
-            <div className="absolute left-3.5 z-10 pointer-events-none p-1.5 bg-red-50 rounded-lg">
-              <Calendar className="w-4 h-4 text-red-600" />
+        {!['/dashboard', '/entries-exits', '/banca', '/admin'].includes(location.pathname) && (
+          <div className="flex flex-col">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 italic">Periodo Evaluación</label>
+            <div className="relative group flex items-center">
+              <div className="absolute left-3.5 z-10 pointer-events-none p-1.5 bg-red-50 rounded-lg">
+                <Calendar className="w-4 h-4 text-red-600" />
+              </div>
+              <input
+                ref={dateInputRef}
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => onMonthChange(e.target.value)}
+                onClick={handleIconClick}
+                className="pl-14 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100 outline-none transition-all cursor-pointer shadow-sm w-44 md:w-52 relative"
+                style={{ colorScheme: 'light' }}
+              />
             </div>
-            <input
-              ref={dateInputRef}
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => onMonthChange(e.target.value)}
-              onClick={handleIconClick}
-              className="pl-14 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100 outline-none transition-all cursor-pointer shadow-sm w-44 md:w-52 relative"
-              style={{ colorScheme: 'light' }}
-            />
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-5">

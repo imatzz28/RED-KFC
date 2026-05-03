@@ -3,17 +3,18 @@ import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
   BancaData, StoreAssignment, StoreLeader, Certification, BancaRole,
-  BANCA_ROLES, Employee
+  BANCA_ROLES, Employee, StoreIdeal
 } from '@/types';
-import { Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown } from 'lucide-react';
+import { Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-const ALL_CERTS: Certification[] = ['GBR', 'GAR', 'GER'];
+const ALL_CERTS: Certification[] = ['EEA', 'GBR', 'GAR', 'GER'];
 
 const CERT_COLORS: Record<Certification, string> = {
   GBR: 'bg-blue-100 text-blue-700 border-blue-200',
-  GAR: 'bg-amber-100 text-amber-700 border-amber-200',
-  GER: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  GAR: 'bg-red-100 text-red-700 border-red-200',
+  GER: 'bg-slate-900 text-white border-slate-900',
+  EEA: 'bg-slate-200 text-slate-700 border-slate-300',
 };
 
 const ROLE_COLORS: Record<BancaRole, string> = {
@@ -21,6 +22,7 @@ const ROLE_COLORS: Record<BancaRole, string> = {
   'Subgerente': 'bg-purple-100 text-purple-700',
   'Líder de turno': 'bg-sky-100 text-sky-700',
   'Entrenador': 'bg-orange-100 text-orange-700',
+  'Licencia en Curso': 'bg-slate-100 text-slate-700',
 };
 
 const emptyAssignment = (restaurantId: string): StoreAssignment => ({ restaurantId, members: [] });
@@ -100,7 +102,13 @@ const MemberRow: React.FC<{
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-800 truncate">{employee?.name ?? leader.employeeId}</p>
-        <p className="text-[10px] text-slate-400 uppercase">{employee?.title} · {employee?.restaurant_id}</p>
+        {employee && (
+          <p className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+            <span className="font-bold uppercase tracking-wide bg-slate-100 px-1.5 py-0.5 rounded">{employee.title}</span>
+            <span className="opacity-50">|</span>
+            <span className="font-mono text-[9px] uppercase tracking-widest">{employee.restaurant_id}</span>
+          </p>
+        )}
       </div>
       <button onClick={onRemove} className="p-1.5 hover:bg-red-50 rounded-lg transition text-slate-300 hover:text-red-500">
         <X className="w-3.5 h-3.5" />
@@ -138,16 +146,18 @@ const EditModal: React.FC<{
   restaurantId: string;
   restaurantName: string;
   initialAssignment: StoreAssignment;
+  initialIdeal?: StoreIdeal;
   allEmployees: Employee[];
   onClose: () => void;
-  onSave: (a: StoreAssignment) => Promise<void>;
-}> = ({ restaurantId, restaurantName, initialAssignment, allEmployees, onClose, onSave }) => {
+  onSave: (a: StoreAssignment, ideal: StoreIdeal) => Promise<void>;
+}> = ({ restaurantId, restaurantName, initialAssignment, initialIdeal, allEmployees, onClose, onSave }) => {
   const [members, setMembers] = useState<StoreLeader[]>([...(initialAssignment.members ?? [])]);
+  const [ideal, setIdeal] = useState<StoreIdeal>(initialIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ restaurantId, members });
+    await onSave({ restaurantId, members }, ideal);
     setSaving(false);
     onClose();
   };
@@ -166,7 +176,22 @@ const EditModal: React.FC<{
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+          <div className="grid grid-cols-3 gap-4 pb-6 border-b border-slate-50">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Gerentes</label>
+              <input type="number" min="0" value={ideal.gerentes} onChange={e => setIdeal({...ideal, gerentes: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Líderes</label>
+              <input type="number" min="0" value={ideal.lideresTurno} onChange={e => setIdeal({...ideal, lideresTurno: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Entrenadores</label>
+              <input type="number" min="0" value={ideal.entrenadores} onChange={e => setIdeal({...ideal, entrenadores: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+            </div>
+          </div>
+
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Agregar persona</p>
             <EmployeeSearch
@@ -216,17 +241,146 @@ const EditModal: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Compliance Summary
+// ─────────────────────────────────────────────────────────────────────────────
+const ComplianceSummary: React.FC<{
+  title: string;
+  subtitle: string;
+  restaurantIds: string[];
+  bancaData: BancaData;
+  onExport: () => void;
+}> = ({ title, subtitle, restaurantIds, bancaData, onExport }) => {
+  let idealGerentes = 0;
+  let realGerentes = 0;
+  let idealLideres = 0;
+  let realLideres = 0;
+  let idealEntrenadores = 0;
+  let realEntrenadores = 0;
+
+  restaurantIds.forEach(id => {
+    const assignment = bancaData.assignments.find(a => a.restaurantId === id);
+    const members = assignment?.members ?? [];
+    const ideal = bancaData.storeIdeals?.[id] ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 };
+
+    idealGerentes += ideal.gerentes;
+    realGerentes += members.filter(m => m.role === 'Gerente' || m.role === 'Subgerente').length;
+
+    idealLideres += ideal.lideresTurno;
+    realLideres += members.filter(m => m.role === 'Líder de turno' || m.role === 'Licencia en Curso').length;
+
+    idealEntrenadores += ideal.entrenadores;
+    realEntrenadores += members.filter(m => m.role === 'Entrenador').length;
+  });
+
+  const getPercent = (real: number, ideal: number) => Math.min(100, Math.round((real / (ideal || 1)) * 100));
+  
+  const pctGerentes = getPercent(realGerentes, idealGerentes);
+  const pctLideres = getPercent(realLideres, idealLideres);
+  const pctEntrenadores = getPercent(realEntrenadores, idealEntrenadores);
+
+  const StatCard = ({ title, icon, real, ideal, pct, colorClass, barColor }: any) => (
+    <div className="bg-white rounded-3xl border-2 border-slate-100 p-5 relative overflow-hidden group hover:border-red-200 transition-all shadow-sm hover:shadow-xl">
+      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 transition-transform group-hover:scale-150 ${colorClass}`} />
+      
+      <div className="flex justify-between items-start mb-4 relative">
+        <div className={`p-3 rounded-2xl ${colorClass} text-white shadow-lg`}>
+          {icon}
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
+          <div className="flex items-baseline justify-end gap-1 mt-1">
+            <span className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{real}</span>
+            <span className="text-sm font-bold text-slate-400">/ {ideal}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative">
+        <div className="flex justify-between items-end mb-1.5">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cumplimiento</span>
+          <span className={`text-xs font-black ${pct >= 100 ? 'text-emerald-500' : 'text-slate-700'}`}>{pct}%</span>
+        </div>
+        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div className={`h-full transition-all duration-1000 ${pct >= 100 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mb-8 space-y-4">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-4 px-2 mb-6">
+        <div>
+          <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight">{title}</h3>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
+            {subtitle} <span className="w-1 h-1 bg-slate-300 rounded-full" /> {restaurantIds.length} tiendas
+          </p>
+        </div>
+        <button
+          onClick={onExport}
+          className="flex items-center gap-2 px-5 py-3.5 bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg hover:-translate-y-0.5"
+        >
+          <FileDown className="w-4 h-4" />
+          <span>Generar Reporte</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard 
+          title="Gerentes" 
+          icon={<Award className="w-6 h-6" />} 
+          real={realGerentes} 
+          ideal={idealGerentes} 
+          pct={pctGerentes} 
+          colorClass="bg-red-500" 
+          barColor="bg-red-500" 
+        />
+        <StatCard 
+          title="Líderes de Turno" 
+          icon={<Users className="w-6 h-6" />} 
+          real={realLideres} 
+          ideal={idealLideres} 
+          pct={pctLideres} 
+          colorClass="bg-blue-500" 
+          barColor="bg-blue-500" 
+        />
+        <StatCard 
+          title="Entrenadores" 
+          icon={<Target className="w-6 h-6" />} 
+          real={realEntrenadores} 
+          ideal={idealEntrenadores} 
+          pct={pctEntrenadores} 
+          colorClass="bg-orange-500" 
+          barColor="bg-orange-500" 
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Store Card
 // ─────────────────────────────────────────────────────────────────────────────
 const StoreCard: React.FC<{
   restaurantId: string;
   restaurantName: string;
   assignment: StoreAssignment;
+  ideal?: StoreIdeal;
   allEmployees: Employee[];
   canEdit: boolean;
   onEdit: () => void;
-}> = ({ restaurantId, restaurantName, assignment, allEmployees, canEdit, onEdit }) => {
+}> = ({ restaurantId, restaurantName, assignment, ideal, allEmployees, canEdit, onEdit }) => {
   const members = assignment.members ?? [];
+  const currentIdeal = ideal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 };
+  
+  const adminIdeal = currentIdeal.gerentes + currentIdeal.lideresTurno;
+  const currentAdmin = members.filter(m => m.role !== 'Entrenador').length;
+  const adminPercent = Math.min(100, Math.round((currentAdmin / (adminIdeal || 1)) * 100));
+
+  const opIdeal = currentIdeal.entrenadores;
+  const currentOp = members.filter(m => m.role === 'Entrenador').length;
+  const opPercent = Math.min(100, Math.round((currentOp / (opIdeal || 1)) * 100));
+
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
       <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-3 flex items-center justify-between">
@@ -237,11 +391,23 @@ const StoreCard: React.FC<{
             <p className="text-[9px] text-slate-400">CECO: {restaurantId}</p>
           </div>
         </div>
-        {canEdit && (
-          <button onClick={onEdit} className="text-[9px] font-black uppercase px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shrink-0 ml-2">
-            Editar
-          </button>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-[7px] text-slate-400 uppercase font-black tracking-widest">Admin</p>
+              <p className={`text-[10px] font-black leading-none ${adminPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{adminPercent}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[7px] text-slate-400 uppercase font-black tracking-widest">Op</p>
+              <p className={`text-[10px] font-black leading-none ${opPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{opPercent}%</p>
+            </div>
+          </div>
+          {canEdit && (
+            <button onClick={onEdit} className="text-[9px] font-black uppercase px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all">
+              Editar
+            </button>
+          )}
+        </div>
       </div>
       <div className="px-4 py-3 flex-1 space-y-1.5">
         {members.length === 0
@@ -253,7 +419,10 @@ const StoreCard: React.FC<{
                   <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0">
                     {emp?.name?.charAt(0) ?? '?'}
                   </div>
-                  <p className="text-[11px] font-bold text-slate-700 truncate flex-1">{emp?.name ?? m.employeeId}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-slate-700 truncate">{emp?.name ?? m.employeeId}</p>
+                    {emp && <p className="text-[8px] text-slate-400 font-medium truncate uppercase">{emp.title} · {emp.restaurant_id}</p>}
+                  </div>
                   <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${ROLE_COLORS[m.role]}`}>{m.role}</span>
                   <div className="flex gap-0.5">
                     {m.certifications.map(cert => (
@@ -287,9 +456,10 @@ const Banca: React.FC = () => {
   const getAssignment = (id: string) =>
     bancaData.assignments.find(a => a.restaurantId === id) ?? emptyAssignment(id);
 
-  const handleSave = async (updated: StoreAssignment) => {
+  const handleSave = async (updated: StoreAssignment, ideal: StoreIdeal) => {
     const newBanca: BancaData = {
-      assignments: [...bancaData.assignments.filter(a => a.restaurantId !== updated.restaurantId), updated]
+      assignments: [...bancaData.assignments.filter(a => a.restaurantId !== updated.restaurantId), updated],
+      storeIdeals: { ...(bancaData.storeIdeals || {}), [updated.restaurantId]: ideal }
     };
     await dataService.saveBancaData(newBanca);
     setBancaData(newBanca);
@@ -414,39 +584,32 @@ const Banca: React.FC = () => {
 
   const modalAssignment = modal ? getAssignment(modal.restaurantId) : null;
 
+  let summaryTitle = "Cumplimiento Nacional";
+  let summarySubtitle = "Resumen de todas las regiones";
+  let summaryIds: string[] = [];
+
+  if (view.level === 'regions') {
+    summaryIds = hierarchy.regions.flatMap(r => r.zones.flatMap(z => z.restaurantIds));
+  } else if (view.level === 'zones') {
+    summaryTitle = `Cumplimiento Región: ${view.region}`;
+    summarySubtitle = "Resumen regional";
+    const region = hierarchy.regions.find(r => r.name === view.region);
+    summaryIds = region ? region.zones.flatMap(z => z.restaurantIds) : [];
+  } else if (view.level === 'stores') {
+    summaryTitle = `Cumplimiento Jefe de Área: ${view.zone}`;
+    summarySubtitle = `Región ${view.region}`;
+    const region = hierarchy.regions.find(r => r.name === view.region);
+    const zone = region?.zones.find(z => z.name === view.zone);
+    summaryIds = zone ? zone.restaurantIds : [];
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 p-6 md:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-600 text-white rounded-2xl shadow-lg"><Users className="w-6 h-6" /></div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase italic">Banca de Líderes</h2>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Jerarquía · Roles · Certificaciones</p>
-            </div>
-          </div>
-          <button
-            onClick={generateExcelReport}
-            className="flex items-center gap-2 px-4 py-3.5 bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg"
-          >
-            <FileDown className="w-4 h-4" />
-            <span>Generar Reporte</span>
-          </button>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ALL_CERTS.map(cert => (
-            <div key={cert} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full border ${CERT_COLORS[cert]}`}>
-              <Award className="w-3 h-3" />
-              {cert === 'GBR' ? 'GBR — Gerencia Básica de Restaurante' : cert === 'GAR' ? 'GAR — Gerencia Avanzada de Restaurante' : 'GER — Gerencia Experta de Restaurante'}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Navigation Area */}
       <div>
         {breadcrumb()}
+
+        <ComplianceSummary title={summaryTitle} subtitle={summarySubtitle} restaurantIds={summaryIds} bancaData={bancaData} onExport={generateExcelReport} />
 
         {/* LEVEL 1: Region Cards */}
         {view.level === 'regions' && (
@@ -519,7 +682,7 @@ const Banca: React.FC = () => {
               const rest = restaurants.find(r => r.id === restId);
               return (
                 <StoreCard key={restId} restaurantId={restId} restaurantName={rest?.name ?? restId}
-                  assignment={getAssignment(restId)} allEmployees={employees} canEdit={isAdmin}
+                  assignment={getAssignment(restId)} ideal={bancaData.storeIdeals?.[restId]} allEmployees={employees} canEdit={isAdmin}
                   onEdit={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId })}
                 />
               );
@@ -531,7 +694,7 @@ const Banca: React.FC = () => {
       {/* Modal */}
       {modal && modalAssignment && (
         <EditModal restaurantId={modal.restaurantId} restaurantName={modal.restaurantName}
-          initialAssignment={modalAssignment} allEmployees={employees}
+          initialAssignment={modalAssignment} initialIdeal={bancaData.storeIdeals?.[modal.restaurantId]} allEmployees={employees}
           onClose={() => setModal(null)} onSave={handleSave}
         />
       )}

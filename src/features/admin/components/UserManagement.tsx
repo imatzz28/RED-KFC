@@ -21,7 +21,6 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   const [newUser, setNewUser] = useState<Partial<User>>({
     username: '',
-    password: '',
     role: UserRole.SPECIALIST,
     assignedZones: [],
     assignedRestaurants: [],
@@ -105,8 +104,8 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
   };
 
   const handleSaveUser = async () => {
-    if (!newUser.username || (!selectedUser && !newUser.password)) {
-      alert("Por favor, completa los campos obligatorios.");
+    if (!newUser.username || !newUser.role) {
+      alert("El usuario y el rol son obligatorios.");
       return;
     }
     setIsSaving(true);
@@ -116,7 +115,6 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
         : {
           id: `user_${Date.now()}`,
           username: newUser.username!,
-          password: newUser.password!,
           role: currentUser.role === UserRole.COORDINATOR ? UserRole.SPECIALIST : newUser.role!,
           assignedZones: newUser.assignedZones || [],
           assignedRestaurants: newUser.assignedRestaurants || [],
@@ -131,7 +129,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       setUsers(updatedUsersList);
       setShowUserModal(false);
       setSelectedUser(null);
-      setNewUser({ username: '', password: '', role: UserRole.SPECIALIST, assignedZones: [], assignedRestaurants: [], assignedRegions: [] });
+      setNewUser({ username: '', role: UserRole.SPECIALIST, assignedZones: [], assignedRestaurants: [], assignedRegions: [] });
       setImportStatus({ message: `Especialista @${userToSave.username} guardado exitosamente.`, isError: false });
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Ocurrió un error desconocido.';
@@ -143,7 +141,9 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-300">
+      {/* Action Bar */}
+      <div className="flex items-center justify-between mb-4 animate-in fade-in duration-300">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{visibleUsers.length} usuarios configurados</p>
         <button onClick={() => {
           setSelectedUser(null);
           setNewUser({
@@ -154,36 +154,81 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
           });
           setRegionSearchTerm(''); setSearchTerm(''); setShowUserModal(true);
         }}
-          className="p-6 border-2 border-dashed border-slate-200 rounded-[32px] flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors group"
+          className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
         >
-          <UserPlus className="w-6 h-6 mb-2" />
-          <span className="text-[9px] font-black uppercase">Nuevo Especialista</span>
+          <UserPlus className="w-4 h-4" />
+          <span>Nuevo Especialista</span>
         </button>
-        {visibleUsers.map(u => (
-          <div
-            key={u.id}
-            onClick={() => { setSelectedUser(u); setNewUser(u); setRegionSearchTerm(''); setSearchTerm(''); setShowUserModal(true); }}
-            className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm group hover:border-red-400 hover:shadow-xl hover:shadow-red-50 transition-all relative cursor-pointer"
-          >
-            <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+      </div>
+
+      {/* User List */}
+      <div className="space-y-2 animate-in fade-in duration-300">
+        {visibleUsers.length === 0 && (
+          <div className="py-16 text-center">
+            <Key className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400 font-bold text-sm">No hay usuarios configurados</p>
+          </div>
+        )}
+        {visibleUsers.map(u => {
+          const roleBadge = u.role === UserRole.ADMIN
+            ? 'bg-slate-900 text-white'
+            : u.role === UserRole.COORDINATOR
+              ? 'bg-blue-600 text-white'
+              : 'bg-red-100 text-red-600';
+          const roleLabel = u.role === UserRole.ADMIN ? 'Admin' : u.role === UserRole.COORDINATOR ? 'Coordinador' : 'Especialista';
+          const zonesLabel = (u.assignedZones || []).join(', ') || '—';
+          const regionsLabel = (u.assignedRegions || []).join(', ') || '—';
+
+          return (
+            <div
+              key={u.id}
+              onClick={() => { setSelectedUser(u); setNewUser(u); setRegionSearchTerm(''); setSearchTerm(''); setShowUserModal(true); }}
+              className="flex items-center gap-4 bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-sm hover:shadow-md hover:border-red-300 transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
+                <Key className="w-4 h-4" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-sm font-black text-slate-800 uppercase italic">{u.username}</p>
+                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest ${roleBadge}`}>
+                    {roleLabel}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                  {(u.assignedRegions || []).length > 0 && (
+                    <span className="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                      <Globe className="w-3 h-3 text-blue-400" />
+                      {regionsLabel.length > 60 ? regionsLabel.slice(0, 60) + '...' : regionsLabel}
+                    </span>
+                  )}
+                  {(u.assignedZones || []).length > 0 && (
+                    <span className="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                      <Layers className="w-3 h-3 text-red-400" />
+                      {zonesLabel.length > 60 ? zonesLabel.slice(0, 60) + '...' : zonesLabel}
+                    </span>
+                  )}
+                  {(u.assignedRestaurants || []).length > 0 && (
+                    <span className="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                      <Store className="w-3 h-3 text-orange-400" />
+                      {u.assignedRestaurants.length} tienda{u.assignedRestaurants.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {u.username !== 'admin' && (u.role === UserRole.SPECIALIST || currentUser.role === UserRole.ADMIN) && (
                 <button
                   onClick={(e) => handleDeleteUser(e, u.id)}
-                  className="p-2 text-slate-300 hover:text-red-600 bg-slate-50 rounded-lg shadow-sm"
+                  className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
             </div>
-            <div className="min-w-0">
-              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mb-4 text-slate-400"><Key className="w-5 h-5" /></div>
-              <p className="text-sm font-black text-slate-800 uppercase truncate italic leading-none">{u.username}</p>
-              <p className={`text-[8px] font-black uppercase mt-2 tracking-widest inline-block px-2 py-0.5 rounded ${u.role === UserRole.ADMIN ? 'bg-slate-900 text-white' : u.role === UserRole.COORDINATOR ? 'bg-blue-600 text-white' : 'bg-red-100 text-red-600'}`}>
-                {u.role === UserRole.ADMIN ? 'ADMIN' : u.role === UserRole.COORDINATOR ? 'COORDINADOR' : 'ESPECIALISTA'}
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {showUserModal && (
@@ -197,42 +242,39 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
             </div>
 
             <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID de Acceso</label>
-                  <input
-                    type="text"
-                    disabled={!!selectedUser}
-                    value={newUser.username}
-                    onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-                    className={`w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black outline-none focus:border-red-500 ${selectedUser ? 'opacity-50' : ''}`}
-                    placeholder="Usuario"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contraseña</label>
-                  <input
-                    type="password"
-                    value={newUser.password}
-                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black outline-none focus:border-red-500"
-                    placeholder={selectedUser ? "Escriba nueva clave" : "Clave inicial"}
-                  />
-                </div>
-              </div>
-
-              {currentUser.role === UserRole.ADMIN && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Perfil de Usuario</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[UserRole.SPECIALIST, UserRole.COORDINATOR, UserRole.ADMIN].map(role => (
-                      <button key={role} onClick={() => setNewUser({ ...newUser, role })} className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${newUser.role === role ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                        {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.COORDINATOR ? 'Coordinador' : 'Admin'}
-                      </button>
-                    ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Usuario</label>
+                  <div className="relative">
+                    <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      disabled={!!selectedUser}
+                      value={newUser.username}
+                      onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      placeholder="Ej: andres.matiz"
+                    />
                   </div>
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Perfil de Usuario</label>
+                  {currentUser.role === UserRole.ADMIN ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[UserRole.SPECIALIST, UserRole.COORDINATOR, UserRole.ADMIN].map(role => (
+                        <button key={role} onClick={() => setNewUser({ ...newUser, role })} className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${newUser.role === role ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'}`}>
+                          {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.COORDINATOR ? 'Coordinador' : 'Admin'}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-3 px-4 rounded-xl text-xs font-black uppercase border-2 bg-slate-100 text-slate-500 border-slate-200">
+                      {newUser.role === UserRole.SPECIALIST ? 'Especialista' : newUser.role}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 {newUser.role === UserRole.COORDINATOR && currentUser.role === UserRole.ADMIN && (

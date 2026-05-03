@@ -14,7 +14,7 @@ import { useAppStore } from '@/store/useAppStore';
 const AdminPanel: React.FC = () => {
   const { auth, refreshData: onEmployeesImported } = useAppStore();
   const currentUser = auth.user!;
-  const [activeSubTab, setActiveSubTab] = useState<'import' | 'users' | 'hierarchy' | 'settlement' | 'sst-config'>(
+  const [activeSubTab, setActiveSubTab] = useState<'import' | 'users' | 'hierarchy' | 'settlement'>(
     currentUser.role === UserRole.ADMIN ? 'import' : 'users'
   );
   const [importStatus, setImportStatus] = useState<{ message: string, isError: boolean } | null>(null);
@@ -39,7 +39,6 @@ const AdminPanel: React.FC = () => {
                 {currentUser.role === UserRole.ADMIN && (
                   <>
                     <button onClick={() => setActiveSubTab('import')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'import' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Carga Excel</button>
-                    <button onClick={() => setActiveSubTab('sst-config')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'sst-config' ? 'bg-red-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Configuración Guías Mensual</button>
                     <button onClick={() => setActiveSubTab('settlement')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'settlement' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Asentar Notas</button>
                     <button onClick={() => setActiveSubTab('hierarchy')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'hierarchy' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Estructura</button>
                   </>
@@ -68,12 +67,7 @@ const AdminPanel: React.FC = () => {
           />
         )}
 
-        {/* SST Config Component */}
-        {activeSubTab === 'sst-config' && currentUser.role === UserRole.ADMIN && (
-          <SstConfig hierarchy={hierarchy} setHierarchy={setHierarchy} setImportStatus={setImportStatus} />
-        )}
-
-        {/* Settlement Manager Component */}
+{/* Settlement Manager Component */}
         {activeSubTab === 'settlement' && currentUser.role === UserRole.ADMIN && (
           <SettlementManager hierarchy={hierarchy} setHierarchy={setHierarchy} setImportStatus={setImportStatus} />
         )}
