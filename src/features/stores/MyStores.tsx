@@ -136,7 +136,7 @@ const MyStores: React.FC = () => {
         const normTitle = normalizeRole(emp.title);
         cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
 
-        const effective = dataService.getEffectiveGrades(emp.id, selectedMonth);
+        const effective = dataService.getEffectiveGrades(emp.id, selectedMonth, store.id);
         const empSummary = summaryMap.get(String(emp.id).trim());
 
         let sum = 0;
@@ -216,7 +216,7 @@ const MyStores: React.FC = () => {
       const normTitle = normalizeRole(emp.title);
       cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
 
-      const effective = dataService.getEffectiveGrades(emp.id, month);
+      const effective = dataService.getEffectiveGrades(emp.id, month, storeId);
       const empSummary = summaryMap.get(String(emp.id).trim());
 
       let sum = 0;
@@ -306,16 +306,6 @@ const MyStores: React.FC = () => {
             >
               <LineChart className="w-4 h-4" /> <span>Generar Curvas</span>
             </button>
-            <div className="relative w-full md:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 z-10" />
-              <input
-                type="text"
-                placeholder="Buscar personal..."
-                value={empSearch}
-                onChange={e => setEmpSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black shadow-sm outline-none focus:border-red-500 transition-all"
-              />
-            </div>
           </div>
         </div>
 
@@ -353,9 +343,22 @@ const MyStores: React.FC = () => {
 
         <div className="bg-white rounded-[32px] md:rounded-[40px] shadow-xl border border-slate-100 overflow-hidden relative">
           <div className="p-6 md:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-            <h3 className="text-[10px] font-black uppercase italic tracking-widest flex items-center">
+            <h3 className="text-[10px] font-black uppercase italic tracking-widest flex items-center shrink-0">
               <Activity className="w-4 h-4 mr-2 text-red-600" /> Registro de Notas
+              <span className="ml-3 text-slate-400 font-bold normal-case not-italic tracking-normal">
+                ({storeEmps.length} colaborador{storeEmps.length !== 1 ? 'es' : ''})
+              </span>
             </h3>
+            <div className="relative w-full md:w-72 ml-4">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 z-10" />
+              <input
+                type="text"
+                placeholder="Buscar personal..."
+                value={empSearch}
+                onChange={e => setEmpSearch(e.target.value)}
+                className="w-full pl-12 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-[10px] font-black shadow-sm outline-none focus:border-red-500 transition-all"
+              />
+            </div>
           </div>
 
           {/* Overlay bloqueador durante carga */}

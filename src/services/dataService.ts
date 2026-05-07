@@ -71,7 +71,7 @@ export const dataService = {
   },
 
   supabaseFetchAll: async (table: string, queryParams: string = ''): Promise<unknown[]> => {
-    // 1. Obtener el conteo total con los filtros aplicados (usando HEAD para evitar error de columna id en vistas)
+    // 1. Obtener el conteo total con los filtros aplicados
     const countUrl = `${SUPABASE_URL}/rest/v1/${table}${queryParams}`;
     const headers = await getAuthHeaders();
 
@@ -102,25 +102,33 @@ export const dataService = {
       return await res.json();
     }
 
+    // 2. Construir URLs de cada chunk
     const numChunks = Math.ceil(total / step);
-    const promises = [];
+    const urls: string[] = [];
     for (let i = 0; i < numChunks; i++) {
       const from = i * step;
-      const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&offset=${from}&limit=${step}`;
-      promises.push(
+      urls.push(`${SUPABASE_URL}/rest/v1/${table}${queryParams}${separator}select=*&offset=${from}&limit=${step}`);
+    }
+
+    // 3. Pool de concurrencia: máximo 5 chunks en paralelo para evitar rate limit (429)
+    const CONCURRENCY = 5;
+    const allResults: unknown[][] = [];
+    for (let i = 0; i < urls.length; i += CONCURRENCY) {
+      const batch = urls.slice(i, i + CONCURRENCY).map(url =>
         fetch(url, { headers })
           .then(async r => {
             if (!r.ok) {
               const txt = await r.text();
-              throw new Error(`Error en chunk ${i} de [${table}]: ${txt}`);
+              throw new Error(`Error en chunk de [${table}]: ${txt}`);
             }
-            return r.json();
+            return r.json() as Promise<unknown[]>;
           })
       );
+      const batchResults = await Promise.all(batch);
+      allResults.push(...batchResults);
     }
 
-    const results = await Promise.all(promises);
-    return results.flat();
+    return allResults.flat();
   },
 
   supabaseFetchPaginated: async (table: string, queryParams: string = '', page: number = 0, limit: number = 50): Promise<{ data: any[], total: number }> => {
@@ -188,7 +196,16 @@ export const dataService = {
     summary: null as any[] | null,
     hierarchy: null as HierarchyData | null,
     users: null as User[] | null,
-    banca: null as BancaData | null
+    banca: null as BancaData | null,
+    // TTL: momento en que se cargó el último datos maestros desde la nube
+    lastCloudSync: null as number | null,
+  },
+
+  // Verifica si el caché de datos maestros tiene más de 30 minutos
+  isCacheStale: (): boolean => {
+    const TTL_MS = 30 * 60 * 1000; // 30 minutos
+    if (!dataService._cache.lastCloudSync) return true;
+    return (Date.now() - dataService._cache.lastCloudSync) > TTL_MS;
   },
 
   initLocalCache: async () => {
@@ -206,7 +223,12 @@ export const dataService = {
     }
   },
 
-  loadAllFromCloud: async () => {
+  loadAllFromCloud: async (force: boolean = false) => {
+    // Si el caché es válido y no se fuerza la recarga, omitir la descarga
+    if (!force && !dataService.isCacheStale()) {
+      console.log('[Cache] Datos maestros en caché válido. Omitiendo descarga.');
+      return true;
+    }
     try {
       const [employees, restaurants, hierarchy, users, banca] = await Promise.all([
         dataService.supabaseFetchAll('employees'),
@@ -236,6 +258,7 @@ export const dataService = {
       dataService._cache.hierarchy = cloudHierarchy;
       dataService._cache.banca = cloudBanca;
       dataService._cache.gradeIndex = null;
+      dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
 
       return true;
     } catch (e) {
@@ -309,34 +332,58 @@ export const dataService = {
     };
 
     try {
-      // 1. Obtener empleados activos de esta tienda
+      // 1. Obtener empleados de esta tienda (activos e inactivos para cubrir traslados)
       const storeEmployees = (dataService._cache.employees || []).filter(
-        e => e.restaurant_id.trim().toUpperCase() === storeId.trim().toUpperCase()
+        e => e.restaurant_id && e.restaurant_id.trim().toUpperCase() === storeId.trim().toUpperCase()
       );
       const employeeIds = storeEmployees.map(e => String(e.id).trim());
 
-      // 2. Fetch A: Por restaurant_id (el path normal)
+      // 2. Calcular el rango de fechas: 24 meses hacia atrás desde el mes solicitado
+      //    Cubre toda la herencia posible sin descargar el historial completo de la tienda
+      const rangeStart = new Date(`${month}-01T12:00:00Z`);
+      rangeStart.setMonth(rangeStart.getMonth() - 24);
+      const rangeStartStr = rangeStart.toISOString().slice(0, 7) + '-01';
+
+      // 3. Fetch A: Por restaurant_id con filtro de rango de mes
       const fetchByStore = () => dataService.supabaseFetchAll(
         'grades',
-        `?restaurant_id=eq.${storeId}&month=lte.${monthDate}`
+        `?restaurant_id=eq.${storeId.trim()}&month=gte.${rangeStartStr}&month=lte.${monthDate}`
       );
 
-      // 3. Fetch B: Por employee IDs (seguro ante diferencias de formato de CECO)
+      // 4. Fetch B: Por employee IDs en chunks con el mismo rango de mes
       const fetchByEmployees = async () => {
         if (employeeIds.length === 0) return [];
-        // Supabase 'in' filter: ?employee_id=in.(id1,id2,...)
-        const inFilter = `(${employeeIds.join(',')})` ;
-        return dataService.supabaseFetchAll(
-          'grades',
-          `?employee_id=in.${inFilter}&month=lte.${monthDate}`
-        );
+        const chunkSize = 40;
+        const requests = [];
+        for (let i = 0; i < employeeIds.length; i += chunkSize) {
+          const chunk = employeeIds.slice(i, i + chunkSize);
+          const inFilter = `(${chunk.join(',')})`;
+          requests.push(
+            dataService.supabaseFetchAll('grades', `?employee_id=in.${inFilter}&month=gte.${rangeStartStr}&month=lte.${monthDate}`)
+              .catch(err => {
+                console.error(`Error en chunk de empleados:`, err);
+                return [];
+              })
+          );
+        }
+        const results = await Promise.all(requests);
+        return results.flat();
       };
 
-      // 4. Ejecutar ambos fetches en paralelo con retry
-      const [byStore, byEmployee] = await Promise.all([
-        fetchWithRetry(fetchByStore),
-        fetchWithRetry(fetchByEmployees)
-      ]);
+      // 4. Ejecutar ambos fetches de manera segura y loguear
+      let byStore: any[] = [];
+      let byEmployee: any[] = [];
+      try {
+        byStore = await fetchWithRetry(fetchByStore);
+      } catch (err: any) {
+        console.error(`[Grades] byStore fetch error:`, err);
+      }
+
+      try {
+        byEmployee = await fetchWithRetry(fetchByEmployees);
+      } catch (err: any) {
+        console.error(`[Grades] byEmployee fetch error:`, err);
+      }
 
       // 5. Deduplicar resultados: usar clave employee_id+month+group+category
       const dedupeMap = new Map<string, any>();
@@ -354,6 +401,8 @@ export const dataService = {
         category: g.category,
         score: g.score
       }));
+      
+      console.log(`[Grades] store: ${storeId}, month: ${monthDate}, fetched: ${grades.length} grades.`);
 
       // 6. Guardar en caché keyed por tienda+mes (totalmente aislado)
       const cacheKey = `${storeId.trim().toUpperCase()}::${month}`;
@@ -362,7 +411,7 @@ export const dataService = {
       dataService._cache.gradeIndex = null; // Invalidar índice para que se reconstruya
       console.log(`[Grades] ${grades.length} notas (únicas: ${dedupeMap.size}) guardadas en clave: ${cacheKey}`);
       return grades;
-    } catch (e) {
+    } catch (e: any) {
       console.error('[Grades] Error crítico en carga de tienda:', e);
       // Retornar el bucket existente si ya había algo cargado
       const cacheKey = `${storeId.trim().toUpperCase()}::${month}`;
@@ -404,15 +453,22 @@ export const dataService = {
     return index;
   },
 
-  getEffectiveGrades: (employeeId: string, upToMonth: string): GradeEntry[] => {
+  getEffectiveGrades: (employeeId: string, upToMonth: string, storeId?: string): GradeEntry[] => {
     const gradeIndex = dataService.getGradeIndex();
     const empGradesRaw = gradeIndex.get(String(employeeId).trim()) || [];
 
     const empGrades = empGradesRaw.filter(g => {
       const gradeMonth = g.month ? g.month.substring(0, 7) : '';
       if (gradeMonth > upToMonth) return false;
-      // Grupos no heredables: solo valen para su propio mes
+
+      // Si se proporciona storeId, solo heredar notas de esa tienda.
+      // Esto evita contaminar las métricas de la tienda actual con
+      // evaluaciones hechas en una tienda anterior del empleado.
+      if (storeId && g.restaurantId && g.restaurantId.trim().toUpperCase() !== storeId.trim().toUpperCase()) return false;
+
+      // Grupos no heredables (D y F): solo valen para su propio mes
       if ((g.group === 'D' || g.group === 'F') && gradeMonth !== upToMonth) return false;
+
       return true;
     });
 
@@ -428,13 +484,7 @@ export const dataService = {
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
   getBancaData: (): BancaData => dataService._cache.banca || { assignments: [] },
   getUsers: (): User[] => {
-    const local: User[] = dataService._cache.users || [];
-    const adminExists = local.some((u: User) => u.username === 'admin');
-    if (!adminExists) {
-      const admin: User = { id: 'admin-master', username: 'admin', password: '123', role: UserRole.ADMIN, assignedZones: [], assignedRestaurants: [], assignedRegions: [] };
-      return [admin, ...local];
-    }
-    return local;
+    return dataService._cache.users || [];
   },
 
   saveBancaData: async (banca: BancaData) => {
@@ -503,30 +553,43 @@ export const dataService = {
     const currentCeco = emp?.restaurant_id || 'SIN_CECO';
 
     const monthDate = `${month}-01`;
-    const deleteUrl = `${SUPABASE_URL}/rest/v1/grades?employee_id=eq.${employeeId}&month=eq.${monthDate}`;
-    await fetch(deleteUrl, {
-      method: 'DELETE',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
 
-    if (grades.length > 0) {
-      const payload = grades.map(g => ({
-        employee_id: g.employeeId,
-        restaurant_id: currentCeco,
-        month: monthDate,
-        group: g.group,
-        category: g.category,
-        score: g.score
-      }));
-      await dataService.supabaseFetch('grades', 'POST', payload);
+    // Guardamos el estado actual del cache ANTES de modificar (para rollback)
+    const previousGrades = dataService.getGrades();
+
+    try {
+      // 1. DELETE en Supabase
+      const deleteUrl = `${SUPABASE_URL}/rest/v1/grades?employee_id=eq.${employeeId}&month=eq.${monthDate}`;
+      const deleteHeaders = await getAuthHeaders();
+      const deleteRes = await fetch(deleteUrl, { method: 'DELETE', headers: deleteHeaders });
+      if (!deleteRes.ok) throw new Error(`Error al borrar notas previas: ${await deleteRes.text()}`);
+
+      // 2. POST en Supabase (solo si hay notas que guardar)
+      if (grades.length > 0) {
+        const payload = grades.map(g => ({
+          employee_id: g.employeeId,
+          restaurant_id: currentCeco,
+          month: monthDate,
+          group: g.group,
+          category: g.category,
+          score: g.score
+        }));
+        await dataService.supabaseFetch('grades', 'POST', payload);
+      }
+
+      // 3. Solo actualizamos el cache LOCAL si la BD tuvo éxito
+      const allGrades = previousGrades.filter(g => !(g.employeeId === employeeId && g.month && g.month.startsWith(month)));
+      const gradesWithContext = grades.map(g => ({ ...g, month: monthDate, restaurantId: currentCeco }));
+      const updated = [...allGrades, ...gradesWithContext];
+      await localforage.setItem('la_akademia_grades', updated);
+      dataService._cache.grades = updated;
+      dataService._cache.gradeIndex = null;
+
+    } catch (err) {
+      // Rollback: el cache local NO se modifica. Los datos en BD son el estado de verdad.
+      console.error('[saveEmployeeGrades] Error guardando notas. Cache no fue modificado.', err);
+      throw err; // Re-lanzamos para que el componente muestre el error al usuario
     }
-
-    const allGrades = dataService.getGrades().filter(g => !(g.employeeId === employeeId && g.month && g.month.startsWith(month)));
-    const gradesWithContext = grades.map(g => ({ ...g, month: monthDate, restaurantId: currentCeco }));
-    const updated = [...allGrades, ...gradesWithContext];
-    await localforage.setItem('la_akademia_grades', updated);
-    dataService._cache.grades = updated;
-    dataService._cache.gradeIndex = null;
   },
 
   saveHierarchy: async (hierarchy: HierarchyData) => {
@@ -537,9 +600,10 @@ export const dataService = {
 
   deleteUser: async (userId: string) => {
     const url = `${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`;
+    const headers = await getAuthHeaders();
     const res = await fetch(url, {
       method: 'DELETE',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      headers
     });
     if (!res.ok) throw new Error('No se pudo eliminar el usuario');
     const current = dataService.getUsers().filter(u => u.id !== userId);
@@ -584,7 +648,9 @@ export const dataService = {
   },
 
   importMonthlyExcel: async (rawData: Record<string, unknown>[]) => {
-    await dataService.loadAllFromCloud();
+    // Fix #15: Usar el caché en memoria existente (cargado en el login).
+    // No hacer loadAllFromCloud() en cada importación: eso descargaba TODOS los empleados
+    // innecesariamente cuando ya los teníamos frescos desde el inicio de sesión.
     const currentEmployees = dataService.getEmployees();
     const currentStores = dataService.getRestaurants();
     const today = new Date().toISOString().split('T')[0];

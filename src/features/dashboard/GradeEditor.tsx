@@ -44,19 +44,8 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
 
   useEffect(() => {
     const empId = String(employee.id).trim();
-    // Normalizar comparación de mes (YYYY-MM vs YYYY-MM-DD)
-    const existing = dataService.getGrades().filter(g => {
-      const gId = String(g.employeeId).trim();
-      const gMonth = g.month ? g.month.substring(0, 7) : '';
-      return gId === empId && gMonth === month;
-    });
-
-    if (existing.length > 0) {
-      setFormGrades(existing);
-    } else {
-      const effective = dataService.getEffectiveGrades(empId, month);
-      setFormGrades(effective.map(g => ({ ...g, month })));
-    }
+    const effective = dataService.getEffectiveGrades(empId, month);
+    setFormGrades(effective.map(g => ({ ...g })));
   }, [employee, month]);
 
   const handleScoreChange = (group: string, category: string, scoreStr: string) => {
@@ -66,7 +55,7 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
       const idx = prev.findIndex(g => g.group === group && g.category === category);
       if (idx > -1) {
         const next = [...prev];
-        next[idx] = { ...next[idx], score };
+        next[idx] = { ...next[idx], score, month };
         return next;
       }
       return [...prev, { employeeId: employee.id, month, group, category, score, restaurantId: employee.restaurant_id }];

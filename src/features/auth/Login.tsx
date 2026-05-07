@@ -88,7 +88,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="w-40 h-40 flex items-center justify-center mb-0 transition-transform hover:scale-105">
             <img src="/logo_red.png" alt="RED Logo" className="w-full h-full object-contain" />
           </div>
-          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] text-center">RED de Entrenamiento y Desempeño</p>
+          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] text-center">Ruta de Entrenamiento y Desempeño</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

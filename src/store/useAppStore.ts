@@ -35,17 +35,21 @@ const computeFilteredEmployees = (employees: Employee[], restaurants: Restaurant
     const assignedZones = new Set((user.assignedZones || []).map(z => (z || '').trim().toUpperCase()));
     const assignedStoresSet = new Set((user.assignedRestaurants || []).map(s => (s || '').trim().toUpperCase()));
 
+    // Fix #16: Pre-construir mapas de búsqueda O(1) en lugar de .find() O(N) dentro del loop
+    const restaurantById = new Map<string, Restaurant>(restaurants.map(r => [(r.id || '').trim().toUpperCase(), r]));
+    const restaurantByName = new Map<string, Restaurant>(restaurants.map(r => [(r.name || '').trim().toUpperCase(), r]));
+
+    const findRestaurant = (nameOrId: string): Restaurant | undefined => {
+        const key = nameOrId.trim().toUpperCase();
+        return restaurantById.get(key) || restaurantByName.get(key);
+    };
+
     if (user.role === UserRole.COORDINATOR) {
-        const restaurantMap = new Map<string, Restaurant>(restaurants.map(r => [(r.id || '').trim().toUpperCase(), r]));
         return employees.filter(e => {
-            const currentStore = restaurantMap.get((e.restaurant_id || '').trim().toUpperCase());
+            const currentStore = restaurantById.get((e.restaurant_id || '').trim().toUpperCase());
             if (currentStore && assignedRegions.has((currentStore.region || '').trim().toUpperCase())) return true;
             return e.history?.some(h => {
-                const histStoreName = (h.restaurantName || '').trim().toUpperCase();
-                const histStore = restaurants.find(r =>
-                    (r.id || '').trim().toUpperCase() === histStoreName ||
-                    (r.name || '').trim().toUpperCase() === histStoreName
-                );
+                const histStore = findRestaurant(h.restaurantName || '');
                 return histStore && assignedRegions.has((histStore.region || '').trim().toUpperCase());
             });
         });
@@ -58,12 +62,11 @@ const computeFilteredEmployees = (employees: Employee[], restaurants: Restaurant
         if (assignedZones.has(empZone) || assignedStoresSet.has(empStoreId)) return true;
 
         return e.history?.some(h => {
-            const histStoreName = (h.restaurantName || '').trim().toUpperCase();
-            const histStore = restaurants.find(r =>
-                r.id.trim().toUpperCase() === histStoreName ||
-                r.name.trim().toUpperCase() === histStoreName
+            const histStore = findRestaurant(h.restaurantName || '');
+            return histStore && (
+                assignedZones.has((histStore.zone || '').trim().toUpperCase()) ||
+                assignedStoresSet.has((histStore.id || '').trim().toUpperCase())
             );
-            return histStore && (assignedZones.has((histStore.zone || '').trim().toUpperCase()) || assignedStoresSet.has(histStore.id.trim().toUpperCase()));
         });
     });
 };
@@ -83,7 +86,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     handleLogin: async (user) => {
         set({ auth: { user, isAuthenticated: true } });
-        await get().initData();
+        await get().initData(true); // Forzar recarga completa al iniciar sesión
     },
 
     handleLogout: async () => {
@@ -91,7 +94,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             const { supabase } = await import('@/services/dataService');
             await supabase.auth.signOut();
             const localforage = (await import('localforage')).default;
-            await localforage.clear();
+            // Borrar SOLO las claves de esta app, no todo el storage del dominio
+            const APP_KEYS = [
+                'la_akademia_employees', 'la_akademia_stores', 'la_akademia_grades',
+                'la_akademia_summary', 'la_akademia_hierarchy', 'la_akademia_users', 'la_akademia_banca'
+            ];
+            await Promise.all(APP_KEYS.map(key => localforage.removeItem(key)));
         } catch {}
         set({ 
             auth: { user: null, isAuthenticated: false }, 
@@ -112,27 +120,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ employees: emps, restaurants: rests, filteredEmployees: filtered });
     },
 
-    initData: async () => {
+    initData: async (force: boolean = false) => {
         set({ syncStatus: 'syncing' });
 
-        // 1. Instant offline-first load using localforage
+        // 1. Carga instantánea desde localforage (offline-first)
         await dataService.initLocalCache();
         get().refreshData();
 
-        // 2. Background sync with cloud
-        const success = await dataService.loadAllFromCloud();
+        // 2. Sincronización con la nube (respeta TTL de 30 min salvo que sea forzado)
+        const success = await dataService.loadAllFromCloud(force);
 
-        // 3. Smart month selection based on hierarchy lockedMonths
+        // 3. Selección inteligente del mes basada en meses asentados
         try {
             const hierarchy = dataService.getHierarchy();
             const lockedMonths = hierarchy?.lockedMonths || [];
             
             if (lockedMonths.length > 0) {
-                // Find the latest locked month
                 const sortedLocked = [...lockedMonths].sort((a, b) => b.localeCompare(a));
                 const lastSettledPrefix = sortedLocked[0].substring(0, 7);
                 
-                // Si el último asentado es Marzo, queremos que la app abra en Abril.
                 const nextEvalMonth = new Date(`${lastSettledPrefix}-01T12:00:00Z`);
                 nextEvalMonth.setMonth(nextEvalMonth.getMonth() + 1);
                 const evalMonthPrefix = nextEvalMonth.toISOString().slice(0, 7);
@@ -143,7 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         await dataService.loadGradesSummary(get().selectedMonth);
 
-        get().refreshData(); // Final render with fresh data
+        get().refreshData();
         set({ syncStatus: success ? 'online' : 'offline' });
     },
 
@@ -154,3 +160,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ syncStatus: 'online' });
     }
 }));
+
+// Fix #18: Listener global de sesión expirada de Supabase.
+// Si el token JWT vence, Supabase emite SIGNED_OUT y la app hace logout limpio.
+(async () => {
+    const { supabase } = await import('@/services/dataService');
+    supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            if (event === 'SIGNED_OUT') {
+                const store = useAppStore.getState();
+                // Solo hacer logout si el usuario estaba autenticado (evitar loop)
+                if (store.auth.isAuthenticated) {
+                    console.warn('[Auth] Sesión expirada. Cerrando sesión automáticamente.');
+                    store.handleLogout();
+                }
+            }
+        }
+    });
+})();

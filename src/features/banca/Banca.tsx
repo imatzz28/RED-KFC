@@ -22,6 +22,7 @@ const ROLE_COLORS: Record<BancaRole, string> = {
   'Subgerente': 'bg-purple-100 text-purple-700',
   'Líder de turno': 'bg-sky-100 text-sky-700',
   'Entrenador': 'bg-orange-100 text-orange-700',
+  'Entrenador HRS': 'bg-amber-100 text-amber-700',
   'Licencia en Curso': 'bg-slate-100 text-slate-700',
 };
 
@@ -269,7 +270,7 @@ const ComplianceSummary: React.FC<{
     realLideres += members.filter(m => m.role === 'Líder de turno' || m.role === 'Licencia en Curso').length;
 
     idealEntrenadores += ideal.entrenadores;
-    realEntrenadores += members.filter(m => m.role === 'Entrenador').length;
+    realEntrenadores += members.filter(m => m.role === 'Entrenador' || m.role === 'Entrenador HRS').length;
   });
 
   const getPercent = (real: number, ideal: number) => Math.min(100, Math.round((real / (ideal || 1)) * 100));
@@ -378,7 +379,7 @@ const StoreCard: React.FC<{
   const adminPercent = Math.min(100, Math.round((currentAdmin / (adminIdeal || 1)) * 100));
 
   const opIdeal = currentIdeal.entrenadores;
-  const currentOp = members.filter(m => m.role === 'Entrenador').length;
+  const currentOp = members.filter(m => m.role === 'Entrenador' || m.role === 'Entrenador HRS').length;
   const opPercent = Math.min(100, Math.round((currentOp / (opIdeal || 1)) * 100));
 
   return (
@@ -451,7 +452,7 @@ const Banca: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const hierarchy = dataService.getHierarchy();
-  const isAdmin = auth.user?.role === 'ADMIN';
+  const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR' || auth.user?.role === 'LIDER';
 
   const getAssignment = (id: string) =>
     bancaData.assignments.find(a => a.restaurantId === id) ?? emptyAssignment(id);
@@ -590,18 +591,18 @@ const Banca: React.FC = () => {
   let summaryIds: string[] = [];
 
   if (view.level === 'regions') {
-    summaryIds = hierarchy.regions.flatMap(r => r.zones.flatMap(z => z.restaurantIds));
+    summaryIds = hierarchy.regions.flatMap(r => r.zones.flatMap(z => z.restaurantIds)).filter(id => restaurants.some(r => r.id === id));
   } else if (view.level === 'zones') {
     summaryTitle = `Cumplimiento Región: ${view.region}`;
     summarySubtitle = "Resumen regional";
     const region = hierarchy.regions.find(r => r.name === view.region);
-    summaryIds = region ? region.zones.flatMap(z => z.restaurantIds) : [];
+    summaryIds = region ? region.zones.flatMap(z => z.restaurantIds).filter(id => restaurants.some(r => r.id === id)) : [];
   } else if (view.level === 'stores') {
     summaryTitle = `Cumplimiento Jefe de Área: ${view.zone}`;
     summarySubtitle = `Región ${view.region}`;
     const region = hierarchy.regions.find(r => r.name === view.region);
     const zone = region?.zones.find(z => z.name === view.zone);
-    summaryIds = zone ? zone.restaurantIds : [];
+    summaryIds = zone ? zone.restaurantIds.filter(id => restaurants.some(r => r.id === id)) : [];
   }
 
   return (
@@ -684,7 +685,7 @@ const Banca: React.FC = () => {
               const rest = restaurants.find(r => r.id === restId);
               return (
                 <StoreCard key={restId} restaurantId={restId} restaurantName={rest?.name ?? restId}
-                  assignment={getAssignment(restId)} ideal={bancaData.storeIdeals?.[restId]} allEmployees={employees} canEdit={isAdmin}
+                  assignment={getAssignment(restId)} ideal={bancaData.storeIdeals?.[restId]} allEmployees={employees} canEdit={canEdit}
                   onEdit={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId })}
                 />
               );

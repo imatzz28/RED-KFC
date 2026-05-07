@@ -161,7 +161,7 @@ export const generateStorePdf = async (
                         return a.name.localeCompare(b.name);
                     })
                     .map(emp => {
-                        const effective = dataService.getEffectiveGrades(emp.id, pdfMonth);
+                        const effective = dataService.getEffectiveGrades(emp.id, pdfMonth, selectedStore.id);
                         const getScore = (gid: string) => {
                             const gGrades = effective.filter(g => g.group === gid);
                             const gConf = EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS];

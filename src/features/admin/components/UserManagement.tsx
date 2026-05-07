@@ -113,7 +113,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       const userToSave: User = selectedUser
         ? { ...selectedUser, ...newUser as User }
         : {
-          id: `user_${Date.now()}`,
+          id: crypto.randomUUID(), // UUID criptográfico para evitar colisiones
           username: newUser.username!,
           role: currentUser.role === UserRole.COORDINATOR ? UserRole.SPECIALIST : newUser.role!,
           assignedZones: newUser.assignedZones || [],
@@ -261,10 +261,10 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Perfil de Usuario</label>
                   {currentUser.role === UserRole.ADMIN ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {[UserRole.SPECIALIST, UserRole.COORDINATOR, UserRole.ADMIN].map(role => (
+                    <div className="grid grid-cols-4 gap-2">
+                      {[UserRole.SPECIALIST, UserRole.LIDER, UserRole.COORDINATOR, UserRole.ADMIN].map(role => (
                         <button key={role} onClick={() => setNewUser({ ...newUser, role })} className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${newUser.role === role ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                          {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.COORDINATOR ? 'Coordinador' : 'Admin'}
+                          {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.LIDER ? 'Líder' : role === UserRole.COORDINATOR ? 'Coordinador' : 'Admin'}
                         </button>
                       ))}
                     </div>

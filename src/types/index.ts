@@ -2,7 +2,8 @@
 export enum UserRole {
   ADMIN = 'ADMIN',
   COORDINATOR = 'COORDINATOR',
-  SPECIALIST = 'SPECIALIST'
+  SPECIALIST = 'SPECIALIST',
+  LIDER = 'LIDER'
 }
 
 export enum JobTitle {
@@ -32,7 +33,7 @@ export interface User {
   role: UserRole;
   assignedZones: string[];
   assignedRestaurants: string[];
-  assignedRegions: string[]; // Nuevo campo para filtrar por regiones
+  assignedRegions: string[]; // Campo para filtrar por regiones
 }
 
 export interface StoreHistory {
@@ -88,9 +89,9 @@ export interface HierarchyData {
 
 // ── Banca ──────────────────────────────────────────────────────────────────
 export type Certification = 'GBR' | 'GAR' | 'GER' | 'EEA';
-export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Licencia en Curso';
+export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Entrenador HRS' | 'Licencia en Curso';
 
-export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Licencia en Curso'];
+export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Licencia en Curso'];
 
 export interface StoreIdeal {
   gerentes: number;

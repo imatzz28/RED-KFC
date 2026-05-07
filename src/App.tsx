@@ -27,7 +27,9 @@ const App: React.FC = () => {
     };
     void load();
     const interval = setInterval(() => {
-      void initData();
+      if (useAppStore.getState().auth.isAuthenticated) {
+        void useAppStore.getState().loadMonthly();
+      }
     }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [initData]);
@@ -68,7 +70,7 @@ const App: React.FC = () => {
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/entries-exits" element={<EntriesExitsReport />} />
             )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
+            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER) && (
               <Route path="/banca" element={<Banca />} />
             )}
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (

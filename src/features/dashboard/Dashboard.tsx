@@ -183,9 +183,9 @@ const Dashboard: React.FC = () => {
     setIsExporting(true);
     let allGradesForMonth: GradeEntry[] = [];
 
-    // Si se requiere detalle, traemos toda la base de datos de notas de ese mes una sola vez
+    // Si se requiere detalle, traemos toda la base de datos de notas históricas hasta ese mes una sola vez
     if (exportConfig.includeDetails) {
-      const raw = await dataService.supabaseFetchAll('grades', `?month=eq.${dashboardMonth}-01`);
+      const raw = await dataService.supabaseFetchAll('grades', `?month=lte.${dashboardMonth}-01`);
       allGradesForMonth = (raw || []).map((g: any) => ({
         employeeId: String(g.employee_id).trim(),
         restaurantId: String(g.restaurant_id || '').trim(),

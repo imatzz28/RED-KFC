@@ -79,15 +79,30 @@ self.onmessage = (e) => {
                     dynamicColumns[`${gConfig.name} %`] = `${groupAvg}%`;
 
                     if (exportConfig.includeDetails) {
-                        const empGrades = gradeIndex.get(empId) || [];
-                        const gGrades = empGrades.filter(g => g.group === gid);
+                        const empGradesRaw = gradeIndex.get(empId) || [];
+                        
+                        const empGrades = empGradesRaw.filter((g: any) => {
+                            const gradeMonth = g.month ? g.month.substring(0, 7) : '';
+                            if (gradeMonth > selectedMonth) return false;
+                            if ((g.group === 'D' || g.group === 'F') && gradeMonth !== selectedMonth) return false;
+                            return true;
+                        });
+
+                        const latestMap = new Map<string, any>();
+                        const sorted = [...empGrades].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
+                        sorted.forEach((g: any) => {
+                            latestMap.set(`${g.group}-${g.category}`, g);
+                        });
+                        
+                        const effectiveGrades = Array.from(latestMap.values());
+                        const gGrades = effectiveGrades.filter((g: any) => g.group === gid);
 
                         gConfig.categories.forEach((cat: string, index: number) => {
                             let catName = cat;
                             const cfg = hierarchy?.groupDConfig?.[selectedMonth];
                             if (gid === 'D') catName = cfg?.cat1 || "Guías Plan de Capacitación";
                             if (gid === 'F') catName = cfg?.cat2 || "Guías de SST";
-                            const grade = gGrades.find(g => g.category === cat);
+                            const grade = gGrades.find((g: any) => g.category === cat);
                             dynamicColumns[`[${gConfig.name}] ${catName}`] = grade ? `${grade.score}%` : '0%';
                         });
                     }

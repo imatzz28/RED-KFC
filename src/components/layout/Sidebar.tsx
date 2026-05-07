@@ -64,7 +64,7 @@ const Sidebar: React.FC = () => {
           </Link>
         )}
 
-        {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
+        {(role === UserRole.ADMIN || role === UserRole.COORDINATOR || role === UserRole.LIDER) && (
           <Link
             to="/banca"
             onClick={() => setIsOpen(false)}
