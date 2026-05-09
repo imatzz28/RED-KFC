@@ -1,27 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
-import { SafeHandsCert, SafeHandsSettings, Employee } from '@/types';
+import { SafeHandsCert, SafeHandsSettings, SafeHandsPerson } from '@/types';
 import { 
-  ShieldCheck, Upload, Download, Search, MapPin, 
-  ChevronRight, ArrowLeft, FileDown, Plus, 
-  Trash2, Filter, CheckCircle2, AlertCircle, Clock,
-  Signature
+  ShieldCheck, Upload, Download, Search, 
+  FileDown, Trash2, Signature,
+  CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
 const SafeHands: React.FC = () => {
-  const { employees, restaurants, auth } = useAppStore();
+  const { auth } = useAppStore();
+  const [personnel, setPersonnel] = useState<SafeHandsPerson[]>([]);
   const [certs, setCerts] = useState<SafeHandsCert[]>([]);
   const [settings, setSettings] = useState<SafeHandsSettings>({ responsibleName: '' });
-  const [view, setView] = useState<{ level: 'regions' | 'zones' | 'stores', region?: string, zone?: string }>({ level: 'regions' });
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  
 
-  const hierarchy = dataService.getHierarchy();
   const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR';
 
   useEffect(() => {
@@ -31,10 +30,12 @@ const SafeHands: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [certsData, settingsData] = await Promise.all([
+      const [peopleData, certsData, settingsData] = await Promise.all([
+        dataService.getSafeHandsPersonnel(),
         dataService.getSafeHandsCerts(),
         dataService.getSafeHandsSettings()
       ]);
+      setPersonnel(peopleData);
       setCerts(certsData);
       setSettings(settingsData);
     } catch (error) {
@@ -45,6 +46,56 @@ const SafeHands: React.FC = () => {
   };
 
   // ── Excel Import ───────────────────────────────────────────────────────────
+  const parseSpanishDate = (dateStr: string): string => {
+    if (!dateStr || typeof dateStr !== 'string') return '';
+    
+    const months: { [key: string]: string } = {
+      enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
+      julio: '07', agosto: '08', septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12'
+    };
+
+    try {
+      const cleanStr = dateStr.toLowerCase().trim().replace(/\s+/g, ' ');
+      const parts = cleanStr.split(' ');
+      
+      // Buscamos el año (el último grupo de 4 dígitos)
+      const year = parts.find(p => /^\d{4}$/.test(p));
+      // El día suele ser el primero
+      const day = parts[0].padStart(2, '0');
+      // El mes es cualquier palabra que coincida con nuestro diccionario
+      const monthName = parts.find(p => months[p]);
+      const month = monthName ? months[monthName] : null;
+
+      if (day && month && year) {
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Fallback si el formato es estándar
+      const fallback = new Date(dateStr);
+      if (!isNaN(fallback.getTime())) {
+        return fallback.toISOString().split('T')[0];
+      }
+      return '';
+    } catch (e) {
+      console.error("Error parsing date:", dateStr);
+      return '';
+    }
+  };
+
+  const formatSpanishDate = (dateStr: string): string => {
+    if (!dateStr) return '-';
+    try {
+      const months = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      ];
+      const [year, month, day] = dateStr.split('-');
+      return `${parseInt(day)} de ${months[parseInt(month) - 1]} ${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -54,37 +105,82 @@ const SafeHands: React.FC = () => {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        const newCerts: SafeHandsCert[] = data.map((item: any) => {
-          const cedula = String(item.Cédula || item.cedula || '').trim();
-          const emp = employees.find(emp => emp.id === cedula);
-          if (!emp) return null;
+        // Mapeo según CM.xlsx: Cedula, Nombre, Especialista, Fecha
+        const newPeople: SafeHandsPerson[] = [];
+        const newCerts: SafeHandsCert[] = [];
 
-          const issueDate = item.Fecha_Emision || item.fecha_emision || item.Fecha || item.fecha;
-          // Lógica simple para calcular vencimiento (1 año después)
+        data.forEach((item: any) => {
+          const cedula = String(item.Cedula || item.cedula || item.Cédula || '').trim();
+          if (!cedula) return;
+
+          const name = String(item.Nombre || item.nombre || 'Sin Nombre').trim();
+          const saStatus = String(item.Especialista || item['Seguridad de Alimentos'] || item.sa_status || '').trim();
+          const rawDate = item.Fecha || item.fecha || item.Fecha_Emision;
+          
+          if (!rawDate) return;
+
+          let issueDate = '';
+
+          if (rawDate instanceof Date) {
+            // Si ya es un objeto Date (gracias a cellDates: true)
+            issueDate = rawDate.toISOString().split('T')[0];
+          } else {
+            const dateStr = String(rawDate).trim();
+            if (dateStr.includes(' de ')) {
+              issueDate = parseSpanishDate(dateStr);
+            } else if (dateStr.includes('/')) {
+              // Formato DD/MM/YYYY
+              const parts = dateStr.split('/');
+              if (parts.length === 3) {
+                const day = parts[0].padStart(2, '0');
+                const month = parts[1].padStart(2, '0');
+                const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                issueDate = `${year}-${month}-${day}`;
+              }
+            } else {
+              // Intento estándar
+              const d = new Date(rawDate);
+              if (!isNaN(d.getTime())) {
+                issueDate = d.toISOString().split('T')[0];
+              }
+            }
+          }
+
+          if (!issueDate || issueDate === 'NaN-NaN-NaN' || issueDate.includes('undefined') || issueDate.startsWith('1970')) return;
+
           const d = new Date(issueDate);
           const expiryDate = new Date(d.setFullYear(d.getFullYear() + 1)).toISOString().split('T')[0];
 
-          return {
-            employeeId: cedula,
-            restaurantId: emp.restaurant_id,
-            issueDate: new Date(issueDate).toISOString().split('T')[0],
-            expiryDate: expiryDate,
-            certificateCode: `SH-${cedula}-${new Date().getTime()}`
-          };
-        }).filter(c => c !== null) as SafeHandsCert[];
+          newPeople.push({
+            id: cedula,
+            name: name,
+            saStatus: saStatus,
+            lastIssueDate: issueDate
+          });
 
-        if (newCerts.length > 0) {
+          newCerts.push({
+            employeeId: cedula,
+            restaurantId: 'SAFE_HANDS_IND',
+            issueDate: issueDate,
+            expiryDate: expiryDate,
+            certificateCode: `SH-${cedula}-${new Date(issueDate).getTime()}`
+          });
+        });
+
+        if (newPeople.length > 0) {
+          await dataService.saveSafeHandsPersonnel(newPeople);
           await dataService.saveSafeHandsCerts(newCerts);
           await loadData();
-          alert(`${newCerts.length} certificados cargados correctamente.`);
+          alert(`${newPeople.length} registros procesados correctamente.`);
         }
       } catch (err) {
-        alert("Error al procesar el archivo Excel. Verifica el formato.");
+        console.error(err);
+        alert("Error al procesar el archivo Excel. Verifica el formato de CM.xlsx.");
       } finally {
         setIsUploading(false);
       }
@@ -111,9 +207,11 @@ const SafeHands: React.FC = () => {
     alert("Configuración guardada correctamente.");
   };
 
-  const handleDownload = async (cert: SafeHandsCert, emp: Employee) => {
+  const handleDownload = async (cert: SafeHandsCert, person: SafeHandsPerson) => {
     try {
-      await safeHandsGenerator.downloadCertificate(cert, emp, settings);
+      // Necesitamos adaptar SafeHandsPerson a lo que espera el generador si es necesario
+      // pero por ahora pasamos el objeto directamente ya que tiene id y name
+      await safeHandsGenerator.downloadCertificate(cert, person as any, settings);
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Error al generar el certificado.");
@@ -133,28 +231,16 @@ const SafeHands: React.FC = () => {
     return 'VIGENTE';
   };
 
-  const filteredRegions = useMemo(() => {
+  const filteredPersonnel = useMemo(() => {
     const q = search.toLowerCase();
-    return hierarchy.regions.filter(r => !q || r.name.toLowerCase().includes(q));
-  }, [hierarchy, search]);
-
-  const filteredZones = useMemo(() => {
-    if (view.level !== 'zones') return [];
-    const region = hierarchy.regions.find(r => r.name === view.region);
-    const q = search.toLowerCase();
-    return region?.zones.filter(z => !q || z.name.toLowerCase().includes(q)) || [];
-  }, [hierarchy, view, search]);
-
-  const filteredStores = useMemo(() => {
-    if (view.level !== 'stores') return [];
-    const region = hierarchy.regions.find(r => r.name === view.region);
-    const zone = region?.zones.find(z => z.name === view.zone);
-    const q = search.toLowerCase();
-    return zone?.restaurantIds.filter(id => {
-      const rest = restaurants.find(r => r.id === id);
-      return !q || id.toLowerCase().includes(q) || rest?.name.toLowerCase().includes(q);
-    }) || [];
-  }, [hierarchy, view, restaurants, search]);
+    return personnel
+      .filter(p => 
+        !q || 
+        p.name.toLowerCase().includes(q) || 
+        p.id.toLowerCase().includes(q) ||
+        p.saStatus?.toLowerCase().includes(q)
+      );
+  }, [personnel, search]);
 
   // ── UI Components ──────────────────────────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => {
@@ -181,7 +267,7 @@ const SafeHands: React.FC = () => {
             Safe Hands
           </h2>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-            Certificaciones de Manipulación de Alimentos
+            Gestión Consolidada
           </p>
         </div>
 
@@ -193,7 +279,7 @@ const SafeHands: React.FC = () => {
               </button>
               <label className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
                 <Upload className="w-4 h-4" />
-                <span>Cargar Excel</span>
+                <span>Cargar Consolidado</span>
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
               </label>
             </>
@@ -201,156 +287,96 @@ const SafeHands: React.FC = () => {
         </div>
       </div>
 
-      {/* Navigation & Stats */}
-      <div className="bg-white rounded-[32px] border border-slate-100 p-6 shadow-sm">
-        <div className="flex items-center gap-4 mb-8">
-           <div className="relative flex-1">
+      {/* Main List Area */}
+      <div className="bg-white rounded-[32px] border border-slate-100 p-6 shadow-sm min-h-[600px] flex flex-col">
+        <div className="flex flex-col md:flex-row items-center gap-4 mb-8">
+           <div className="relative flex-1 w-full">
              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
              <input 
                type="text" 
-               placeholder="Buscar por región, zona o tienda..." 
+               placeholder="Buscar por nombre, cédula o seguridad de alimentos..." 
                className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-red-500 transition-all text-sm font-medium"
                value={search}
                onChange={e => setSearch(e.target.value)}
              />
            </div>
+           <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-2xl shrink-0">
+             <div className="flex items-center gap-2">
+               <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+               <span className="text-[10px] font-black text-slate-400 uppercase">Vigentes: {certs.filter(c => getEmpStatus(c.employeeId) === 'VIGENTE').length}</span>
+             </div>
+             <div className="flex items-center gap-2">
+               <div className="w-2 h-2 bg-red-500 rounded-full" />
+               <span className="text-[10px] font-black text-slate-400 uppercase">Vencidos: {certs.filter(c => getEmpStatus(c.employeeId) === 'VENCIDO').length}</span>
+             </div>
+           </div>
         </div>
 
-        {view.level !== 'regions' && (
-          <button 
-            onClick={() => setView({ level: view.level === 'stores' ? 'zones' : 'regions', region: view.region })}
-            className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-red-600 transition mb-6 uppercase tracking-widest"
-          >
-            <ArrowLeft className="w-4 h-4" /> Volver
-          </button>
-        )}
-
-        {/* Level 1: Regions */}
-        {view.level === 'regions' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredRegions.map(region => {
-               const ids = region.zones.flatMap(z => z.restaurantIds);
-               const empsInRegion = employees.filter(e => ids.includes(e.restaurant_id) && e.active);
-               const certifiedCount = empsInRegion.filter(e => getEmpStatus(e.id) === 'VIGENTE').length;
-               return (
-                 <button 
-                   key={region.name}
-                   onClick={() => setView({ level: 'zones', region: region.name })}
-                   className="group bg-slate-50/50 hover:bg-white p-5 rounded-[24px] border-2 border-transparent hover:border-red-100 transition-all text-left shadow-sm hover:shadow-xl"
-                 >
-                   <div className="flex justify-between items-start mb-4">
-                     <div className="p-3 bg-white rounded-xl shadow-sm text-red-600 group-hover:scale-110 transition-transform">
-                       <MapPin className="w-5 h-5" />
-                     </div>
-                     <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                   </div>
-                   <h3 className="text-sm font-black text-slate-800 uppercase truncate mb-1">{region.name}</h3>
-                   <div className="flex items-center justify-between">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{empsInRegion.length} Personal</p>
-                     <p className="text-xs font-black text-emerald-600">{certifiedCount} <span className="text-[8px] text-slate-300 uppercase">Cert.</span></p>
-                   </div>
-                 </button>
-               );
-            })}
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-20 animate-pulse">
+            <div className="w-12 h-12 border-4 border-slate-200 border-t-red-600 rounded-full animate-spin mb-4" />
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Cargando Personal Safe Hands...</p>
           </div>
-        )}
-
-        {/* Level 2: Zones */}
-        {view.level === 'zones' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredZones.map(zone => {
-               const empsInZone = employees.filter(e => zone.restaurantIds.includes(e.restaurant_id) && e.active);
-               const certifiedCount = empsInZone.filter(e => getEmpStatus(e.id) === 'VIGENTE').length;
-               return (
-                 <button 
-                   key={zone.name}
-                   onClick={() => setView({ level: 'stores', region: view.region, zone: zone.name })}
-                   className="group bg-slate-50/50 hover:bg-white p-5 rounded-[24px] border-2 border-transparent hover:border-red-100 transition-all text-left shadow-sm hover:shadow-xl"
-                 >
-                   <div className="flex justify-between items-start mb-4">
-                     <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600 group-hover:scale-110 transition-transform">
-                       <ShieldCheck className="w-5 h-5" />
-                     </div>
-                     <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                   </div>
-                   <h3 className="text-sm font-black text-slate-800 uppercase truncate mb-1">{zone.name}</h3>
-                   <div className="flex items-center justify-between">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{empsInZone.length} Personal</p>
-                     <p className="text-xs font-black text-emerald-600">{certifiedCount} <span className="text-[8px] text-slate-300 uppercase">Cert.</span></p>
-                   </div>
-                 </button>
-               );
-            })}
-          </div>
-        )}
-
-        {/* Level 3: Stores Table */}
-        {view.level === 'stores' && (
-          <div className="space-y-6">
-            {filteredStores.map(storeId => {
-              const rest = restaurants.find(r => r.id === storeId);
-              const empsInStore = employees.filter(e => e.restaurant_id === storeId && e.active);
-              
-              return (
-                <div key={storeId} className="bg-slate-50/30 rounded-[28px] border border-slate-100 overflow-hidden">
-                  <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center">
-                    <div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase italic">{rest?.name || storeId}</h4>
-                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">{storeId} · {empsInStore.length} Personas</p>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                          <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
-                          <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Emisión</th>
-                          <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Vencimiento</th>
-                          <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
-                          <th className="px-6 py-3 text-right text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {empsInStore.map(emp => {
-                          const cert = certs.find(c => c.employeeId === emp.id);
-                          const status = getEmpStatus(emp.id);
-                          return (
-                            <tr key={emp.id} className="hover:bg-white transition-colors group">
-                              <td className="px-6 py-4">
-                                <p className="text-xs font-bold text-slate-700">{emp.name}</p>
-                                <p className="text-[9px] font-mono text-slate-300">{emp.id}</p>
-                              </td>
-                              <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
-                                {cert?.issueDate || '-'}
-                              </td>
-                              <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
-                                {cert?.expiryDate || '-'}
-                              </td>
-                              <td className="px-6 py-4">
-                                <StatusBadge status={status} />
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                {cert && (
-                                  <button 
-                                    onClick={() => handleDownload(cert, emp)}
-                                    className="p-2 bg-white border border-slate-100 rounded-lg text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                                  >
-                                    <FileDown className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
+                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Seguridad Alimentos</th>
+                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Emisión</th>
+                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Vencimiento</th>
+                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
+                  <th className="px-6 py-3 text-right text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredPersonnel.slice(0, 100).map(person => {
+                  const cert = certs.find(c => c.employeeId === person.id);
+                  const status = getEmpStatus(person.id);
+                  return (
+                    <tr key={person.id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-bold text-slate-700 uppercase">{person.name}</p>
+                        <p className="text-[9px] font-mono text-slate-300">{person.id}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] font-black text-slate-500 uppercase">{person.saStatus || '-'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase">
+                        {formatSpanishDate(cert?.issueDate || '')}
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase">
+                        {formatSpanishDate(cert?.expiryDate || '')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2 transition-all">
+                          {cert && (
+                            <>
+                              
+                              <button 
+                                onClick={() => handleDownload(cert, person)}
+                                className="p-2 bg-white border border-slate-100 rounded-lg text-red-600 hover:bg-red-50 transition-all shadow-sm"
+                                title="Descargar PDF"
+                              >
+                                <FileDown className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
 
       {/* Settings Modal */}
       {showSettings && (

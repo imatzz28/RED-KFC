@@ -76,15 +76,17 @@ const Sidebar: React.FC = () => {
           </Link>
         )}
 
-        <Link
-          to="/safe-hands"
-          onClick={() => setIsOpen(false)}
-          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'safe-hands' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
-            }`}
-        >
-          <ShieldCheck className="w-5 h-5" />
-          <span className="font-bold text-sm uppercase tracking-tight">Safe Hands</span>
-        </Link>
+        {(role === UserRole.ADMIN || role === UserRole.COORDINATOR || role === UserRole.LIDER) && (
+          <Link
+            to="/safe-hands"
+            onClick={() => setIsOpen(false)}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'safe-hands' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+          >
+            <ShieldCheck className="w-5 h-5" />
+            <span className="font-bold text-sm uppercase tracking-tight">Safe Hands</span>
+          </Link>
+        )}
 
         {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
           <Link

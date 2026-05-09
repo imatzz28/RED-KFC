@@ -84,7 +84,9 @@ const App: React.FC = () => {
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/admin" element={<AdminPanel />} />
             )}
-            <Route path="/safe-hands" element={<SafeHands />} />
+            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER) && (
+              <Route path="/safe-hands" element={<SafeHands />} />
+            )}
             <Route path="/verify" element={<PublicValidation />} />
             <Route path="/verify/:id" element={<PublicValidation />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

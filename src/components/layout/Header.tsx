@@ -45,7 +45,7 @@ const Header: React.FC = () => {
           <Menu className="w-6 h-6" />
         </button>
 
-        {!['/dashboard', '/entries-exits', '/banca', '/admin'].includes(location.pathname) && (
+        {!['/dashboard', '/entries-exits', '/banca', '/admin', '/safe-hands'].includes(location.pathname) && (
           <div className="flex flex-col">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 italic">Periodo Evaluación</label>
             <div className="relative group flex items-center">

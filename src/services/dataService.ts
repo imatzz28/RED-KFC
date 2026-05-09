@@ -811,6 +811,29 @@ export const dataService = {
   },
 
   // ── Safe Hands Methods ───────────────────────────────────────────────────
+  getSafeHandsPersonnel: async (): Promise<SafeHandsPerson[]> => {
+    const result = await dataService.supabaseFetch('safe_hands_personnel', 'GET');
+    return (result || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      saStatus: p.sa_status,
+      restaurantId: p.restaurant_id,
+      lastIssueDate: p.last_issue_date,
+      createdAt: p.created_at
+    }));
+  },
+
+  saveSafeHandsPersonnel: async (people: SafeHandsPerson[]): Promise<void> => {
+    const payload = people.map(p => ({
+      id: p.id,
+      name: p.name,
+      sa_status: p.saStatus,
+      restaurant_id: p.restaurantId,
+      last_issue_date: p.lastIssueDate
+    }));
+    await dataService.supabaseFetch('safe_hands_personnel', 'POST', payload, '?on_conflict=id');
+  },
+
   getSafeHandsCerts: async (employeeId?: string): Promise<SafeHandsCert[]> => {
     const query = employeeId ? `?employee_id=eq.${employeeId}` : '';
     const result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, query);
@@ -826,7 +849,7 @@ export const dataService = {
     }));
   },
 
-  getPublicCert: async (codeOrId: string): Promise<{ cert: SafeHandsCert, employee: Employee } | null> => {
+  getPublicCert: async (codeOrId: string): Promise<{ cert: SafeHandsCert, employee: SafeHandsPerson } | null> => {
     // Buscar por código de certificado primero, luego por ID de empleado
     let result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?certificate_code=eq.${codeOrId}`);
     if (!result || result.length === 0) {
@@ -835,8 +858,9 @@ export const dataService = {
 
     if (result && result.length > 0) {
       const c = result[0];
-      const empResult = await dataService.supabaseFetch('employees', 'GET', null, `?id=eq.${c.employee_id}`);
-      if (empResult && empResult.length > 0) {
+      const personResult = await dataService.supabaseFetch('safe_hands_personnel', 'GET', null, `?id=eq.${c.employee_id}`);
+      if (personResult && personResult.length > 0) {
+        const p = personResult[0];
         return {
           cert: {
             id: c.id,
@@ -847,7 +871,13 @@ export const dataService = {
             certificateCode: c.certificate_code,
             signatureUrl: c.signature_url
           },
-          employee: empResult[0]
+          employee: {
+            id: p.id,
+            name: p.name,
+            saStatus: p.sa_status,
+            restaurantId: p.restaurant_id,
+            lastIssueDate: p.last_issue_date
+          }
         };
       }
     }
@@ -863,7 +893,7 @@ export const dataService = {
       certificate_code: c.certificateCode,
       signature_url: c.signatureUrl
     }));
-    await dataService.supabaseFetch('safe_hands_certs', 'POST', payload, '?on_conflict=certificate_code');
+    await dataService.supabaseFetch('safe_hands_certs', 'POST', payload, '?on_conflict=employee_id');
   },
 
   getSafeHandsSettings: async (): Promise<SafeHandsSettings> => {

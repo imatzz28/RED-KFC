@@ -1,123 +1,131 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import QRCode from 'qrcode';
-import { SafeHandsCert, Employee, SafeHandsSettings } from '@/types';
+import { SafeHandsCert, SafeHandsSettings } from '@/types';
+import { templateBase64 } from './templateBase64';
 
 (pdfMake as any).vfs = pdfFonts.vfs;
 
 export const safeHandsGenerator = {
   generateQR: async (code: string): Promise<string> => {
-    // Definir la URL de validación pública
-    // En producción esto debería ser una URL real
-    const validationUrl = `${window.location.origin}/verify/${code}`;
-    return await QRCode.toDataURL(validationUrl, {
-      margin: 1,
-      width: 150,
-      color: {
-        dark: '#1a1c23',
-        light: '#ffffff'
-      }
-    });
+    try {
+      const validationUrl = `${window.location.origin}/verify/${code}`;
+      return await QRCode.toDataURL(validationUrl, {
+        margin: 1,
+        width: 150,
+        color: { dark: '#1a1c23', light: '#ffffff' }
+      });
+    } catch (err) {
+      console.error("Error generating QR:", err);
+      throw err;
+    }
   },
 
-  downloadCertificate: async (cert: SafeHandsCert, employee: Employee, settings: SafeHandsSettings) => {
-    const qrDataUrl = await safeHandsGenerator.generateQR(cert.certificateCode);
+  downloadCertificate: async (cert: SafeHandsCert, employee: any, settings: SafeHandsSettings) => {
+    console.log("Iniciando generación de certificado para:", employee.name);
+    
+    try {
+      const qrDataUrl = await safeHandsGenerator.generateQR(cert.certificateCode);
+      console.log("QR generado con éxito");
+      
+      const formatDate = (d: string) => {
+        if (!d) return "N/A";
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const parts = d.split('-');
+        if (parts.length !== 3) return d;
+        const [year, month, day] = parts;
+        return `${parseInt(day)} de ${months[parseInt(month)-1]} ${year}`;
+      };
 
-    const docDefinition: any = {
-      pageSize: { width: 300, height: 450 },
-      pageMargins: [20, 20, 20, 20],
-      content: [
-        // Header
+      const docDefinition: any = {
+        pageSize: { width: 600, height: 400 },
+        pageMargins: [0, 0, 0, 0],
+        background: [
+          {
+            image: 'templateBackground',
+            width: 600,
+            height: 400
+          }
+        ],
+        content: [
         {
-          canvas: [
-            { type: 'rect', x: -20, y: -20, w: 300, h: 80, color: '#e60000' }
-          ]
-        },
-        {
-          text: 'SAFE HANDS',
-          color: 'white',
-          fontSize: 18,
+          text: (employee.name || "N/A").toUpperCase(),
+          fontSize: 13,
           bold: true,
-          alignment: 'center',
-          margin: [0, -60, 0, 5]
+          color: '#1a1c23',
+          absolutePosition: { x: 218, y: 153 }
         },
         {
-          text: 'CERTIFICADO DE MANIPULACIÓN',
-          color: 'white',
-          fontSize: 8,
-          bold: true,
-          alignment: 'center',
-          margin: [0, 0, 0, 0]
-        },
-
-        // Body
-        {
-          text: employee.name.toUpperCase(),
+          text: employee.id || "N/A",
           fontSize: 14,
           bold: true,
-          alignment: 'center',
-          margin: [0, 40, 0, 5],
-          color: '#1a1c23'
+          color: '#1a1c23',
+          absolutePosition: { x: 218, y: 205 }
         },
         {
-          text: `C.C. ${employee.id}`,
+          text: formatDate(cert.expiryDate),
+          fontSize: 14,
+          bold: true,
+          color: '#1a1c23',
+          absolutePosition: { x: 218, y: 255 }
+        },
+        {
+          text: (settings.responsibleName || "ESPECIALISTA").toUpperCase(),
           fontSize: 10,
+          bold: true,
+          color: '#1a1c23',
           alignment: 'center',
-          color: '#64748b',
-          margin: [0, 0, 0, 20]
+          absolutePosition: { x: 200, y: 358 },
+          width: 220
         },
-
+        // Marco rojo redondeado para el QR
         {
-          columns: [
+          canvas: [
             {
-              width: '*',
-              stack: [
-                { text: 'FECHA EMISIÓN', fontSize: 7, bold: true, color: '#94a3b8' },
-                { text: cert.issueDate, fontSize: 10, bold: true, color: '#1e293b' },
-                { text: 'FECHA VENCIMIENTO', fontSize: 7, bold: true, color: '#94a3b8', margin: [0, 10, 0, 0] },
-                { text: cert.expiryDate, fontSize: 10, bold: true, color: '#e60000' }
-              ]
-            },
-            {
-              width: 'auto',
-              image: qrDataUrl,
-              fit: [80, 80]
+              type: 'rect',
+              x: 0,
+              y: 0,
+              w: 110,
+              h: 110,
+              r: 8,
+              lineColor: '#e60000',
+              lineWidth: 2
             }
           ],
-          margin: [0, 0, 0, 30]
+          absolutePosition: { x: 457, y: 157 }
         },
-
-        // Signature Area
         {
-          stack: [
-            settings.signatureBase64 ? {
-              image: settings.signatureBase64,
-              fit: [100, 40],
-              alignment: 'center'
-            } : { text: '', height: 40 },
-            { 
-              canvas: [{ type: 'line', x1: 50, y1: 0, x2: 210, y2: 0, lineWidth: 0.5, lineColor: '#cbd5e1' }],
-              margin: [0, 5, 0, 5]
-            },
-            { text: settings.responsibleName.toUpperCase(), fontSize: 8, bold: true, alignment: 'center', color: '#1e293b' },
-            { text: 'DEPARTAMENTO DE CALIDAD', fontSize: 6, alignment: 'center', color: '#94a3b8' }
-          ]
+          image: qrDataUrl,
+          width: 100,
+          absolutePosition: { x: 462, y: 162 }
         },
-
-        // Footer
+        // Código único bajo el QR (alineado al borde derecho del marco)
         {
-          text: `CÓDIGO DE VERIFICACIÓN: ${cert.certificateCode}`,
+          text: cert.certificateCode,
           fontSize: 6,
-          alignment: 'center',
-          color: '#cbd5e1',
-          margin: [0, 40, 0, 0]
+          color: '#94a3b8',
+          width: 100, // Ajustado al mismo ancho del QR
+          absolutePosition: { x: 462, y: 268 }, // Alineado exactamente en la X del QR
+        },
+          settings.signatureBase64 ? {
+            image: settings.signatureBase64,
+            width: 100,
+            absolutePosition: { x: 250, y: 315 }
+          } : null
+        ].filter(Boolean),
+        images: {
+          templateBackground: templateBase64
         }
-      ],
-      defaultStyle: {
-        font: 'Helvetica'
-      }
-    };
+      };
 
-    pdfMake.createPdf(docDefinition).download(`Carnet_${employee.id}.pdf`);
+      console.log("Documento pdfMake listo, disparando descarga...");
+      const pdfDoc = pdfMake.createPdf(docDefinition);
+      pdfDoc.download(`Carnet_SafeHands_${employee.id}.pdf`);
+      console.log("Descarga iniciada.");
+      
+    } catch (error) {
+      console.error("Error fatal en downloadCertificate:", error);
+      throw error;
+    }
   }
 };

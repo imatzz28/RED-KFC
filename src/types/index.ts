@@ -115,6 +115,15 @@ export interface StoreAssignment {
   members: StoreLeader[];
 }
 // ── Safe Hands ─────────────────────────────────────────────────────────────
+export interface SafeHandsPerson {
+  id: string; // Cedula
+  name: string; // Nombre
+  saStatus?: string; // Seguridad de Alimentos
+  restaurantId?: string;
+  lastIssueDate?: string; // Fecha
+  createdAt?: string;
+}
+
 export interface SafeHandsCert {
   id?: string;
   employeeId: string;

@@ -132,8 +132,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </button>
         </form>
 
-        <div className="mt-12 pt-8 border-t border-slate-50 text-center">
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">© 2026 RED KFC - A2M LABS</p>
+        <div className="mt-12 pt-8 border-t border-slate-100 text-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">© 2026 RED KFC - A2M LABS</p>
         </div>
       </div>
     </div>

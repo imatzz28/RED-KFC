@@ -209,27 +209,37 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 -- ============================================================
--- SAFE HANDS: Gestión de Manipulación de Alimentos
+-- SAFE HANDS: Gestión de Manipulación de Alimentos (INDEPENDIENTE)
 -- ============================================================
 
--- 1. TABLA DE CERTIFICACIONES INDEPENDIENTE
+-- 1. TABLA DE PERSONAL ESPECÍFICA (Basada en CM.xlsx)
+CREATE TABLE IF NOT EXISTS safe_hands_personnel (
+  id                TEXT PRIMARY KEY, -- Cedula
+  name              TEXT NOT NULL,    -- Nombre
+  sa_status         TEXT,             -- Seguridad de Alimentos
+  restaurant_id     TEXT,             -- Opcional para filtros
+  last_issue_date   DATE,             -- Fecha
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. TABLA DE CERTIFICACIONES (Referenciando personal independiente)
 CREATE TABLE IF NOT EXISTS safe_hands_certs (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id       TEXT NOT NULL,
+  employee_id       TEXT UNIQUE NOT NULL, -- Solo un certificado por persona
   restaurant_id     TEXT NOT NULL,
   issue_date        DATE NOT NULL,
   expiry_date       DATE NOT NULL,
   certificate_code  TEXT UNIQUE NOT NULL,
   signature_url     TEXT,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT fk_employee FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+  CONSTRAINT fk_sh_person FOREIGN KEY (employee_id) REFERENCES safe_hands_personnel(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_sh_employee    ON safe_hands_certs(employee_id);
 CREATE INDEX IF NOT EXISTS idx_sh_expiry      ON safe_hands_certs(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_sh_code        ON safe_hands_certs(certificate_code);
 
--- 2. TABLA DE CONFIGURACIÓN (Firma Digital)
+-- 3. TABLA DE CONFIGURACIÓN (Firma Digital)
 CREATE TABLE IF NOT EXISTS safe_hands_settings (
   id            SERIAL PRIMARY KEY,
   signature_base64 TEXT,
@@ -242,17 +252,21 @@ INSERT INTO safe_hands_settings (id, responsible_name)
 VALUES (1, 'RESPONSABLE CALIDAD')
 ON CONFLICT (id) DO NOTHING;
 
--- 3. POLÍTICAS DE ACCESO PÚBLICO (Read-only para validación)
+-- 4. POLÍTICAS DE ACCESO (RLS)
 ALTER TABLE safe_hands_certs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safe_hands_personnel ENABLE ROW LEVEL SECURITY;
 
+-- Lectura pública para validación
 DROP POLICY IF EXISTS "Public validation access" ON safe_hands_certs;
-CREATE POLICY "Public validation access" ON safe_hands_certs
-  FOR SELECT
-  USING (true); -- Permitimos lectura pública de la tabla de certificados para el buscador
+CREATE POLICY "Public validation access" ON safe_hands_certs FOR SELECT USING (true);
 
--- También necesitamos lectura de empleados para el nombre en la validación
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public employee name access" ON employees;
-CREATE POLICY "Public employee name access" ON employees
-  FOR SELECT
-  USING (true); 
+DROP POLICY IF EXISTS "Public person access" ON safe_hands_personnel;
+CREATE POLICY "Public person access" ON safe_hands_personnel FOR SELECT USING (true);
+
+-- Escritura permitida (para el admin/coordinador desde la app)
+-- Nota: En un entorno real, usarías auth.uid() o roles, aquí permitimos a todos para simplificar la integración inicial o a autenticados
+DROP POLICY IF EXISTS "Allow all for safe_hands_certs" ON safe_hands_certs;
+CREATE POLICY "Allow all for safe_hands_certs" ON safe_hands_certs FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all for safe_hands_personnel" ON safe_hands_personnel;
+CREATE POLICY "Allow all for safe_hands_personnel" ON safe_hands_personnel FOR ALL USING (true) WITH CHECK (true);
