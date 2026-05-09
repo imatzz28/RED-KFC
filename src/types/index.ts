@@ -114,3 +114,19 @@ export interface StoreAssignment {
   restaurantId: string;
   members: StoreLeader[];
 }
+// ── Safe Hands ─────────────────────────────────────────────────────────────
+export interface SafeHandsCert {
+  id?: string;
+  employeeId: string;
+  restaurantId: string;
+  issueDate: string;
+  expiryDate: string;
+  certificateCode: string;
+  signatureUrl?: string;
+  createdAt?: string;
+}
+
+export interface SafeHandsSettings {
+  signatureBase64?: string;
+  responsibleName: string;
+}

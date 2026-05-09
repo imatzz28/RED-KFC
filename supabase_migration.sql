@@ -209,7 +209,50 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 -- ============================================================
--- PASO FINAL: Ejecutar el backfill histórico
--- (Ejecutar solo después de que las 3 funciones anteriores existan)
+-- SAFE HANDS: Gestión de Manipulación de Alimentos
 -- ============================================================
-SELECT backfill_monthly_group_stats();
+
+-- 1. TABLA DE CERTIFICACIONES INDEPENDIENTE
+CREATE TABLE IF NOT EXISTS safe_hands_certs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id       TEXT NOT NULL,
+  restaurant_id     TEXT NOT NULL,
+  issue_date        DATE NOT NULL,
+  expiry_date       DATE NOT NULL,
+  certificate_code  TEXT UNIQUE NOT NULL,
+  signature_url     TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT fk_employee FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sh_employee    ON safe_hands_certs(employee_id);
+CREATE INDEX IF NOT EXISTS idx_sh_expiry      ON safe_hands_certs(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_sh_code        ON safe_hands_certs(certificate_code);
+
+-- 2. TABLA DE CONFIGURACIÓN (Firma Digital)
+CREATE TABLE IF NOT EXISTS safe_hands_settings (
+  id            SERIAL PRIMARY KEY,
+  signature_base64 TEXT,
+  responsible_name TEXT,
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insertar settings por defecto si no existen
+INSERT INTO safe_hands_settings (id, responsible_name) 
+VALUES (1, 'RESPONSABLE CALIDAD')
+ON CONFLICT (id) DO NOTHING;
+
+-- 3. POLÍTICAS DE ACCESO PÚBLICO (Read-only para validación)
+ALTER TABLE safe_hands_certs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public validation access" ON safe_hands_certs;
+CREATE POLICY "Public validation access" ON safe_hands_certs
+  FOR SELECT
+  USING (true); -- Permitimos lectura pública de la tabla de certificados para el buscador
+
+-- También necesitamos lectura de empleados para el nombre en la validación
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public employee name access" ON employees;
+CREATE POLICY "Public employee name access" ON employees
+  FOR SELECT
+  USING (true); 

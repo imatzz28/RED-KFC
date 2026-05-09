@@ -808,5 +808,82 @@ export const dataService = {
     const finalEmployees = Array.from(allProcessedMap.values());
     await dataService.saveEmployees(finalEmployees);
     return { count: importedEmployees.length };
+  },
+
+  // ── Safe Hands Methods ───────────────────────────────────────────────────
+  getSafeHandsCerts: async (employeeId?: string): Promise<SafeHandsCert[]> => {
+    const query = employeeId ? `?employee_id=eq.${employeeId}` : '';
+    const result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, query);
+    return (result || []).map((c: any) => ({
+      id: c.id,
+      employeeId: c.employee_id,
+      restaurantId: c.restaurant_id,
+      issueDate: c.issue_date,
+      expiryDate: c.expiry_date,
+      certificateCode: c.certificate_code,
+      signatureUrl: c.signature_url,
+      createdAt: c.created_at
+    }));
+  },
+
+  getPublicCert: async (codeOrId: string): Promise<{ cert: SafeHandsCert, employee: Employee } | null> => {
+    // Buscar por código de certificado primero, luego por ID de empleado
+    let result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?certificate_code=eq.${codeOrId}`);
+    if (!result || result.length === 0) {
+      result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?employee_id=eq.${codeOrId}&order=expiry_date.desc&limit=1`);
+    }
+
+    if (result && result.length > 0) {
+      const c = result[0];
+      const empResult = await dataService.supabaseFetch('employees', 'GET', null, `?id=eq.${c.employee_id}`);
+      if (empResult && empResult.length > 0) {
+        return {
+          cert: {
+            id: c.id,
+            employeeId: c.employee_id,
+            restaurantId: c.restaurant_id,
+            issueDate: c.issue_date,
+            expiryDate: c.expiry_date,
+            certificateCode: c.certificate_code,
+            signatureUrl: c.signature_url
+          },
+          employee: empResult[0]
+        };
+      }
+    }
+    return null;
+  },
+
+  saveSafeHandsCerts: async (certs: SafeHandsCert[]): Promise<void> => {
+    const payload = certs.map(c => ({
+      employee_id: c.employeeId,
+      restaurant_id: c.restaurantId,
+      issue_date: c.issueDate,
+      expiry_date: c.expiryDate,
+      certificate_code: c.certificateCode,
+      signature_url: c.signatureUrl
+    }));
+    await dataService.supabaseFetch('safe_hands_certs', 'POST', payload, '?on_conflict=certificate_code');
+  },
+
+  getSafeHandsSettings: async (): Promise<SafeHandsSettings> => {
+    const result = await dataService.supabaseFetch('safe_hands_settings', 'GET', null, '?id=eq.1');
+    if (result && result.length > 0) {
+      return {
+        signatureBase64: result[0].signature_base64,
+        responsibleName: result[0].responsible_name
+      };
+    }
+    return { responsibleName: 'RESPONSABLE CALIDAD' };
+  },
+
+  updateSafeHandsSettings: async (settings: SafeHandsSettings): Promise<void> => {
+    const payload = {
+      id: 1,
+      signature_base64: settings.signatureBase64,
+      responsible_name: settings.responsibleName,
+      updated_at: new Date().toISOString()
+    };
+    await dataService.supabaseFetch('safe_hands_settings', 'POST', payload, '?on_conflict=id');
   }
 };

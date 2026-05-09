@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { UserRole } from '@/types';
-import { LayoutDashboard, ShieldAlert, LogOut, GraduationCap, X, Store, ArrowUpDown, Settings, BookUser } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, LogOut, GraduationCap, X, Store, ArrowUpDown, Settings, BookUser, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { useAppStore } from '@/store/useAppStore';
@@ -75,6 +75,16 @@ const Sidebar: React.FC = () => {
             <span className="font-bold text-sm uppercase tracking-tight">Banca</span>
           </Link>
         )}
+
+        <Link
+          to="/safe-hands"
+          onClick={() => setIsOpen(false)}
+          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'safe-hands' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+            }`}
+        >
+          <ShieldCheck className="w-5 h-5" />
+          <span className="font-bold text-sm uppercase tracking-tight">Safe Hands</span>
+        </Link>
 
         {(role === UserRole.ADMIN || role === UserRole.COORDINATOR) && (
           <Link

@@ -12,6 +12,8 @@ import Banca from '@/features/banca/Banca';
 import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
+import SafeHands from '@/features/safe-hands/SafeHands';
+import PublicValidation from '@/features/safe-hands/PublicValidation';
 
 const App: React.FC = () => {
   const {
@@ -41,7 +43,13 @@ const App: React.FC = () => {
   }, [selectedMonth, auth.isAuthenticated, loadMonthly]);
 
   if (!auth.isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <Routes>
+        <Route path="/verify" element={<PublicValidation />} />
+        <Route path="/verify/:id" element={<PublicValidation />} />
+        <Route path="*" element={<Login onLogin={handleLogin} />} />
+      </Routes>
+    );
   }
 
   return (
@@ -76,6 +84,9 @@ const App: React.FC = () => {
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/admin" element={<AdminPanel />} />
             )}
+            <Route path="/safe-hands" element={<SafeHands />} />
+            <Route path="/verify" element={<PublicValidation />} />
+            <Route path="/verify/:id" element={<PublicValidation />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
