@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Employee, GradeEntry } from '@/types';
 import { EVALUATION_GROUPS } from '@/utils/constants';
 import { dataService } from '@/services/dataService';
+import { useQueryClient } from '@tanstack/react-query';
 // Added MapPin to the imports from lucide-react
 import { X, Save, User, Calendar, GraduationCap, Star, Trophy, ClipboardCheck, Vault, Lock, RefreshCw, BookOpen, ArrowUp, ArrowDown, Repeat, History, Clock, MapPin, Activity } from 'lucide-react';
 
@@ -23,10 +24,12 @@ const GroupIcons: Record<string, React.ReactNode> = {
 };
 
 const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) => {
+  const queryClient = useQueryClient();
   const [activeGroup, setActiveGroup] = useState<string>('AK');
   const [formGrades, setFormGrades] = useState<GradeEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const hierarchy = useMemo(() => dataService.getHierarchy(), []);
 
@@ -65,9 +68,13 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
   const saveGrades = async () => {
     if (isPeriodLocked) return;
     setIsSaving(true);
+    setSaveSuccess(false);
     try {
       await dataService.saveEmployeeGrades(employee.id, month, formGrades);
-      onClose();
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      // Removed onClose() to keep editor open as requested
     } catch (err: unknown) {
       alert(`Error al guardar notas: ${err instanceof Error ? err.message : 'Ocurrió un error desconocido.'}`);
     } finally {
@@ -186,13 +193,21 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
           </div>
         </div>
 
-        <div className="p-6 md:p-8 border-t border-slate-100 bg-slate-50 flex justify-end items-center shrink-0">
+        <div className="p-6 md:p-8 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+          <div className="flex-1">
+            {saveSuccess && (
+              <div className="flex items-center gap-2 text-emerald-600 animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest italic">Cambios guardados correctamente</span>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <button onClick={onClose} className="flex-1 sm:flex-none px-8 py-4 bg-white text-slate-400 font-black rounded-2xl border-2 border-slate-200 text-[10px] uppercase transition-all">Regresar</button>
             {!isPeriodLocked && (
-              <button onClick={saveGrades} disabled={isSaving} className="flex-1 sm:flex-none px-10 py-4 bg-red-600 text-white text-[10px] font-black rounded-2xl shadow-xl hover:bg-red-700 transition-all uppercase flex items-center justify-center gap-2">
-                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {isSaving ? 'Sincronizando...' : 'Guardar y Certificar'}
+              <button onClick={saveGrades} disabled={isSaving} className={`flex-1 sm:flex-none px-10 py-4 text-white text-[10px] font-black rounded-2xl shadow-xl transition-all uppercase flex items-center justify-center gap-2 ${saveSuccess ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : saveSuccess ? <ClipboardCheck className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                {isSaving ? 'Sincronizando...' : saveSuccess ? '¡Completado!' : 'Guardar y Certificar'}
               </button>
             )}
           </div>

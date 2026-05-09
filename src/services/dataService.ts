@@ -631,8 +631,19 @@ export const dataService = {
       const allGrades = previousGrades.filter(g => !(g.employeeId === employeeId && g.month && g.month.startsWith(month)));
       const gradesWithContext = grades.map(g => ({ ...g, month: monthDate, restaurantId: currentCeco }));
       const updated = [...allGrades, ...gradesWithContext];
+
+      // Actualizar caché global y persistencia local
       await localforage.setItem('la_akademia_grades', updated);
       dataService._cache.grades = updated;
+
+      // Sincronizar también el bucket específico de la tienda si existe
+      const cacheKey = `${currentCeco.trim().toUpperCase()}::${month}`;
+      if (dataService._cache.gradesByKey.has(cacheKey)) {
+        const storeGrades = dataService._cache.gradesByKey.get(cacheKey)!;
+        const filteredStore = storeGrades.filter(g => !(g.employeeId === employeeId && g.month && g.month.startsWith(month)));
+        dataService._cache.gradesByKey.set(cacheKey, [...filteredStore, ...gradesWithContext]);
+      }
+
       dataService._cache.gradeIndex = null;
 
     } catch (err) {

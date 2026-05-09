@@ -615,7 +615,7 @@ const Banca: React.FC = () => {
 
         {/* LEVEL 1: Region Cards */}
         {view.level === 'regions' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {regionsView.length === 0 && (
               <div className="col-span-full bg-white rounded-2xl border border-slate-100 p-12 text-center">
                 <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
@@ -628,20 +628,43 @@ const Banca: React.FC = () => {
               const assigned = countAssigned(allIds);
               return (
                 <button key={region.name} onClick={() => { setView({ level: 'zones', region: region.name }); setSearch(''); }}
-                  className="group text-left bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-red-200 transition-all overflow-hidden">
-                  <div className="bg-gradient-to-br from-slate-900 to-slate-700 group-hover:from-red-700 group-hover:to-red-500 transition-all p-4">
-                    <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center mb-3">
-                      <MapPin className="w-5 h-5 text-white" />
+                  className="group text-left bg-white rounded-[24px] shadow-md hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col">
+                  {/* Header: Dark Style */}
+                  <div className="flex h-20 bg-[#1a1c23]">
+                    <div className="w-12 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                      </div>
+                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
                     </div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-tight">{region.name}</h3>
-                    <p className="text-[10px] text-white/60 mt-0.5">{region.zones.length} zonas · {allIds.length} tiendas</p>
+                    <div className="flex-1 flex items-center px-4 gap-3">
+                      <div className="w-10 h-10 bg-red-700/80 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+                        <MapPin className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-black text-white uppercase tracking-tight truncate">{region.name}</h3>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
+                           <span className="w-1 h-1 bg-red-500 rounded-full" /> {region.zones.length} zonas | {allIds.length} tiendas
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Asignadas</p>
-                      <p className="text-xl font-black text-slate-800">{assigned}<span className="text-xs text-slate-300 font-bold">/{allIds.length}</span></p>
+                  {/* Body: White Footer */}
+                  <div className="px-4 py-3 flex items-center justify-between bg-white flex-1">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-red-600 shadow-inner">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-red-600 uppercase tracking-[0.2em] font-black mb-0.5">Asignadas</p>
+                        <p className="text-xl font-black text-slate-900 leading-none">
+                          {assigned}<span className="text-[10px] text-slate-300 ml-0.5 font-bold">/{allIds.length}</span>
+                        </p>
+                      </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-red-500 group-hover:translate-x-1 transition-all" />
+                    <ChevronRight className="w-4 h-4 text-red-600 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </button>
               );
@@ -651,26 +674,49 @@ const Banca: React.FC = () => {
 
         {/* LEVEL 2: Zone Cards */}
         {view.level === 'zones' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {zonesView.map(zone => {
               const validIds = zone.restaurantIds.filter(id => restaurants.some(r => r.id === id));
               const assigned = countAssigned(validIds);
               return (
                 <button key={zone.name} onClick={() => { setView({ level: 'stores', region: (view as any).region, zone: zone.name }); setSearch(''); }}
-                  className="group text-left bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-red-200 transition-all overflow-hidden">
-                  <div className="bg-gradient-to-br from-slate-700 to-slate-600 group-hover:from-red-600 group-hover:to-red-400 transition-all p-4">
-                    <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center mb-3">
-                      <Users className="w-5 h-5 text-white" />
+                  className="group text-left bg-white rounded-[24px] shadow-md hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col">
+                  {/* Header: Dark Style */}
+                  <div className="flex h-20 bg-[#2d333d]">
+                    <div className="w-12 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
+                      </div>
+                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
                     </div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-tight">{zone.name}</h3>
-                    <p className="text-[10px] text-white/60 mt-0.5">{validIds.length} tiendas</p>
+                    <div className="flex-1 flex items-center px-4 gap-3">
+                      <div className="w-10 h-10 bg-red-600/80 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+                        <Users className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-black text-white uppercase tracking-tight truncate">{zone.name}</h3>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
+                           <span className="w-1 h-1 bg-red-500 rounded-full" /> {validIds.length} tiendas
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Asignadas</p>
-                      <p className="text-xl font-black text-slate-800">{assigned}<span className="text-xs text-slate-300 font-bold">/{validIds.length}</span></p>
+                  {/* Body: White Footer */}
+                  <div className="px-4 py-3 flex items-center justify-between bg-white flex-1">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-red-600 shadow-inner">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-red-600 uppercase tracking-[0.2em] font-black mb-0.5">Asignadas</p>
+                        <p className="text-xl font-black text-slate-900 leading-none">
+                          {assigned}<span className="text-[10px] text-slate-300 ml-0.5 font-bold">/{validIds.length}</span>
+                        </p>
+                      </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-red-500 group-hover:translate-x-1 transition-all" />
+                    <ChevronRight className="w-4 h-4 text-red-600 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </button>
               );

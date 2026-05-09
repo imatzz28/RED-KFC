@@ -358,7 +358,7 @@ const MyStores: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <DetailStatCard icon={<Users className="w-6 h-6" />} label="Estructura Total" value={stats.total} color="blue" />
-          <DetailStatCard icon={<TrendingUp className="w-6 h-6" />} label="Curva Global" value={`${stats.percent}%`} color="dark" />
+          <DetailStatCard icon={<TrendingUp className="w-6 h-6" />} label="Curva Global" value={stats.percent} color="dark" />
         </div>
 
 
@@ -368,19 +368,22 @@ const MyStores: React.FC = () => {
           {Object.entries(EVALUATION_GROUPS).map(([id, group]) => {
             const groupAvg = stats.groupStats[id]?.avg || 0;
             return (
-              <div key={id} className={`bg-white p-5 rounded-[28px] border flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-lg hover:-translate-y-0.5 transition-all group ${groupAvg >= 90 ? 'hover:border-emerald-200 border-slate-100' : 'hover:border-slate-300 border-slate-100'}`}>
+              <div key={id} className={`bg-white p-6 rounded-[32px] border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group ${groupAvg >= 90 ? 'border-emerald-50' : 'border-slate-50'}`}>
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-2xl transition-transform group-hover:scale-110 shadow-sm shrink-0 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                  <div className={`p-4 rounded-2xl transition-transform group-hover:rotate-6 shadow-sm shrink-0 ${groupAvg >= 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
                     {React.cloneElement(GroupIcons[id] as React.ReactElement, { className: 'w-5 h-5' })}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.15em] truncate pr-2">{group.name}</p>
-                    <p className={`text-2xl font-black italic tracking-tighter leading-none mt-1 ${groupAvg >= 90 ? 'text-emerald-700' : 'text-slate-800'}`}>{groupAvg}%</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] truncate pr-2 mb-1">{group.name}</p>
+                    <p className={`text-2xl font-black italic tracking-tighter leading-none ${groupAvg >= 90 ? 'text-emerald-700' : 'text-slate-800'}`}>{groupAvg}</p>
                   </div>
                 </div>
 
-                <div className="w-full md:w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0 mt-2 md:mt-0 relative" title={`${groupAvg}% completado`}>
-                  <div className={`absolute top-0 left-0 bottom-0 transition-all duration-1000 ${groupAvg >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400'}`} style={{ width: `${groupAvg}%` }} />
+                <div className="flex flex-col gap-1.5 items-end">
+                  <div className="w-full md:w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0 relative shadow-inner">
+                    <div className={`absolute top-0 left-0 bottom-0 transition-all duration-1000 ${groupAvg >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} style={{ width: `${groupAvg}%` }} />
+                  </div>
+                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Cumplimiento</p>
                 </div>
               </div>
             );
@@ -484,7 +487,7 @@ const MyStores: React.FC = () => {
           </div>
         </div>
 
-        {editingEmployee && <GradeEditor employee={editingEmployee} month={selectedMonth} onClose={() => { setEditingEmployee(null); onUpdate(); }} />}
+        {editingEmployee && <GradeEditor employee={editingEmployee} month={selectedMonth} onClose={() => { setEditingEmployee(null); onUpdate(); setGradeVersion(v => v + 1); }} />}
 
         {showPdfModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
@@ -549,39 +552,45 @@ const MyStores: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {paginatedStores.map(store => {
           const stats = getStoreStatsForMonth(store.id, selectedMonth);
           return (
-            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[24px] shadow-sm hover:shadow-xl border-2 border-slate-100 hover:border-red-500 transition-all duration-300 group cursor-pointer flex flex-col overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-              <div className="p-5 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-5">
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 bg-red-50 rounded-[16px] flex shrink-0 items-center justify-center text-red-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                      <Store className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0 pr-2">
-                      <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter leading-none italic group-hover:text-red-700 transition-colors truncate">{store.name}</h3>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3 text-red-400 shrink-0" /> {store.region} • {store.zone}</p>
-                    </div>
+            <div key={store.id} onClick={() => setSelectedStore(store)} className="bg-white rounded-[20px] shadow-md hover:shadow-2xl border border-slate-100/50 hover:border-red-200 transition-all duration-300 group cursor-pointer overflow-hidden flex flex-col">
+              {/* Header: KFC Brand Strip */}
+              <div className="flex h-16 border-b border-slate-50">
+                <div className="w-16 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+                    <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                    <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                    <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                  </div>
+                  <Store className="w-6 h-6 text-white relative z-10" />
+                  <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+                </div>
+                <div className="flex-1 flex flex-col justify-center px-4">
+                  <h3 className="text-base font-black text-slate-900 italic uppercase tracking-tighter leading-tight group-hover:text-red-700 transition-colors truncate">{store.name}</h3>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 font-bold text-[7px] uppercase tracking-widest">
+                    <MapPin className="w-2.5 h-2.5 text-red-500 shrink-0" />
+                    <span className="truncate">{store.region} • {store.zone}</span>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-auto grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 p-3.5 rounded-[16px] border border-slate-100 flex flex-col items-center justify-center group-hover:bg-rose-50/50 transition-colors">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Personal</p>
-                    <p className="text-xl font-black text-slate-800 tracking-tighter leading-none">
-                      {stats.total} <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase ml-0.5">Pers.</span>
-                    </p>
+              {/* Body: Stats Section */}
+              <div className="flex bg-white relative overflow-hidden h-20">
+                <div className="absolute right-0 bottom-0 w-24 h-24 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 0)', backgroundSize: '6px 6px' }}></div>
+                
+                <div className="w-[35%] flex flex-col items-center justify-center p-3 border-r border-slate-50 bg-slate-50/20">
+                  <div className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+                    <Users className="w-4 h-4" />
                   </div>
-                  <div className={`p-3.5 rounded-[16px] border flex flex-col items-center justify-center transition-colors ${stats.percent >= 90 ? 'bg-emerald-50 border-emerald-100 group-hover:bg-emerald-100/50' : 'bg-slate-800 border-slate-700 group-hover:bg-slate-700'}`}>
-                    <p className={`text-[8px] font-black uppercase tracking-widest mb-1 text-center ${stats.percent >= 90 ? 'text-emerald-600' : 'text-slate-400'}`}>Curva Global</p>
-                    <p className={`text-xl font-black tracking-tighter leading-none ${stats.percent >= 90 ? 'text-emerald-700' : 'text-white'}`}>
-                      {stats.percent}%
-                    </p>
-                  </div>
+                  <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest text-center leading-tight">Personal</p>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center p-3 relative z-10">
+                  <span className="text-3xl font-black text-red-600 tracking-tighter leading-none">{stats.total}</span>
+                  <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Colaboradores</p>
                 </div>
               </div>
             </div>
@@ -616,29 +625,40 @@ const MyStores: React.FC = () => {
 
 const DetailStatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, color: string }> = ({ icon, label, value, color }) => {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    red: 'bg-red-50 text-red-700 border-red-100',
-    slate: 'bg-slate-50 text-slate-700 border-slate-200',
-    dark: 'bg-slate-800 text-white border-slate-700 shadow-xl'
+    blue: 'border-blue-100 text-blue-600 bg-white',
+    green: 'border-emerald-100 text-emerald-600 bg-white',
+    red: 'border-red-100 text-red-600 bg-white',
+    slate: 'border-slate-100 text-slate-600 bg-white',
+    dark: 'bg-slate-950 text-white border-slate-900 shadow-2xl'
+  };
+
+  const iconBgMap: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-emerald-50 text-emerald-600',
+    red: 'bg-red-50 text-red-600',
+    slate: 'bg-slate-50 text-slate-600',
+    dark: 'bg-white/10 text-white'
   };
 
   const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
 
   return (
-    <div className={`p-6 md:p-8 rounded-[32px] border flex flex-col justify-center transition-transform hover:-translate-y-1 ${colorMap[color]}`}>
+    <div className={`p-6 md:p-8 rounded-[32px] border-2 flex flex-col justify-center transition-all hover:shadow-2xl hover:scale-[1.02] group ${colorMap[color]}`}>
       <div className="flex items-center space-x-5">
-        <div className={`p-4 rounded-2xl shadow-sm ring-1 ${color === 'dark' ? 'bg-slate-800 text-slate-300 ring-white/10' : 'bg-white ring-black/5'}`}>{React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}</div>
+        <div className={`p-4 rounded-2xl shadow-inner transition-transform group-hover:rotate-6 ${iconBgMap[color]}`}>{React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}</div>
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">{label}</p>
-          <div className="flex items-baseline gap-3 mt-1">
-            <h4 className="text-3xl font-black tracking-tighter leading-none truncate">{value}</h4>
+          <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${color === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>{label}</p>
+          <div className="flex items-center gap-3">
+            <h4 className={`text-3xl font-black tracking-tighter leading-none ${color === 'dark' ? 'text-white' : 'text-slate-900'}`}>{value}</h4>
             {label.includes('Curva') && (
-              <div className={`w-20 h-1.5 rounded-full overflow-hidden ${color === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
-                <div
-                  className={`h-full transition-all duration-1000 ${numericValue >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400'}`}
-                  style={{ width: `${numericValue}%` }}
-                />
+              <div className="flex flex-col gap-1">
+                <div className={`w-16 h-1.5 rounded-full overflow-hidden ${color === 'dark' ? 'bg-white/10' : 'bg-slate-100'}`}>
+                  <div
+                    className={`h-full transition-all duration-1000 ${numericValue >= 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`}
+                    style={{ width: `${numericValue}%` }}
+                  />
+                </div>
+                <p className={`text-[8px] font-black uppercase tracking-widest ${color === 'dark' ? 'text-slate-500' : 'text-slate-300'}`}>Desempeño</p>
               </div>
             )}
           </div>
