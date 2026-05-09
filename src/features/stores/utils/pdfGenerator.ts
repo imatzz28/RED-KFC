@@ -16,7 +16,18 @@ export const generateStorePdf = async (
         setTimeout(async () => {
             try {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
-                const storeEmps = employees.filter(e => e.restaurant_id === selectedStore.id && e.active);
+                // Filtrado histórico de empleados para el PDF
+                const [yVal, mVal] = pdfMonth.split('-').map(Number);
+                const lastDayVal = new Date(yVal, mVal, 0).getDate();
+                const periodEndStr = `${pdfMonth}-${String(lastDayVal).padStart(2, '0')}`;
+                const periodStartStr = `${pdfMonth}-01`;
+
+                const storeEmps = employees.filter(e => {
+                    const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
+                    const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
+                    const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+                    return (e.restaurant_id || '').trim().toUpperCase() === selectedStore.id.trim().toUpperCase() && isHistoricalActive;
+                });
 
                 const colors: Record<string, [number, number, number]> = {
                     kfcRed: [227, 24, 55],
@@ -105,7 +116,7 @@ export const generateStorePdf = async (
 
                 let barY = 75;
                 Object.entries(EVALUATION_GROUPS).forEach(([gid, config]) => {
-                    const rate = stats.groupStats[gid]?.approvalRate || 0;
+                    const rate = stats.groupStats[gid]?.avg || 0; // Cambiado de approvalRate a avg para consistencia con Dashboard
                     const isApp = rate >= APPROVAL_THRESHOLD;
 
                     doc.setFontSize(8.5);

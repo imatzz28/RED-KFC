@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { GradeEntry, Employee, JobTitle, User, Restaurant, UserRole } from '@/types';
 import { dataService } from '@/services/dataService';
 import { EVALUATION_GROUPS, APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT } from '@/utils/constants';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList, AreaChart, Area, Line, LineChart, Legend } from 'recharts';
 import { Activity, XCircle, Users, Award, TrendingUp, Search, MapPin, Filter, Download, X, Check, FileText, ArrowUpCircle, ArrowDownCircle, RefreshCw, UserCheck, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ExportWorker from '@/workers/exportWorker?worker';
 
+import { getSeniorityMonths } from '@/features/stores/utils/storeUtils';
 import { useAppStore } from '@/store/useAppStore';
 
 // Clasificación de cargos para rotación operativa vs administrativa
@@ -95,78 +96,122 @@ const Dashboard: React.FC = () => {
   const { data: statsMap, isLoading: isLoadingStats } = useQuery({
     queryKey: ['dashboard-stats', dashboardMonth, filterRegion, filterZone, filterStore],
     queryFn: async () => {
-      const storeIds = Array.from(scopeStoresSet);
-      const storeNames = storeIds.map(id => restaurants.find(r => r.id.trim().toUpperCase() === id)?.name || id);
+      const storeIds    = Array.from(scopeStoresSet);
+      const isSingleStore = filterStore !== 'all';
 
-      // Obtenemos resúmenes con herencia (lte) para este mes
-      const monthDate = `${dashboardMonth}-01`;
-      const allSummaries = await dataService.supabaseFetchAll('employee_monthly_summary', `?month=lte.${monthDate}&order=month.desc`);
-      
-      const latestMap = new Map<string, any>();
-      (allSummaries || []).forEach((s: any) => {
-        const empId = String(s.employee_id).trim();
-        if (!latestMap.has(empId)) latestMap.set(empId, s);
-      });
+      // ── CAMINO A: Zona / Región / Nacional → RPC get_dashboard_stats ──────
+      // Datos precalculados en monthly_group_stats (históricos y correctos).
+      // Un solo request HTTP, sin importar cuántas tiendas haya en el scope.
+      if (!isSingleStore) {
+        const rpcData = await dataService.getDashboardStats(
+          dashboardMonth,
+          undefined,
+          filterZone   !== 'all' ? filterZone   : undefined,
+          filterRegion !== 'all' ? filterRegion : undefined
+        );
 
-      // 2. Filtramos empleados válidos (que finalizaron activos en este mes)
-      const monthEndStr = `${dashboardMonth}-31`;
+        const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => {
+          const row = rpcData.find((r: any) => r.group_id === gid);
+          return {
+            id:   gid,
+            name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name,
+            avg:  row ? Math.round(Number(row.avg_score))     : 0,
+            rate: row ? Math.round(Number(row.approval_rate)) : 0
+          };
+        });
+
+        // El total de empleados viene del grupo AK (sin restricción de antigüedad)
+        const akRow = rpcData.find((r: any) => r.group_id === 'AK');
+        const totalEmployees  = akRow ? Number(akRow.employee_count) : 0;
+        const approvedCount   = akRow ? Number(akRow.approved_count) : 0;
+        const globalProgress  = groupAvgs.length > 0
+          ? Math.round(groupAvgs.reduce((acc, g) => acc + g.avg, 0) / groupAvgs.length)
+          : 0;
+
+        return { totalEmployees, approvedCount, pendingCount: totalEmployees - approvedCount, globalProgress, groupAvgs };
+      }
+
+      // ── CAMINO B: Tienda específica → grades reales (mismo cálculo que MyStores) ──
+      // Carga las notas desde Supabase en tiempo real con herencia correcta.
+      if (storeIds.length > 0) {
+        await Promise.all(storeIds.map(sid => dataService.loadGradesForStore(sid, dashboardMonth)));
+        dataService._cache.gradeIndex = null;
+      }
+
+      const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+
+      // Obtener el último día del mes en formato string "YYYY-MM-DD"
+      const year = parseInt(dashboardMonth.split('-')[0]);
+      const month = parseInt(dashboardMonth.split('-')[1]);
+      const lastDay = new Date(year, month, 0).getDate();
+      const periodEndStr = `${dashboardMonth}-${String(lastDay).padStart(2, '0')}`;
+      const periodStartStr = `${dashboardMonth}-01`;
+
       const validEmployees = initialEmployees.filter(emp => {
-        if (!storeIds.includes(emp.restaurant_id)) return false;
-        if (!emp.active && emp.exit_date && emp.exit_date <= monthEndStr) return false;
-        return true;
+        const normalizedEmpStore = String(emp.restaurant_id || '').trim().toUpperCase();
+        if (!storeIds.includes(normalizedEmpStore)) return false;
+        
+        const joinDateStr = emp.join_date ? emp.join_date.substring(0, 10) : '0000-01-01';
+        const exitDateStr = emp.exit_date ? emp.exit_date.substring(0, 10) : '9999-12-31';
+        
+        // Estaba contratado: entró antes del fin de mes Y no se fue antes del inicio de mes
+        const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+        
+        return isHistoricalActive;
       });
 
-      // 3. Computamos métricas locales
-      let totalEmployees = validEmployees.length;
       let approvedCount = 0;
-      let pendingCount = 0;
-      let globalSum = 0;
-      let globalCount = 0;
-
-      const groupTotals: Record<string, { sum: number, count: number }> = {};
-      Object.keys(EVALUATION_GROUPS).forEach(g => groupTotals[g] = { sum: 0, count: 0 });
+      const groupData: Record<string, { scores: number[], passed: number }> = {};
+      Object.keys(EVALUATION_GROUPS).forEach(gid => { groupData[gid] = { scores: [], passed: 0 }; });
 
       validEmployees.forEach(emp => {
-        const empSummary = latestMap.get(emp.id);
-        
-        if (empSummary) {
-          let hasAnyGrade = false;
-          let totalScore = 0;
-          
-          Object.keys(EVALUATION_GROUPS).forEach(gid => {
-            const score = empSummary[`avg_${gid.toLowerCase()}`] || 0;
-            if (score > 0) hasAnyGrade = true;
-            
-            totalScore += score;
-            globalSum += score;
-            
-            groupTotals[gid].sum += score;
-          });
+        const seniority  = getSeniorityMonths(emp.join_date, dashboardMonth);
+        const empSummary = summaryMap.get(String(emp.id).trim());
+        const storeId    = String(emp.restaurant_id || '').trim().toUpperCase();
+        const effective  = dataService.getEffectiveGrades(emp.id, dashboardMonth, storeId);
 
-          const avg = Math.round(totalScore / TOTAL_CATEGORIES_COUNT);
-          if (avg >= APPROVAL_THRESHOLD) {
-            approvedCount++;
+        let empTotalSum = 0;
+
+        Object.entries(EVALUATION_GROUPS).forEach(([gid, gconfig]) => {
+          if (gid === 'C' && seniority <= 3) return;
+
+          let gAvg = 0;
+          const groupGrades = effective.filter(g => g.group === gid);
+
+          if (groupGrades.length > 0) {
+            gAvg = groupGrades.reduce((s, g) => s + g.score, 0) / gconfig.categories.length;
+          } else if (empSummary) {
+            gAvg = empSummary[`avg_${gid.toLowerCase()}`] || 0;
           }
-        }
+
+          groupData[gid].scores.push(gAvg);
+          if (gAvg >= APPROVAL_THRESHOLD) groupData[gid].passed++;
+          empTotalSum += gAvg;
+        });
+
+        if ((empTotalSum / Object.keys(EVALUATION_GROUPS).length) >= APPROVAL_THRESHOLD) approvedCount++;
       });
 
-      pendingCount = totalEmployees - approvedCount;
-      // La curva global promedia el total sobre todos los empleados válidos
-      const globalProgress = totalEmployees > 0 ? Math.round(globalSum / (totalEmployees * TOTAL_CATEGORIES_COUNT)) : 0;
-      
-      const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => ({ 
-        id: gid, 
-        name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name, 
-        avg: totalEmployees > 0 ? Math.round(groupTotals[gid].sum / totalEmployees) : 0 
-      }));
+      const totalEmployees    = validEmployees.length;
+      const eligibleAllStar   = validEmployees.filter(e => getSeniorityMonths(e.join_date, dashboardMonth) > 3).length;
 
-      return {
-        totalEmployees,
-        approvedCount,
-        pendingCount,
-        globalProgress,
-        groupAvgs
-      };
+      const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => {
+        const scores = groupData[gid].scores;
+        const avg    = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        const denom  = gid === 'C' ? eligibleAllStar : totalEmployees;
+        return {
+          id:   gid,
+          name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name,
+          avg:  Math.round(avg),
+          rate: denom > 0 ? Math.round((groupData[gid].passed / denom) * 100) : 0
+        };
+      });
+
+      const globalProgress = groupAvgs.length > 0
+        ? Math.round(groupAvgs.reduce((acc, g) => acc + g.avg, 0) / groupAvgs.length)
+        : 0;
+
+      return { totalEmployees, approvedCount, pendingCount: totalEmployees - approvedCount, globalProgress, groupAvgs };
     },
     staleTime: 60 * 1000
   });
@@ -319,6 +364,14 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Gráfica de Tendencia Histórica */}
+      <TrendChart 
+        dashboardMonth={dashboardMonth} 
+        filterRegion={filterRegion} 
+        filterZone={filterZone} 
+        filterStore={filterStore} 
+      />
+
 
 
       {showExportModal && (
@@ -430,6 +483,127 @@ const StatCard: React.FC<{ icon: React.ReactNode, label: string, sublabel?: stri
             />
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const TrendChart: React.FC<{ dashboardMonth: string, filterRegion: string, filterZone: string, filterStore: string }> = ({ dashboardMonth, filterRegion, filterZone, filterStore }) => {
+  const hierarchy = useMemo(() => dataService.getHierarchy(), []);
+  const lockedMonths = hierarchy?.lockedMonths || [];
+
+  const { data: trendData, isLoading } = useQuery({
+    queryKey: ['dashboard-trend-detailed', dashboardMonth, filterRegion, filterZone, filterStore, lockedMonths.length],
+    queryFn: async () => {
+      const [year, currentMonthNum] = dashboardMonth.split('-').map(Number);
+      const months: string[] = [];
+      
+      // Generar desde Enero (01) hasta el mes actual del año seleccionado
+      for (let i = 1; i <= currentMonthNum; i++) {
+        const mStr = `${year}-${String(i).padStart(2, '0')}`;
+        // SOLO TENER EN CUENTA MESES ASENTADOS
+        if (lockedMonths.includes(mStr)) {
+          months.push(mStr);
+        }
+      }
+
+      if (months.length === 0) return [];
+
+      const history = await Promise.all(months.map(async (m) => {
+        const rpcData = await dataService.getDashboardStats(
+          m,
+          filterStore !== 'all' ? filterStore : undefined,
+          filterZone !== 'all' ? filterZone : undefined,
+          filterRegion !== 'all' ? filterRegion : undefined
+        );
+
+        const dataPoint: any = { 
+          month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][new Date(m + '-02').getMonth()]
+        };
+
+        // Extraer promedio de cada grupo
+        Object.keys(EVALUATION_GROUPS).forEach(gid => {
+          const row = rpcData?.find((r: any) => r.group_id === gid);
+          dataPoint[gid] = row ? Math.round(Number(row.avg_score)) : 0;
+        });
+        
+        return dataPoint;
+      }));
+
+      return history;
+    },
+    staleTime: 5 * 60 * 1000
+  });
+
+  if (isLoading) return (
+    <div className="bg-white p-8 rounded-3xl border border-slate-100 h-[400px] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <RefreshCw className="w-8 h-8 text-red-500 animate-spin" />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculando historial anual...</p>
+      </div>
+    </div>
+  );
+
+  const LINE_COLORS: Record<string, string> = {
+    'AK': '#ef4444', // Rojo
+    'A': '#f59e0b',  // Ambar
+    'B': '#10b981',  // Esmeralda
+    'C': '#3b82f6',  // Azul
+    'D': '#8b5cf6',  // Violeta
+    'E': '#ec4899',  // Rosa
+    'F': '#6366f1'   // Indigo
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center">
+            <Activity className="w-4 h-4 mr-2 text-red-500" /> Evolución Detallada por Nota
+          </h3>
+          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Tendencia acumulada del año actual</p>
+        </div>
+      </div>
+      
+      <div className="h-[350px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis 
+              dataKey="month" 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} 
+            />
+            <YAxis 
+              domain={[0, 100]} 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} 
+            />
+            <Tooltip 
+              contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
+            />
+            <Legend 
+              verticalAlign="top" 
+              height={36}
+              iconType="circle"
+              formatter={(value) => <span className="text-[9px] font-black uppercase text-slate-500 ml-1">{EVALUATION_GROUPS[value as keyof typeof EVALUATION_GROUPS]?.name || value}</span>}
+            />
+            {Object.keys(EVALUATION_GROUPS).map(gid => (
+              <Line 
+                key={gid}
+                type="monotone" 
+                dataKey={gid} 
+                stroke={LINE_COLORS[gid]} 
+                strokeWidth={3}
+                dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+                animationDuration={1500}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

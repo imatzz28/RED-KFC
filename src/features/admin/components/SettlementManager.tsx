@@ -35,6 +35,12 @@ export const SettlementManager: React.FC<Props> = ({ hierarchy, setHierarchy, se
     setIsSaving(true);
     try {
       await dataService.saveHierarchy(newHierarchy);
+      
+      // Si estamos cerrando el mes, disparamos el cálculo de estadísticas agregadas
+      if (!isLocked) {
+        await dataService.settleMonthlyGroupStats(month);
+      }
+
       setHierarchy(newHierarchy);
       setImportStatus({
         message: isLocked ? `Periodo ${month} abierto para edición.` : `Periodo ${month} cerrado (Asentado).`,

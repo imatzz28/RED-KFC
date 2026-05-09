@@ -110,16 +110,28 @@ const MyStores: React.FC = () => {
 
   const storesWithStats = useMemo(() => {
     // Optimización: Agrupar empleados por tienda una sola vez (O(N))
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const periodEndStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+    const periodStartStr = `${selectedMonth}-01`;
+
     const employeesByStore = new Map<string, Employee[]>();
     employees.forEach(e => {
-      if (e.active) {
-        if (!employeesByStore.has(e.restaurant_id)) employeesByStore.set(e.restaurant_id, []);
-        employeesByStore.get(e.restaurant_id)!.push(e);
+      // Lógica Histórica
+      const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
+      const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
+      const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+
+      if (isHistoricalActive) {
+        const normId = (e.restaurant_id || '').trim().toUpperCase();
+        if (!employeesByStore.has(normId)) employeesByStore.set(normId, []);
+        employeesByStore.get(normId)!.push(e);
       }
     });
 
     return assigned.map(store => {
-      const storeEmps = employeesByStore.get(store.id) || [];
+      const normStoreId = store.id.trim().toUpperCase();
+      const storeEmps = employeesByStore.get(normStoreId) || [];
       if (storeEmps.length === 0) return { ...store, stats: { total: 0, approved: 0, percent: 0, groupStats: {} as Record<string, { avg: number, approvalRate: number }>, cargoCounts: {} as Record<string, number> } };
 
       let storeApprovedCount = 0;
@@ -153,6 +165,10 @@ const MyStores: React.FC = () => {
         if (isApproved) storeApprovedCount++;
 
         Object.entries(EVALUATION_GROUPS).forEach(([gid, gconfig]) => {
+          // REGLA: El indicador All-Star (Grupo C) solo cuenta para personal con +3 meses
+          const seniority = getSeniorityMonths(emp.join_date, selectedMonth);
+          if (gid === 'C' && seniority <= 3) return;
+
           let gAvg = 0;
           const groupGrades = effective.filter(g => g.group === gid);
 
@@ -170,9 +186,17 @@ const MyStores: React.FC = () => {
 
       const groupStats: Record<string, { avg: number, approvalRate: number }> = {};
       let totalAvgSum = 0;
+      const eligibleForAllStar = storeEmps.filter(e => getSeniorityMonths(e.join_date, selectedMonth) > 3).length;
       Object.keys(EVALUATION_GROUPS).forEach(gid => {
         const avg = groupData[gid].scores.length > 0 ? groupData[gid].scores.reduce((a, b) => a + b, 0) / groupData[gid].scores.length : 0;
-        const rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
+        
+        let rate = 0;
+        if (gid === 'C') {
+          rate = eligibleForAllStar > 0 ? (groupData[gid].passed / eligibleForAllStar) * 100 : 0;
+        } else {
+          rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
+        }
+
         const roundedAvg = Math.round(avg);
         groupStats[gid] = { avg: roundedAvg, approvalRate: Math.round(rate) };
         totalAvgSum += roundedAvg;
@@ -199,7 +223,18 @@ const MyStores: React.FC = () => {
     }
 
     // Si no, hacemos el cálculo (para PDFs históricos por ejemplo)
-    const storeEmps = employees.filter(e => e.restaurant_id === storeId && e.active);
+    const normStoreId = storeId.trim().toUpperCase();
+    const [yVal, mVal] = month.split('-').map(Number);
+    const lastDayVal = new Date(yVal, mVal, 0).getDate();
+    const periodEndStr = `${month}-${String(lastDayVal).padStart(2, '0')}`;
+    const periodStartStr = `${month}-01`;
+
+    const storeEmps = employees.filter(e => {
+      const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
+      const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
+      const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+      return (e.restaurant_id || '').trim().toUpperCase() === normStoreId && isHistoricalActive;
+    });
     if (storeEmps.length === 0) return { total: 0, approved: 0, percent: 0, groupStats: {} as Record<string, { avg: number, approvalRate: number }>, cargoCounts: {} as Record<string, number> };
 
     let storeApprovedCount = 0;
@@ -233,6 +268,10 @@ const MyStores: React.FC = () => {
       if (isApproved) storeApprovedCount++;
 
       Object.entries(EVALUATION_GROUPS).forEach(([gid, gconfig]) => {
+        // REGLA: El indicador All-Star (Grupo C) solo cuenta para personal con +3 meses
+        const seniority = getSeniorityMonths(emp.join_date, month);
+        if (gid === 'C' && seniority <= 3) return;
+
         let gAvg = 0;
         const groupGrades = effective.filter(g => g.group === gid);
 
@@ -250,9 +289,17 @@ const MyStores: React.FC = () => {
 
     const groupStats: Record<string, { avg: number, approvalRate: number }> = {};
     let totalAvgSum = 0;
+    const eligibleForAllStar = storeEmps.filter(e => getSeniorityMonths(e.join_date, month) > 3).length;
     Object.keys(EVALUATION_GROUPS).forEach(gid => {
       const avg = groupData[gid].scores.length > 0 ? groupData[gid].scores.reduce((a, b) => a + b, 0) / groupData[gid].scores.length : 0;
-      const rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
+      
+      let rate = 0;
+      if (gid === 'C') {
+        rate = eligibleForAllStar > 0 ? (groupData[gid].passed / eligibleForAllStar) * 100 : 0;
+      } else {
+        rate = storeEmps.length > 0 ? (groupData[gid].passed / storeEmps.length) * 100 : 0;
+      }
+
       const roundedAvg = Math.round(avg);
       groupStats[gid] = { avg: roundedAvg, approvalRate: Math.round(rate) };
       totalAvgSum += roundedAvg;

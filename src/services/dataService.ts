@@ -461,12 +461,8 @@ export const dataService = {
       const gradeMonth = g.month ? g.month.substring(0, 7) : '';
       if (gradeMonth > upToMonth) return false;
 
-      // Si se proporciona storeId, solo heredar notas de esa tienda.
-      // Esto evita contaminar las métricas de la tienda actual con
-      // evaluaciones hechas en una tienda anterior del empleado.
       if (storeId && g.restaurantId && g.restaurantId.trim().toUpperCase() !== storeId.trim().toUpperCase()) return false;
 
-      // Grupos no heredables (D y F): solo valen para su propio mes
       if ((g.group === 'D' || g.group === 'F') && gradeMonth !== upToMonth) return false;
 
       return true;
@@ -479,6 +475,60 @@ export const dataService = {
     });
 
     return Array.from(latestMap.values());
+  },
+
+  // ── Dashboard RPC Methods ────────────────────────────────────────────────
+
+  /**
+   * Llama al RPC get_dashboard_stats en Supabase.
+   * Devuelve estadísticas agregadas (promedio ponderado) por grupo para el mes y scope indicados.
+   * Se usa en el Dashboard para vistas de Zona / Región / Nacional.
+   */
+  getDashboardStats: async (
+    month: string,
+    storeId?: string,
+    zone?: string,
+    region?: string
+  ): Promise<any[]> => {
+    try {
+      const result = await dataService.supabaseFetchRPC('get_dashboard_stats', {
+        p_month:    month,
+        p_store_id: storeId  || null,
+        p_zone:     zone     || null,
+        p_region:   region   || null
+      });
+      return Array.isArray(result) ? result : [];
+    } catch (e) {
+      console.error('[getDashboardStats] Error llamando RPC:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Calcula y persiste las estadísticas por grupo para el mes indicado.
+   * Se llama al "Asentar Notas" en SettlementManager.
+   */
+  settleMonthlyGroupStats: async (month: string): Promise<void> => {
+    try {
+      await dataService.supabaseFetchRPC('settle_monthly_group_stats', { p_month: month });
+      console.log(`[settleMonthlyGroupStats] Stats calculadas para ${month}`);
+    } catch (e) {
+      console.error('[settleMonthlyGroupStats] Error:', e);
+    }
+  },
+
+  /**
+   * Rellena monthly_group_stats para todos los meses históricos en grades.
+   * Solo se ejecuta una vez desde el Admin Panel.
+   */
+  backfillMonthlyGroupStats: async (): Promise<string> => {
+    try {
+      const result = await dataService.supabaseFetchRPC('backfill_monthly_group_stats', {});
+      return typeof result === 'string' ? result : 'Backfill completado.';
+    } catch (e: any) {
+      console.error('[backfillMonthlyGroupStats] Error:', e);
+      throw e;
+    }
   },
 
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
