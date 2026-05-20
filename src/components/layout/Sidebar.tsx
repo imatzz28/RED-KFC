@@ -79,31 +79,22 @@ const Sidebar: React.FC = () => {
   return (
     <aside className={sidebarClasses}>
       {/* Header Area */}
-      <div className="px-6 pt-6 pb-6 flex items-center justify-between border-b border-slate-900/50">
-        <div className="flex items-center gap-3">
-          {/* Logo container */}
-          <div className="w-11 h-11 bg-[#e60000] rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative select-none">
-            <svg className="w-7 h-7 text-white" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 4C6 2.89543 6.89543 2 8 2H20L26 8V28C26 29.1046 25.1046 30 24 30H8C6.89543 30 6 29.1046 6 28V4Z" fill="white" />
-              <text x="9" y="10" fill="#e60000" fontSize="5" fontWeight="900" fontFamily="system-ui, sans-serif" letterSpacing="-0.05em">KFC</text>
-              <rect x="9" y="19" width="3" height="7" rx="0.5" fill="#e60000" />
-              <rect x="13.5" y="15" width="3" height="11" rx="0.5" fill="#e60000" />
-              <rect x="18" y="12" width="3" height="14" rx="0.5" fill="#e60000" />
-              <path d="M9 22L14 16L19 13.5L23.5 9" stroke="#e60000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M21 9H23.5V11.5" stroke="#e60000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+      <div className="px-6 pt-6 pb-6 flex flex-col border-b border-slate-900/50 relative">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center -mt-2">
+            <img src="/logo_horizontal.png" alt="RED Logo" className="h-14 w-auto object-contain" />
           </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-black text-white tracking-wider leading-none">R.E.D</h1>
-            <p className="text-[7px] text-slate-500 font-bold uppercase tracking-widest mt-1">Restaurant · Efficiency · Data</p>
-          </div>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="lg:hidden p-1.5 hover:bg-slate-800 rounded-xl transition"
+          >
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="lg:hidden p-1.5 hover:bg-slate-800 rounded-xl transition"
-        >
-          <X className="w-5 h-5 text-slate-400" />
-        </button>
+        {/* Subtitle just below the logo */}
+        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.05em] mt-3 pl-1 leading-tight">
+          Ruta de entrenamiento y desarollo
+        </p>
       </div>
 
       {/* Navigation Links Area */}

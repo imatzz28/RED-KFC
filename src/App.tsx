@@ -54,15 +54,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden relative">
-      <div className={`fixed bottom-6 left-6 z-[200] px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-3 transition-all duration-500 border-2 ${syncStatus === 'syncing' ? 'bg-slate-900 border-red-500 text-white animate-pulse' :
-        syncStatus === 'online' ? 'bg-white border-emerald-500 text-emerald-600' :
-          'bg-white border-red-500 text-red-600'
-        }`}>
-        {syncStatus === 'syncing' ? <RefreshCw className="w-3 h-3 animate-spin" /> :
-          syncStatus === 'online' ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
-        {syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'online' ? 'Nube Conectada' : 'Modo Offline'}
-      </div>
-
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
