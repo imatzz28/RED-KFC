@@ -3,7 +3,6 @@ import { UserRole } from '@/types';
 import { 
   LayoutDashboard, 
   ShieldAlert, 
-  LogOut, 
   X, 
   Store, 
   ArrowUpDown, 
@@ -11,6 +10,8 @@ import {
   ShieldCheck, 
   Landmark, 
   Cloud, 
+  CloudOff,
+  RefreshCw,
   ChevronRight 
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -18,7 +19,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 
 const Sidebar: React.FC = () => {
-  const { auth, handleLogout: onLogout, isSidebarOpen: isOpen, setIsSidebarOpen: setIsOpen } = useAppStore();
+  const { auth, isSidebarOpen: isOpen, setIsSidebarOpen: setIsOpen, syncStatus } = useAppStore();
   const role = auth.user!.role;
   const location = useLocation();
   const activeTab = location.pathname.substring(1) || 'dashboard';
@@ -79,20 +80,18 @@ const Sidebar: React.FC = () => {
   return (
     <aside className={sidebarClasses}>
       {/* Header Area */}
-      <div className="px-6 pt-6 pb-6 flex flex-col border-b border-slate-900/50 relative">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center -mt-2">
-            <img src="/logo_horizontal.png" alt="RED Logo" className="h-14 w-auto object-contain" />
-          </div>
+      <div className="px-6 pt-6 pb-5 flex flex-col items-center justify-center border-b border-slate-900/50 relative">
+        <div className="w-full flex items-center justify-center">
+          <img src="/logo_horizontal.png" alt="RED Logo" className="h-18 w-auto object-contain" />
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden p-1.5 hover:bg-slate-800 rounded-xl transition"
+            className="lg:hidden absolute right-4 top-6 p-1.5 hover:bg-slate-800 rounded-xl transition"
           >
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
         {/* Subtitle just below the logo */}
-        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.05em] mt-3 pl-1 leading-tight">
+        <p className="text-[7.5px] text-white font-black uppercase tracking-[0.03em] mt-1.5 leading-none text-center w-full">
           Ruta de entrenamiento y desarollo
         </p>
       </div>
@@ -139,32 +138,47 @@ const Sidebar: React.FC = () => {
       {/* Footer Area */}
       <div className="p-4 border-t border-slate-900/50 mt-auto bg-[#0b0f19]">
         {/* Connected Status Card */}
-        <div className="bg-[#121824] rounded-2xl p-4 flex items-center justify-between border border-slate-800/40">
+        <div className={`rounded-2xl p-4 flex items-center justify-between border transition-all duration-500 ${
+          syncStatus === 'syncing' 
+            ? 'bg-slate-900/40 border-amber-500/20' 
+            : syncStatus === 'online' 
+              ? 'bg-[#121824] border-slate-800/40' 
+              : 'bg-red-950/20 border-red-500/20'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
-              <Cloud className="w-5 h-5" />
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#121824] rounded-full flex items-center justify-center">
-                <span className="w-1.5 h-1.5 bg-white rounded-full" />
-              </span>
-            </div>
+            {syncStatus === 'syncing' && (
+              <div className="relative w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              </div>
+            )}
+            {syncStatus === 'online' && (
+              <div className="relative w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                <Cloud className="w-5 h-5" />
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#121824] rounded-full flex items-center justify-center">
+                  <span className="w-1 h-1 bg-white rounded-full" />
+                </span>
+              </div>
+            )}
+            {syncStatus !== 'syncing' && syncStatus !== 'online' && (
+              <div className="relative w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
+                <CloudOff className="w-5 h-5" />
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-red-500 border-2 border-[#121824] rounded-full flex items-center justify-center">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+                </span>
+              </div>
+            )}
+            
             <div className="min-w-0">
-              <p className="text-[10px] font-black text-white uppercase tracking-wider leading-none">Nube Conectada</p>
-              <p className="text-[8px] text-slate-500 font-bold mt-1 leading-none">Sincronizado en tiempo real</p>
+              <p className="text-[10px] font-black text-white uppercase tracking-wider leading-none">
+                {syncStatus === 'syncing' ? 'Sincronizando' : syncStatus === 'online' ? 'Nube Conectada' : 'Modo Offline'}
+              </p>
+              <p className="text-[8px] text-slate-500 font-bold mt-1.5 leading-none">
+                {syncStatus === 'syncing' ? 'Guardando en la nube' : syncStatus === 'online' ? 'Sincronizado en tiempo real' : 'Guardando localmente'}
+              </p>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-600" />
         </div>
-
-        {/* Logout Button */}
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3.5 px-4 py-2.5 text-slate-500 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all duration-300 mt-4 group"
-        >
-          <div className="w-8 h-8 rounded-lg bg-slate-800/20 text-slate-500 group-hover:bg-red-500/10 group-hover:text-red-500 flex items-center justify-center transition-colors">
-            <LogOut className="w-4 h-4" />
-          </div>
-          <span className="font-black text-[10px] uppercase tracking-wider">Cerrar Sesión</span>
-        </button>
       </div>
     </aside>
   );
