@@ -80,7 +80,7 @@ const Sidebar: React.FC = () => {
   return (
     <aside className={sidebarClasses}>
       {/* Header Area */}
-      <div className="px-6 pt-6 pb-5 flex flex-col items-center justify-center border-b border-slate-900/50 relative">
+      <div className="px-6 pt-5 pb-3 flex flex-col items-center justify-center border-b border-slate-900/50 relative">
         <div className="w-full flex items-center justify-center">
           <img src="/logo_horizontal.png" alt="RED Logo" className="h-18 w-auto object-contain" />
           <button
@@ -90,14 +90,10 @@ const Sidebar: React.FC = () => {
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
-        {/* Subtitle just below the logo */}
-        <p className="text-[7.5px] text-white font-black uppercase tracking-[0.03em] mt-1.5 leading-none text-center w-full">
-          Ruta de entrenamiento y desarollo
-        </p>
       </div>
 
       {/* Navigation Links Area */}
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-4 py-3 space-y-2.5 overflow-y-auto">
         {allowedItems.map(item => {
           const isActive = activeTab === item.key;
           const Icon = item.icon;
@@ -106,22 +102,22 @@ const Sidebar: React.FC = () => {
               key={item.key}
               to={item.to}
               onClick={() => setIsOpen(false)}
-              className={`relative w-full flex items-center gap-4 px-4 py-2.5 rounded-2xl transition-all duration-300 group ${
+              className={`relative w-full flex items-center gap-4 px-4 py-2.5 rounded-2xl transition-all duration-300 ease-out group hover:scale-[1.02] active:scale-[0.98] ${
                 isActive 
                   ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-[0_8px_25px_rgba(230,0,0,0.25)]' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
               }`}
             >
               {/* Red left edge bar for active item */}
-              {isActive && (
-                <div className="absolute left-0 w-1.5 h-8 bg-[#e60000] rounded-r-full -translate-x-4" />
-              )}
+              <div className={`absolute left-0 w-1 bg-[#e60000] rounded-r-full -translate-x-4 transition-all duration-300 ease-out ${
+                isActive ? 'h-7 opacity-100 scale-y-100' : 'h-0 opacity-0 scale-y-0'
+              }`} />
               
               {/* Icon box */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300 ${
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 ${
                 isActive ? 'bg-white/10 text-white' : 'bg-slate-800/50 text-slate-400 group-hover:bg-slate-800 group-hover:text-slate-200'
               }`}>
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5 group-hover:scale-110 group-hover:rotate-2 transition-transform duration-300" />
               </div>
 
               {/* Label */}
