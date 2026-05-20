@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import localforage from 'localforage';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
 const SafeHands: React.FC = () => {
@@ -19,25 +20,69 @@ const SafeHands: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  
+
+  // Server-side pagination states
+  const [page, setPage] = useState(0);
+  const [totalRows, setTotalRows] = useState(0);
+  const [vigentesCount, setVigentesCount] = useState(0);
+  const [vencidosCount, setVencidosCount] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR';
 
+  // Debounce search input
   useEffect(() => {
-    loadData();
-  }, []);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0); // Reset page on search
+    }, 450);
+    return () => clearTimeout(handler);
+  }, [search]);
 
-  const loadData = async () => {
+  // Load data when page or debouncedSearch changes
+  useEffect(() => {
+    loadData(page, debouncedSearch);
+  }, [page, debouncedSearch]);
+
+  const loadData = async (currentPage: number, searchVal: string) => {
     setIsLoading(true);
     try {
-      const [peopleData, certsData, settingsData] = await Promise.all([
-        dataService.getSafeHandsPersonnel(),
-        dataService.getSafeHandsCerts(),
+      // 1. Fetch paginated personnel
+      const { data: peopleData, total } = await dataService.getSafeHandsPersonnelPaginated(currentPage, 50, searchVal);
+      setPersonnel(peopleData);
+      setTotalRows(total);
+
+      // 2. Fetch certs for these employees
+      const employeeIds = peopleData.map(p => p.id);
+      const [certsData, summaryCounts, settingsData] = await Promise.all([
+        dataService.getSafeHandsCertsForEmployees(employeeIds),
+        dataService.getSafeHandsSummaryCounts(),
         dataService.getSafeHandsSettings()
       ]);
-      setPersonnel(peopleData);
+
+      let activeSettings = settingsData;
+      try {
+        const localSettings = await localforage.getItem<SafeHandsSettings>('safe_hands_settings_local');
+        if (localSettings) {
+          activeSettings = {
+            ...settingsData,
+            ...localSettings
+          };
+        }
+      } catch (err) {
+        console.warn("Error leyendo safe_hands_settings_local:", err);
+      }
+
       setCerts(certsData);
-      setSettings(settingsData);
+      setVigentesCount(summaryCounts.vigentes);
+      setVencidosCount(summaryCounts.vencidos);
+      setSettings(activeSettings);
     } catch (error) {
       console.error("Error loading Safe Hands data:", error);
     } finally {
@@ -175,7 +220,7 @@ const SafeHands: React.FC = () => {
         if (newPeople.length > 0) {
           await dataService.saveSafeHandsPersonnel(newPeople);
           await dataService.saveSafeHandsCerts(newCerts);
-          await loadData();
+          await loadData(page, debouncedSearch);
           alert(`${newPeople.length} registros procesados correctamente.`);
         }
       } catch (err) {
@@ -202,9 +247,26 @@ const SafeHands: React.FC = () => {
   };
 
   const saveSettings = async () => {
-    await dataService.updateSafeHandsSettings(settings);
-    setShowSettings(false);
-    alert("Configuración guardada correctamente.");
+    try {
+      // 1. Guardar localmente primero (para asegurar persistencia inmediata en el navegador actual)
+      await localforage.setItem('safe_hands_settings_local', settings);
+      
+      // 2. Intentar guardar en Supabase (puede fallar por políticas de RLS)
+      try {
+        await dataService.updateSafeHandsSettings(settings);
+      } catch (dbErr) {
+        console.warn("No se pudo persistir la firma en Supabase (RLS o conexión), usando respaldo local:", dbErr);
+      }
+
+      setShowSettings(false);
+      setToastMessage("¡Firma actualizada correctamente!");
+      setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error("Error al guardar la configuración local:", err);
+      alert("Error local al guardar la firma.");
+    }
   };
 
   const handleDownload = async (cert: SafeHandsCert, person: SafeHandsPerson) => {
@@ -215,6 +277,31 @@ const SafeHands: React.FC = () => {
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Error al generar el certificado.");
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await dataService.clearAllSafeHandsData(confirmEmail, confirmPassword);
+      
+      setShowDeleteConfirm(false);
+      setConfirmEmail('');
+      setConfirmPassword('');
+      setToastMessage("¡Base de datos limpiada con éxito!");
+      
+      loadData(0, debouncedSearch);
+      setPage(0);
+      
+      setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+    } catch (err: any) {
+      console.error("Error al borrar base de datos:", err);
+      setDeleteError(err.message || "Error al autenticar administrador.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -231,16 +318,7 @@ const SafeHands: React.FC = () => {
     return 'VIGENTE';
   };
 
-  const filteredPersonnel = useMemo(() => {
-    const q = search.toLowerCase();
-    return personnel
-      .filter(p => 
-        !q || 
-        p.name.toLowerCase().includes(q) || 
-        p.id.toLowerCase().includes(q) ||
-        p.saStatus?.toLowerCase().includes(q)
-      );
-  }, [personnel, search]);
+  const totalPages = Math.ceil(totalRows / 50);
 
   // ── UI Components ──────────────────────────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => {
@@ -274,6 +352,13 @@ const SafeHands: React.FC = () => {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
+              <button 
+                onClick={() => setShowDeleteConfirm(true)} 
+                className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-600 hover:bg-red-50/20 transition-all shadow-sm group"
+                title="Borrar todos los datos"
+              >
+                <Trash2 className="w-5 h-5 text-red-500 group-hover:scale-105 transition-transform" />
+              </button>
               <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
                 <Signature className="w-5 h-5 text-slate-400" />
               </button>
@@ -303,11 +388,11 @@ const SafeHands: React.FC = () => {
            <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-2xl shrink-0">
              <div className="flex items-center gap-2">
                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-               <span className="text-[10px] font-black text-slate-400 uppercase">Vigentes: {certs.filter(c => getEmpStatus(c.employeeId) === 'VIGENTE').length}</span>
+               <span className="text-[10px] font-black text-slate-400 uppercase">Vigentes: {vigentesCount}</span>
              </div>
              <div className="flex items-center gap-2">
                <div className="w-2 h-2 bg-red-500 rounded-full" />
-               <span className="text-[10px] font-black text-slate-400 uppercase">Vencidos: {certs.filter(c => getEmpStatus(c.employeeId) === 'VENCIDO').length}</span>
+               <span className="text-[10px] font-black text-slate-400 uppercase">Vencidos: {vencidosCount}</span>
              </div>
            </div>
         </div>
@@ -331,7 +416,7 @@ const SafeHands: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredPersonnel.slice(0, 100).map(person => {
+                {personnel.map(person => {
                   const cert = certs.find(c => c.employeeId === person.id);
                   const status = getEmpStatus(person.id);
                   return (
@@ -373,6 +458,29 @@ const SafeHands: React.FC = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {!isLoading && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-slate-50">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border-2 border-slate-100 bg-white hover:border-red-500 hover:text-red-600 disabled:opacity-50 disabled:hover:border-slate-100 disabled:hover:text-slate-800 transition-all shadow-sm"
+            >
+              Anterior
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-4">
+              Página {page + 1} de {totalPages} ({totalRows} registros)
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border-2 border-slate-100 bg-white hover:border-red-500 hover:text-red-600 disabled:opacity-50 disabled:hover:border-slate-100 disabled:hover:text-slate-800 transition-all shadow-sm"
+            >
+              Siguiente
+            </button>
           </div>
         )}
       </div>
@@ -420,6 +528,9 @@ const SafeHands: React.FC = () => {
                     </>
                   )}
                 </div>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-3 text-center">
+                  Dimensiones recomendadas: 300 x 100 px (relación 3:1) en formato PNG con fondo transparente.
+                </p>
               </div>
             </div>
             <div className="p-8 bg-slate-50 flex gap-3">
@@ -427,6 +538,97 @@ const SafeHands: React.FC = () => {
                <button onClick={saveSettings} className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700">Guardar</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => { if (!isDeleting) setShowDeleteConfirm(false); }} />
+          <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-red-50 bg-red-600 text-white">
+              <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 animate-bounce" />
+                ¿Confirmar Borrado Total?
+              </h3>
+              <p className="text-[10px] text-red-100 font-bold uppercase tracking-[0.2em] mt-1">
+                Esta acción eliminará todos los carnets y personal de manipulación
+              </p>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-[10px] font-bold text-red-600 uppercase leading-relaxed">
+                ¡Advertencia! Se eliminará toda la información almacenada en las tablas de manipuladores de alimentos de forma irreversible. Por seguridad, valide sus credenciales de Administrador.
+              </div>
+
+              {deleteError && (
+                <div className="bg-red-100 border border-red-200 rounded-2xl p-4 text-[10px] font-bold text-red-700 uppercase">
+                  {deleteError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Correo de Administrador</label>
+                <input 
+                  type="email" 
+                  disabled={isDeleting}
+                  placeholder="admin@kfc.co"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-red-500 transition-all text-xs font-bold"
+                  value={confirmEmail}
+                  onChange={e => setConfirmEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Contraseña</label>
+                <input 
+                  type="password" 
+                  disabled={isDeleting}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-red-500 transition-all text-xs font-bold"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50 flex gap-3">
+               <button 
+                 disabled={isDeleting}
+                 onClick={() => {
+                   setShowDeleteConfirm(false);
+                   setConfirmEmail('');
+                   setConfirmPassword('');
+                   setDeleteError('');
+                 }} 
+                 className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 disabled:opacity-50"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 disabled={isDeleting || !confirmEmail || !confirmPassword}
+                 onClick={handleDeleteAllData} 
+                 className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+               >
+                 {isDeleting ? (
+                   <>
+                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                     <span>Borrando...</span>
+                   </>
+                 ) : (
+                   <span>Confirmar Borrado</span>
+                 )}
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[120] flex items-center gap-3 px-5 py-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-950/20 border border-slate-800 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-wider">{toastMessage}</span>
         </div>
       )}
     </div>

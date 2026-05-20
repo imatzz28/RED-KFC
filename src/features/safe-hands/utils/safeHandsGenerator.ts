@@ -109,8 +109,8 @@ export const safeHandsGenerator = {
         },
           settings.signatureBase64 ? {
             image: settings.signatureBase64,
-            width: 100,
-            absolutePosition: { x: 250, y: 315 }
+            width: 205,
+            absolutePosition: { x: 170, y: 280 }
           } : null
         ].filter(Boolean),
         images: {

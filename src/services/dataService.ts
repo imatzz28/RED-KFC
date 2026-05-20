@@ -823,6 +823,71 @@ export const dataService = {
     }));
   },
 
+  getSafeHandsPersonnelPaginated: async (page: number, limit: number, search?: string): Promise<{ data: SafeHandsPerson[], total: number }> => {
+    let queryParams = '?order=name.asc';
+    if (search) {
+      const cleanSearch = search.trim();
+      if (cleanSearch) {
+        queryParams += `&or=(name.ilike.*${encodeURIComponent(cleanSearch)}*,id.ilike.*${encodeURIComponent(cleanSearch)}*,sa_status.ilike.*${encodeURIComponent(cleanSearch)}*)`;
+      }
+    }
+    const { data, total } = await dataService.supabaseFetchPaginated('safe_hands_personnel', queryParams, page, limit);
+    const parsedData = (data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      saStatus: p.sa_status,
+      restaurantId: p.restaurant_id,
+      lastIssueDate: p.last_issue_date,
+      createdAt: p.created_at
+    }));
+    return { data: parsedData, total };
+  },
+
+  getSafeHandsCertsForEmployees: async (employeeIds: string[]): Promise<SafeHandsCert[]> => {
+    if (!employeeIds || employeeIds.length === 0) return [];
+    const query = `?employee_id=in.(${employeeIds.map(id => encodeURIComponent(id)).join(',')})`;
+    const result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, query);
+    return (result || []).map((c: any) => ({
+      id: c.id,
+      employeeId: c.employee_id,
+      restaurantId: c.restaurant_id,
+      issueDate: c.issue_date,
+      expiryDate: c.expiry_date,
+      certificateCode: c.certificate_code,
+      signatureUrl: c.signature_url,
+      createdAt: c.created_at
+    }));
+  },
+
+  getSafeHandsSummaryCounts: async (): Promise<{ vigentes: number, vencidos: number }> => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const headers = await getAuthHeaders();
+    
+    // Count vigentes: expiry_date >= today
+    const vigRes = await fetch(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${todayStr}`, {
+      method: 'HEAD',
+      headers: { ...headers, 'Prefer': 'count=exact' }
+    });
+    let vigentes = 0;
+    const vigRange = vigRes.headers.get('content-range');
+    if (vigRange) {
+      vigentes = parseInt(vigRange.split('/')[1]) || 0;
+    }
+
+    // Count vencidos: expiry_date < today
+    const venRes = await fetch(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=lt.${todayStr}`, {
+      method: 'HEAD',
+      headers: { ...headers, 'Prefer': 'count=exact' }
+    });
+    let vencidos = 0;
+    const venRange = venRes.headers.get('content-range');
+    if (venRange) {
+      vencidos = parseInt(venRange.split('/')[1]) || 0;
+    }
+
+    return { vigentes, vencidos };
+  },
+
   saveSafeHandsPersonnel: async (people: SafeHandsPerson[]): Promise<void> => {
     const payload = people.map(p => ({
       id: p.id,
@@ -915,5 +980,57 @@ export const dataService = {
       updated_at: new Date().toISOString()
     };
     await dataService.supabaseFetch('safe_hands_settings', 'POST', payload, '?on_conflict=id');
+  },
+
+  clearAllSafeHandsData: async (email: string, password: string): Promise<void> => {
+    // 1. Crear cliente temporal para autenticar sin alterar la sesión del usuario actual
+    const tempSupabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false }
+    });
+
+    const loginEmail = email.includes('@') ? email : `${email}@kfc.co`;
+    const { data: authData, error: authError } = await tempSupabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: password
+    });
+
+    if (authError || !authData.user) {
+      throw new Error(authError?.message || "Credenciales incorrectas.");
+    }
+
+    // 2. Obtener el rol del usuario autenticado
+    const baseUsername = loginEmail.split('@')[0];
+    const { data: profileData, error: profileError } = await tempSupabase
+      .from('users')
+      .select('role')
+      .ilike('username', baseUsername)
+      .single();
+
+    if (profileError || !profileData) {
+      throw new Error("No se pudo verificar el perfil del administrador.");
+    }
+
+    if (profileData.role !== 'ADMIN') {
+      throw new Error("Acceso denegado: Se requieren credenciales de Administrador.");
+    }
+
+    // 3. Borrar certificados y personal
+    const { error: certsError } = await tempSupabase
+      .from('safe_hands_certs')
+      .delete()
+      .neq('employee_id', 'FORCE_DELETE_ALL_REST_QUERY');
+
+    if (certsError) {
+      throw new Error(`Error al borrar certificados: ${certsError.message}`);
+    }
+
+    const { error: personnelError } = await tempSupabase
+      .from('safe_hands_personnel')
+      .delete()
+      .neq('id', 'FORCE_DELETE_ALL_REST_QUERY');
+
+    if (personnelError) {
+      throw new Error(`Error al borrar personal de manipulación: ${personnelError.message}`);
+    }
   }
 };

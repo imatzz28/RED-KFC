@@ -155,7 +155,18 @@ const Dashboard: React.FC = () => {
         const exitDateStr = emp.exit_date ? emp.exit_date.substring(0, 10) : '9999-12-31';
         
         // Estaba contratado: entró antes del fin de mes Y no se fue antes del inicio de mes
-        const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+        let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+        if (isHistoricalActive) {
+          const isRetired = !emp.active || (emp.exit_date && emp.exit_date.trim() !== '');
+          if (isRetired) {
+            const empSummary = summaryMap.get(String(emp.id).trim());
+            const effective = dataService.getEffectiveGrades(emp.id, dashboardMonth, normalizedEmpStore);
+            const hasNotes = (effective && effective.length > 0) || !!empSummary;
+            if (!hasNotes) {
+              isHistoricalActive = false;
+            }
+          }
+        }
         
         return isHistoricalActive;
       });

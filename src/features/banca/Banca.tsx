@@ -383,57 +383,71 @@ const StoreCard: React.FC<{
   const opPercent = Math.min(100, Math.round((currentOp / (opIdeal || 1)) * 100));
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+    <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_12px_36px_rgba(0,0,0,0.04)] hover:shadow-[0_24px_50px_rgba(0,0,0,0.09)] hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
+      {/* Card Header */}
+      <div className="bg-slate-900/95 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center shrink-0">
+            <Building2 className="w-4 h-4 text-slate-200" />
+          </div>
           <div className="min-w-0">
             <p className="text-xs font-black text-white uppercase truncate">{restaurantName || restaurantId}</p>
-            <p className="text-[9px] text-slate-400">CECO: {restaurantId}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">CECO: {restaurantId}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-[7px] text-slate-400 uppercase font-black tracking-widest">Admin</p>
-              <p className={`text-[10px] font-black leading-none ${adminPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{adminPercent}%</p>
+              <p className="text-[7px] text-slate-500 uppercase font-black tracking-widest">Admin</p>
+              <p className={`text-[10px] font-black leading-none mt-0.5 ${adminPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{adminPercent}%</p>
             </div>
             <div className="text-right">
-              <p className="text-[7px] text-slate-400 uppercase font-black tracking-widest">Op</p>
-              <p className={`text-[10px] font-black leading-none ${opPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{opPercent}%</p>
+              <p className="text-[7px] text-slate-500 uppercase font-black tracking-widest">Op</p>
+              <p className={`text-[10px] font-black leading-none mt-0.5 ${opPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{opPercent}%</p>
             </div>
           </div>
           {canEdit && (
-            <button onClick={onEdit} className="text-[9px] font-black uppercase px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all">
+            <button 
+              onClick={onEdit} 
+              className="text-[9px] font-black uppercase px-3 py-1.5 bg-[#e60000] hover:bg-red-700 text-white rounded-lg transition-all"
+            >
               Editar
             </button>
           )}
         </div>
       </div>
-      <div className="px-4 py-3 flex-1 space-y-1.5">
-        {members.length === 0
-          ? <p className="text-[10px] text-slate-300 italic text-center py-3">Sin asignaciones</p>
-          : members.map(m => {
-              const emp = allEmployees.find(e => e.id === m.employeeId);
-              return (
-                <div key={m.employeeId} className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0">
-                    {emp?.name?.charAt(0) ?? '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-slate-700 truncate">{emp?.name ?? m.employeeId}</p>
-                    {emp && <p className="text-[8px] text-slate-400 font-medium truncate uppercase">{emp.title} · {emp.restaurant_id}</p>}
-                  </div>
-                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${ROLE_COLORS[m.role]}`}>{m.role}</span>
+
+      {/* Card Body */}
+      <div className="p-6 flex-1 space-y-3.5 bg-white">
+        {members.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-slate-300">
+            <Users className="w-8 h-8 opacity-30 mb-2" />
+            <p className="text-[10px] font-bold uppercase tracking-wider italic">Sin asignaciones</p>
+          </div>
+        ) : (
+          members.map(m => {
+            const emp = allEmployees.find(e => e.id === m.employeeId);
+            return (
+              <div key={m.employeeId} className="flex items-center gap-3 bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100/50 hover:bg-slate-50 transition">
+                <div className="w-7 h-7 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0 shadow-sm">
+                  {emp?.name?.charAt(0) ?? '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-slate-800 truncate">{emp?.name ?? m.employeeId}</p>
+                  {emp && <p className="text-[9px] text-slate-400 font-bold tracking-tight truncate uppercase mt-0.5">{emp.title}</p>}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${ROLE_COLORS[m.role]}`}>{m.role}</span>
                   <div className="flex gap-0.5">
                     {m.certifications.map(cert => (
-                      <span key={cert} className={`text-[7px] font-black px-1 py-0.5 rounded-full border ${CERT_COLORS[cert]}`}>{cert}</span>
+                      <span key={cert} className={`text-[6px] font-black px-1.5 py-0.5 rounded border ${CERT_COLORS[cert]}`}>{cert}</span>
                     ))}
                   </div>
                 </div>
-              );
-            })
-        }
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -626,47 +640,92 @@ const Banca: React.FC = () => {
             {regionsView.map(region => {
               const allIds = region.zones.flatMap(z => z.restaurantIds).filter(id => restaurants.some(r => r.id === id));
               const assigned = countAssigned(allIds);
+              const pct = Math.min(100, Math.round((assigned / (allIds.length || 1)) * 100));
+
+              // Circle SVG Parameters
+              const radius = 16;
+              const strokeWidth = 3.5;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference - (pct / 100) * circumference;
+
               return (
-                <button key={region.name} onClick={() => { setView({ level: 'zones', region: region.name }); setSearch(''); }}
-                  className="group text-left bg-white rounded-[24px] shadow-md hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col">
-                  {/* Header: Dark Style */}
-                  <div className="flex h-20 bg-[#1a1c23]">
-                    <div className="w-12 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                      </div>
-                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+                <div 
+                  key={region.name} 
+                  onClick={() => { setView({ level: 'zones', region: region.name }); setSearch(''); }}
+                  className="group cursor-pointer bg-white rounded-[32px] p-6 border border-slate-100/90 shadow-[0_12px_36px_rgba(0,0,0,0.04)] hover:shadow-[0_24px_50px_rgba(0,0,0,0.09)] hover:-translate-y-1 hover:border-red-200/50 transition-all duration-300 flex flex-col"
+                >
+                  {/* Top Bar: KFC Logo and Options dots */}
+                  <div className="flex justify-between items-center w-full">
+                    {/* KFC Logo */}
+                    <div className="px-3.5 py-1 bg-[#e60000] text-white flex items-center justify-center font-black rounded-xl italic tracking-tighter text-[11px] select-none shadow-sm">
+                      KFC
                     </div>
-                    <div className="flex-1 flex items-center px-4 gap-3">
-                      <div className="w-10 h-10 bg-red-700/80 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-                        <MapPin className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-black text-white uppercase tracking-tight truncate">{region.name}</h3>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                           <span className="w-1 h-1 bg-red-500 rounded-full" /> {region.zones.length} zonas | {allIds.length} tiendas
+                    {/* More dots decoration */}
+                    <div className="flex flex-col gap-0.5 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition">
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                    </div>
+                  </div>
+
+                  {/* Title & Icon Row */}
+                  <div className="flex items-center gap-3.5 mt-5">
+                    <div className="w-12 h-12 rounded-[20px] bg-red-50 text-red-500 flex items-center justify-center shrink-0 border border-red-100/30">
+                      <MapPin className="w-5 h-5 text-[#e60000]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate leading-tight">{region.name}</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+                         <span className="text-[#e60000]">•</span> {region.zones.length} ZONAS <span className="text-slate-200">|</span> {allIds.length} TIENDAS
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-slate-100/80 my-5" />
+
+                  {/* Footer Stats Row */}
+                  <div className="flex items-center justify-between mt-auto">
+                    {/* Left: Indicator & Values */}
+                    <div className="flex items-stretch gap-3">
+                      <div className="w-1 bg-[#e60000] rounded-full" />
+                      <div className="flex flex-col justify-between py-0.5">
+                        <p className="text-[8px] text-[#e60000] uppercase tracking-[0.2em] font-black leading-none mb-1.5">Asignadas</p>
+                        <p className="text-2xl font-black text-slate-900 leading-none">
+                          {assigned}<span className="text-xs text-slate-400 ml-1 font-bold">/{allIds.length}</span>
                         </p>
                       </div>
                     </div>
-                  </div>
-                  {/* Body: White Footer */}
-                  <div className="px-4 py-3 flex items-center justify-between bg-white flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-red-600 shadow-inner">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-red-600 uppercase tracking-[0.2em] font-black mb-0.5">Asignadas</p>
-                        <p className="text-xl font-black text-slate-900 leading-none">
-                          {assigned}<span className="text-[10px] text-slate-300 ml-0.5 font-bold">/{allIds.length}</span>
-                        </p>
+
+                    {/* Right: Circular Progress */}
+                    <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                      <svg className="w-full h-full -rotate-90">
+                        <circle 
+                          cx="24" 
+                          cy="24" 
+                          r={radius} 
+                          className="stroke-red-50/50" 
+                          strokeWidth={strokeWidth} 
+                          fill="transparent" 
+                        />
+                        <circle 
+                          cx="24" 
+                          cy="24" 
+                          r={radius} 
+                          className="stroke-[#e60000] transition-all duration-500 ease-out" 
+                          strokeWidth={strokeWidth} 
+                          fill="transparent" 
+                          strokeDasharray={circumference}
+                          strokeDashoffset={strokeDashoffset}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute w-7 h-7 bg-red-50/60 rounded-full flex items-center justify-center text-[#e60000]">
+                        <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-red-600 group-hover:translate-x-1 transition-transform" />
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -678,47 +737,92 @@ const Banca: React.FC = () => {
             {zonesView.map(zone => {
               const validIds = zone.restaurantIds.filter(id => restaurants.some(r => r.id === id));
               const assigned = countAssigned(validIds);
+              const pct = Math.min(100, Math.round((assigned / (validIds.length || 1)) * 100));
+
+              // Circle SVG Parameters
+              const radius = 16;
+              const strokeWidth = 3.5;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference - (pct / 100) * circumference;
+
               return (
-                <button key={zone.name} onClick={() => { setView({ level: 'stores', region: (view as any).region, zone: zone.name }); setSearch(''); }}
-                  className="group text-left bg-white rounded-[24px] shadow-md hover:shadow-2xl border border-slate-100 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col">
-                  {/* Header: Dark Style */}
-                  <div className="flex h-20 bg-[#2d333d]">
-                    <div className="w-12 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                        <div className="w-0.5 h-3 bg-white/40 rounded-full" />
-                      </div>
-                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+                <div 
+                  key={zone.name} 
+                  onClick={() => { setView({ level: 'stores', region: (view as any).region, zone: zone.name }); setSearch(''); }}
+                  className="group cursor-pointer bg-white rounded-[32px] p-6 border border-slate-100/90 shadow-[0_12px_36px_rgba(0,0,0,0.04)] hover:shadow-[0_24px_50px_rgba(0,0,0,0.09)] hover:-translate-y-1 hover:border-red-200/50 transition-all duration-300 flex flex-col"
+                >
+                  {/* Top Bar: KFC Logo and Options dots */}
+                  <div className="flex justify-between items-center w-full">
+                    {/* KFC Logo */}
+                    <div className="px-3.5 py-1 bg-[#e60000] text-white flex items-center justify-center font-black rounded-xl italic tracking-tighter text-[11px] select-none shadow-sm">
+                      KFC
                     </div>
-                    <div className="flex-1 flex items-center px-4 gap-3">
-                      <div className="w-10 h-10 bg-red-600/80 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-                        <Users className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-black text-white uppercase tracking-tight truncate">{zone.name}</h3>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                           <span className="w-1 h-1 bg-red-500 rounded-full" /> {validIds.length} tiendas
+                    {/* More dots decoration */}
+                    <div className="flex flex-col gap-0.5 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition">
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                      <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                    </div>
+                  </div>
+
+                  {/* Title & Icon Row */}
+                  <div className="flex items-center gap-3.5 mt-5">
+                    <div className="w-12 h-12 rounded-[20px] bg-red-50 text-red-500 flex items-center justify-center shrink-0 border border-red-100/30">
+                      <Users className="w-5 h-5 text-[#e60000]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate leading-tight">{zone.name}</h3>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+                         <span className="text-[#e60000]">•</span> {validIds.length} TIENDAS
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-slate-100/80 my-5" />
+
+                  {/* Footer Stats Row */}
+                  <div className="flex items-center justify-between mt-auto">
+                    {/* Left: Indicator & Values */}
+                    <div className="flex items-stretch gap-3">
+                      <div className="w-1 bg-[#e60000] rounded-full" />
+                      <div className="flex flex-col justify-between py-0.5">
+                        <p className="text-[8px] text-[#e60000] uppercase tracking-[0.2em] font-black leading-none mb-1.5">Asignadas</p>
+                        <p className="text-2xl font-black text-slate-900 leading-none">
+                          {assigned}<span className="text-xs text-slate-400 ml-1 font-bold">/{validIds.length}</span>
                         </p>
                       </div>
                     </div>
-                  </div>
-                  {/* Body: White Footer */}
-                  <div className="px-4 py-3 flex items-center justify-between bg-white flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-red-600 shadow-inner">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-red-600 uppercase tracking-[0.2em] font-black mb-0.5">Asignadas</p>
-                        <p className="text-xl font-black text-slate-900 leading-none">
-                          {assigned}<span className="text-[10px] text-slate-300 ml-0.5 font-bold">/{validIds.length}</span>
-                        </p>
+
+                    {/* Right: Circular Progress */}
+                    <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                      <svg className="w-full h-full -rotate-90">
+                        <circle 
+                          cx="24" 
+                          cy="24" 
+                          r={radius} 
+                          className="stroke-red-50/50" 
+                          strokeWidth={strokeWidth} 
+                          fill="transparent" 
+                        />
+                        <circle 
+                          cx="24" 
+                          cy="24" 
+                          r={radius} 
+                          className="stroke-[#e60000] transition-all duration-500 ease-out" 
+                          strokeWidth={strokeWidth} 
+                          fill="transparent" 
+                          strokeDasharray={circumference}
+                          strokeDashoffset={strokeDashoffset}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute w-7 h-7 bg-red-50/60 rounded-full flex items-center justify-center text-[#e60000]">
+                        <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-red-600 group-hover:translate-x-1 transition-transform" />
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

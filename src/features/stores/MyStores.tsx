@@ -41,6 +41,10 @@ const MyStores: React.FC = () => {
   const [isLoadingGrades, setIsLoadingGrades] = useState(false);
   const [gradeVersion, setGradeVersion] = useState(0); // Trigger re-render tras carga async
 
+  const summaryMap = useMemo(() => {
+    return new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+  }, [selectedMonth, gradeVersion]);
+
   React.useEffect(() => {
     if (selectedStore) {
       // Activar la clave del bucket correcto de forma SINCRÓNICA
@@ -120,7 +124,20 @@ const MyStores: React.FC = () => {
       // Lógica Histórica
       const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
       const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-      const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+      let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+
+      if (isHistoricalActive) {
+        const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');
+        if (isRetired) {
+          const empSummary = summaryMap.get(String(e.id).trim());
+          const normStoreId = (e.restaurant_id || '').trim().toUpperCase();
+          const effective = dataService.getEffectiveGrades(e.id, selectedMonth, normStoreId);
+          const hasNotes = (effective && effective.length > 0) || !!empSummary;
+          if (!hasNotes) {
+            isHistoricalActive = false;
+          }
+        }
+      }
 
       if (isHistoricalActive) {
         const normId = (e.restaurant_id || '').trim().toUpperCase();
@@ -213,7 +230,7 @@ const MyStores: React.FC = () => {
         }
       };
     });
-  }, [assigned, employees, selectedMonth, gradeVersion]);
+  }, [assigned, employees, selectedMonth, gradeVersion, summaryMap]);
 
   const getStoreStatsForMonth = (storeId: string, month: string) => {
     // Si es el mes seleccionado, usamos la versión memoizada
@@ -232,7 +249,19 @@ const MyStores: React.FC = () => {
     const storeEmps = employees.filter(e => {
       const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
       const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-      const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+      let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+      
+      if (isHistoricalActive) {
+        const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');
+        if (isRetired) {
+          const empSummary = summaryMap.get(String(e.id).trim());
+          const effective = dataService.getEffectiveGrades(e.id, month, normStoreId);
+          const hasNotes = (effective && effective.length > 0) || !!empSummary;
+          if (!hasNotes) {
+            isHistoricalActive = false;
+          }
+        }
+      }
       return (e.restaurant_id || '').trim().toUpperCase() === normStoreId && isHistoricalActive;
     });
     if (storeEmps.length === 0) return { total: 0, approved: 0, percent: 0, groupStats: {} as Record<string, { avg: number, approvalRate: number }>, cargoCounts: {} as Record<string, number> };
@@ -331,7 +360,18 @@ const MyStores: React.FC = () => {
   if (selectedStore) {
     const stats = getStoreStatsForMonth(selectedStore.id, selectedMonth);
     const storeEmps = employees
-      .filter(e => e.restaurant_id === selectedStore.id && e.active)
+      .filter(e => {
+        if (e.restaurant_id !== selectedStore.id) return false;
+        
+        const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');
+        if (isRetired) {
+          const empSummary = summaryMap.get(String(e.id).trim());
+          const effective = dataService.getEffectiveGrades(e.id, selectedMonth, selectedStore.id);
+          const hasNotes = (effective && effective.length > 0) || !!empSummary;
+          if (!hasNotes) return false;
+        }
+        return true;
+      })
       .filter(e => empSearch === '' || e.name.toLowerCase().includes(empSearch.toLowerCase()) || e.id.includes(empSearch))
       .sort((a, b) => (JobHierarchy[a.title] || 99) - (JobHierarchy[b.title] || 99));
 

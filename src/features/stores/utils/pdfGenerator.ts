@@ -22,10 +22,26 @@ export const generateStorePdf = async (
                 const periodEndStr = `${pdfMonth}-${String(lastDayVal).padStart(2, '0')}`;
                 const periodStartStr = `${pdfMonth}-01`;
 
+                const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+
                 const storeEmps = employees.filter(e => {
                     const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
                     const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-                    const isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+                    let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+                    
+                    if (isHistoricalActive) {
+                        const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');
+                        if (isRetired) {
+                            const empSummary = summaryMap.get(String(e.id).trim());
+                            const normStoreId = (e.restaurant_id || '').trim().toUpperCase();
+                            const effective = dataService.getEffectiveGrades(e.id, pdfMonth, normStoreId);
+                            const hasNotes = (effective && effective.length > 0) || !!empSummary;
+                            if (!hasNotes) {
+                                isHistoricalActive = false;
+                            }
+                        }
+                    }
+                    
                     return (e.restaurant_id || '').trim().toUpperCase() === selectedStore.id.trim().toUpperCase() && isHistoricalActive;
                 });
 
