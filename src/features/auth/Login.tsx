@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '@/types';
 import { supabase } from '@/services/dataService';
-import { LogIn, RefreshCw, GraduationCap } from 'lucide-react';
+import { LogIn, RefreshCw, GraduationCap, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -13,6 +14,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +131,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
             {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
             {loading ? 'Validando...' : 'Entrar al Sistema'}
+          </button>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink-0 mx-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">O</span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/verify')}
+            className="w-full bg-white border-2 border-slate-200 text-slate-500 font-black py-4 rounded-2xl hover:border-slate-300 hover:text-slate-800 hover:bg-slate-50 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest text-[10px]"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            Validar Certificados
           </button>
         </form>
 
