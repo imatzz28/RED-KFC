@@ -678,63 +678,44 @@ const Banca: React.FC = () => {
                 <div 
                   key={region.name} 
                   onClick={() => { setView({ level: 'zones', region: region.name }); setSearch(''); }}
-                  className="group cursor-pointer bg-white rounded-[32px] p-5 border border-slate-100/90 shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_45px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:border-red-200/50 transition-all duration-300 flex flex-col justify-between relative overflow-hidden min-h-[170px]"
+                  className="group cursor-pointer bg-white rounded-[20px] shadow-md hover:shadow-2xl border border-slate-100/50 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col"
                 >
-                  {/* Grid Pattern Background */}
-                  <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:8px_8px] opacity-45 pointer-events-none" />
-
-                  {/* KFC Banner */}
-                  <div className="absolute top-0 left-0 w-12 h-16 bg-[#e60000] rounded-tl-[32px] rounded-br-[16px] flex flex-col items-center justify-center text-white shadow-sm z-10">
-                    <Building2 className="w-4 h-4 text-white" />
-                    <span className="text-[9px] font-black tracking-tighter italic mt-0.5">KFC</span>
-                  </div>
-
-                  {/* Top Section */}
-                  <div className="flex items-start justify-between relative z-10 pl-[36px]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white border border-red-100 flex items-center justify-center shrink-0 shadow-sm">
-                        <MapPin className="w-4 h-4 text-[#e60000]" />
+                  {/* Header: KFC Brand Strip */}
+                  <div className="flex h-16 border-b border-slate-50">
+                    <div className="w-16 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate leading-tight">
-                          {region.name}
-                        </h3>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mt-1 text-slate-400">
-                          <span className="text-[#e60000]">•</span> {region.zones.length} ZONAS <span className="text-slate-200">|</span> {allIds.length} TIENDAS
-                        </p>
+                      <MapPin className="w-6 h-6 text-white relative z-10" />
+                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+                    </div>
+                    <div className="flex-1 flex flex-col justify-center px-4 min-w-0">
+                      <h3 className="text-base font-black text-slate-900 italic uppercase tracking-tighter leading-tight group-hover:text-red-700 transition-colors truncate">{region.name}</h3>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 font-bold text-[7px] uppercase tracking-widest">
+                        <span className="text-[#e60000]">•</span> {region.zones.length} Zonas
                       </div>
                     </div>
                   </div>
 
-                  {/* Divider */}
-                  <div className="h-px bg-slate-100/80 my-4 relative z-10" />
+                  {/* Body: member count */}
+                  <div className="flex bg-white relative overflow-hidden h-20">
+                    <div className="absolute right-0 bottom-0 w-24 h-24 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 0)', backgroundSize: '6px 6px' }} />
 
-                  {/* Footer Stats Row */}
-                  <div className="flex items-center justify-between mt-auto relative z-10">
-                    {/* Left Part: Users icon & ASIGNADAS text */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-col items-center justify-center w-12 shrink-0">
-                        <Users className="w-4 h-4 text-slate-500" />
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Asignadas</span>
+                    <div className="w-[35%] flex flex-col items-center justify-center p-3 border-r border-slate-50 bg-slate-50/20">
+                      <div className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+                        <Users className="w-4 h-4" />
                       </div>
+                      <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest text-center leading-tight">Asignados</p>
+                    </div>
 
-                      {/* Vertical Red Line */}
-                      <div className="w-[1.5px] h-8 bg-red-600 rounded-full shrink-0" />
-
-                      {/* Numbers */}
+                    <div className="flex-1 flex flex-col items-center justify-center p-3 relative z-10">
                       <div className="flex items-baseline">
-                        <span className="text-3xl font-black text-[#e60000] tracking-tighter leading-none">
-                          {assigned}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400 ml-0.5">
-                          /{allIds.length}
-                        </span>
+                        <span className="text-3xl font-black text-red-600 tracking-tighter leading-none">{assigned}</span>
+                        <span className="text-xs font-bold text-slate-400 ml-0.5">/{allIds.length}</span>
                       </div>
-                    </div>
-
-                    {/* Right Part: Circular Button */}
-                    <div className="w-9 h-9 rounded-full bg-red-50 border border-red-100/50 flex items-center justify-center text-[#e60000] shadow-sm group-hover:bg-[#e60000] group-hover:text-white transition-all duration-300 shrink-0">
-                      <TrendingUp className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Tiendas</p>
                     </div>
                   </div>
                 </div>
@@ -754,63 +735,44 @@ const Banca: React.FC = () => {
                 <div 
                   key={zone.name} 
                   onClick={() => { setView({ level: 'stores', region: (view as any).region, zone: zone.name }); setSearch(''); }}
-                  className="group cursor-pointer bg-white rounded-[32px] p-5 border border-slate-100/90 shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_45px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:border-red-200/50 transition-all duration-300 flex flex-col justify-between relative overflow-hidden min-h-[170px]"
+                  className="group cursor-pointer bg-white rounded-[20px] shadow-md hover:shadow-2xl border border-slate-100/50 hover:border-red-200 transition-all duration-300 overflow-hidden flex flex-col"
                 >
-                  {/* Grid Pattern Background */}
-                  <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:8px_8px] opacity-45 pointer-events-none" />
-
-                  {/* KFC Banner */}
-                  <div className="absolute top-0 left-0 w-12 h-16 bg-[#e60000] rounded-tl-[32px] rounded-br-[16px] flex flex-col items-center justify-center text-white shadow-sm z-10">
-                    <Building2 className="w-4 h-4 text-white" />
-                    <span className="text-[9px] font-black tracking-tighter italic mt-0.5">KFC</span>
-                  </div>
-
-                  {/* Top Section */}
-                  <div className="flex items-start justify-between relative z-10 pl-[36px]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white border border-red-100 flex items-center justify-center shrink-0 shadow-sm">
-                        <MapPin className="w-4 h-4 text-[#e60000]" />
+                  {/* Header: KFC Brand Strip */}
+                  <div className="flex h-16 border-b border-slate-50">
+                    <div className="w-16 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+                        <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate leading-tight">
-                          {zone.name}
-                        </h3>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mt-1 text-slate-400">
-                          <span className="text-[#e60000]">•</span> {validIds.length} TIENDAS
-                        </p>
+                      <MapPin className="w-6 h-6 text-white relative z-10" />
+                      <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+                    </div>
+                    <div className="flex-1 flex flex-col justify-center px-4 min-w-0">
+                      <h3 className="text-base font-black text-slate-900 italic uppercase tracking-tighter leading-tight group-hover:text-red-700 transition-colors truncate">{zone.name}</h3>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 font-bold text-[7px] uppercase tracking-widest">
+                        <span className="text-[#e60000]">•</span> {validIds.length} Tiendas
                       </div>
                     </div>
                   </div>
 
-                  {/* Divider */}
-                  <div className="h-px bg-slate-100/80 my-4 relative z-10" />
+                  {/* Body: member count */}
+                  <div className="flex bg-white relative overflow-hidden h-20">
+                    <div className="absolute right-0 bottom-0 w-24 h-24 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 0)', backgroundSize: '6px 6px' }} />
 
-                  {/* Footer Stats Row */}
-                  <div className="flex items-center justify-between mt-auto relative z-10">
-                    {/* Left Part: Users icon & ASIGNADAS text */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-col items-center justify-center w-12 shrink-0">
-                        <Users className="w-4 h-4 text-slate-500" />
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Asignadas</span>
+                    <div className="w-[35%] flex flex-col items-center justify-center p-3 border-r border-slate-50 bg-slate-50/20">
+                      <div className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+                        <Users className="w-4 h-4" />
                       </div>
+                      <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest text-center leading-tight">Asignados</p>
+                    </div>
 
-                      {/* Vertical Red Line */}
-                      <div className="w-[1.5px] h-8 bg-red-600 rounded-full shrink-0" />
-
-                      {/* Numbers */}
+                    <div className="flex-1 flex flex-col items-center justify-center p-3 relative z-10">
                       <div className="flex items-baseline">
-                        <span className="text-3xl font-black text-[#e60000] tracking-tighter leading-none">
-                          {assigned}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400 ml-0.5">
-                          /{validIds.length}
-                        </span>
+                        <span className="text-3xl font-black text-red-600 tracking-tighter leading-none">{assigned}</span>
+                        <span className="text-xs font-bold text-slate-400 ml-0.5">/{validIds.length}</span>
                       </div>
-                    </div>
-
-                    {/* Right Part: Circular Button */}
-                    <div className="w-9 h-9 rounded-full bg-red-50 border border-red-100/50 flex items-center justify-center text-[#e60000] shadow-sm group-hover:bg-[#e60000] group-hover:text-white transition-all duration-300 shrink-0">
-                      <TrendingUp className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Tiendas</p>
                     </div>
                   </div>
                 </div>
@@ -821,7 +783,7 @@ const Banca: React.FC = () => {
 
         {/* LEVEL 3: Store Cards */}
         {view.level === 'stores' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {storesView.map(restId => {
               const rest = restaurants.find(r => r.id === restId);
               return (
