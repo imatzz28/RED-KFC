@@ -500,6 +500,30 @@ const Banca: React.FC = () => {
   const hierarchy = dataService.getHierarchy();
   const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR' || auth.user?.role === 'LIDER';
 
+  // ── Migración: Licencia en Curso → Potencial ─────────────────────────────
+  React.useEffect(() => {
+    const needsMigration = bancaData.assignments.some(a =>
+      a.members?.some(m => (m.role as string) === 'Licencia en Curso')
+    );
+    if (!needsMigration) return;
+
+    const migrated: BancaData = {
+      ...bancaData,
+      assignments: bancaData.assignments.map(a => ({
+        ...a,
+        members: (a.members ?? []).map(m =>
+          (m.role as string) === 'Licencia en Curso' ? { ...m, role: 'Potencial' as BancaRole } : m
+        ),
+      })),
+    };
+
+    dataService.saveBancaData(migrated).then(() => {
+      setBancaData(migrated);
+      console.log('[Banca] Migración completada: Licencia en Curso → Potencial');
+    });
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const getAssignment = (id: string) =>
     bancaData.assignments.find(a => a.restaurantId === id) ?? emptyAssignment(id);
 
