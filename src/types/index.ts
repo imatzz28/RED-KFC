@@ -89,9 +89,9 @@ export interface HierarchyData {
 
 // ── Banca ──────────────────────────────────────────────────────────────────
 export type Certification = 'GBR' | 'GAR' | 'GER' | 'EEA';
-export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Entrenador HRS' | 'Licencia en Curso';
+export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Entrenador HRS' | 'Potencial';
 
-export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Licencia en Curso'];
+export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Potencial'];
 
 export interface StoreIdeal {
   gerentes: number;

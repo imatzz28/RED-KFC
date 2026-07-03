@@ -23,7 +23,7 @@ const ROLE_COLORS: Record<BancaRole, string> = {
   'Líder de turno': 'bg-sky-100 text-sky-700',
   'Entrenador': 'bg-orange-100 text-orange-700',
   'Entrenador HRS': 'bg-amber-100 text-amber-700',
-  'Licencia en Curso': 'bg-slate-100 text-slate-700',
+  'Potencial': 'bg-slate-100 text-slate-700',
 };
 
 const emptyAssignment = (restaurantId: string): StoreAssignment => ({ restaurantId, members: [] });
@@ -257,6 +257,7 @@ const ComplianceSummary: React.FC<{
   let realLideres = 0;
   let idealEntrenadores = 0;
   let realEntrenadores = 0;
+  let realPotenciales = 0;
 
   restaurantIds.forEach(id => {
     const assignment = bancaData.assignments.find(a => a.restaurantId === id);
@@ -267,10 +268,12 @@ const ComplianceSummary: React.FC<{
     realGerentes += members.filter(m => m.role === 'Gerente' || m.role === 'Subgerente').length;
 
     idealLideres += ideal.lideresTurno;
-    realLideres += members.filter(m => m.role === 'Líder de turno' || m.role === 'Licencia en Curso').length;
+    realLideres += members.filter(m => m.role === 'Líder de turno').length;
 
     idealEntrenadores += ideal.entrenadores;
     realEntrenadores += members.filter(m => m.role === 'Entrenador' || m.role === 'Entrenador HRS').length;
+
+    realPotenciales += members.filter(m => m.role === 'Potencial').length;
   });
 
   const getPercent = (real: number, ideal: number) => Math.min(100, Math.round((real / (ideal || 1)) * 100));
@@ -316,6 +319,28 @@ const ComplianceSummary: React.FC<{
     </div>
   );
 
+  // Tarjeta informativa sin porcentaje (solo muestra el conteo real)
+  const InfoCard = ({ title, icon, real }: { title: string; icon: React.ReactNode; real: number }) => (
+    <div className="bg-white rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] border border-slate-100/80 flex flex-col justify-between min-h-[140px]">
+      {/* Grid Pattern Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:8px_8px] opacity-40 pointer-events-none" />
+      
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="w-12 h-12 rounded-2xl bg-slate-700 text-white flex items-center justify-center shadow-md shrink-0">
+          {icon}
+        </div>
+        <div className="flex flex-col">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
+          <span className="text-3xl font-black text-slate-700 tracking-tighter leading-none mt-0.5">{real}</span>
+        </div>
+      </div>
+
+      <div className="mt-4 relative z-10">
+        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">Solo informativo — sin meta asignada</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="mb-8 space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-end gap-4 px-2 mb-6">
@@ -334,27 +359,32 @@ const ComplianceSummary: React.FC<{
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard 
-          title="Gerentes" 
-          icon={<Award className="w-6 h-6 text-white" />} 
-          real={realGerentes} 
-          ideal={idealGerentes} 
-          pct={pctGerentes} 
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          title="Gerentes"
+          icon={<Award className="w-6 h-6 text-white" />}
+          real={realGerentes}
+          ideal={idealGerentes}
+          pct={pctGerentes}
         />
-        <StatCard 
-          title="Líderes de Turno" 
-          icon={<Users className="w-6 h-6 text-white" />} 
-          real={realLideres} 
-          ideal={idealLideres} 
-          pct={pctLideres} 
+        <StatCard
+          title="Líderes de Turno"
+          icon={<Users className="w-6 h-6 text-white" />}
+          real={realLideres}
+          ideal={idealLideres}
+          pct={pctLideres}
         />
-        <StatCard 
-          title="Entrenadores" 
-          icon={<Target className="w-6 h-6 text-white" />} 
-          real={realEntrenadores} 
-          ideal={idealEntrenadores} 
-          pct={pctEntrenadores} 
+        <InfoCard
+          title="Potenciales"
+          icon={<TrendingUp className="w-6 h-6 text-white" />}
+          real={realPotenciales}
+        />
+        <StatCard
+          title="Entrenadores"
+          icon={<Target className="w-6 h-6 text-white" />}
+          real={realEntrenadores}
+          ideal={idealEntrenadores}
+          pct={pctEntrenadores}
         />
       </div>
     </div>
