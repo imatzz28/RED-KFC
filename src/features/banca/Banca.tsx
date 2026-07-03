@@ -5,7 +5,7 @@ import {
   BancaData, StoreAssignment, StoreLeader, Certification, BancaRole,
   BANCA_ROLES, Employee, StoreIdeal
 } from '@/types';
-import { Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp } from 'lucide-react';
+import { Store, Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const ALL_CERTS: Certification[] = ['EEA', 'GBR', 'GAR', 'GER'];
@@ -283,60 +283,67 @@ const ComplianceSummary: React.FC<{
   const pctEntrenadores = getPercent(realEntrenadores, idealEntrenadores);
 
   const StatCard = ({ title, icon, real, ideal, pct }: any) => (
-    <div className="bg-white rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] border border-slate-100/80 flex flex-col justify-between min-h-[140px]">
-      {/* Grid Pattern Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:8px_8px] opacity-40 pointer-events-none" />
-      
-      <div className="flex items-center gap-4 relative z-10">
-        <div className="w-12 h-12 rounded-2xl bg-[#e60000] text-white flex items-center justify-center shadow-md shrink-0">
+    <div className="bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_15px_35px_rgba(15,23,42,0.4)] hover:shadow-[0_22px_45px_rgba(15,23,42,0.55)] hover:-translate-y-0.5 flex flex-col justify-between min-h-[160px]">
+      {/* Diagonal stripe pattern */}
+      <div className="absolute inset-0 opacity-[0.05] pointer-events-none"
+        style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} />
+      {/* Glow top-right */}
+      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+
+      {/* Top: icon + title + real/ideal */}
+      <div className="flex items-start gap-3 relative z-10">
+        <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 shadow-inner">
           {icon}
         </div>
         <div className="flex flex-col">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
-          <div className="flex items-baseline gap-0.5 mt-0.5">
-            <span className="text-3xl font-black text-[#e60000] tracking-tighter leading-none">{real}</span>
-            <span className="text-xs font-bold text-slate-400">/{ideal}</span>
+          <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">{title}</p>
+          <div className="flex items-baseline gap-1 mt-0.5">
+            <span className="text-3xl font-black text-white tracking-tighter leading-none">{real}</span>
+            <span className="text-sm font-bold text-white/40">/{ideal}</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 relative z-10">
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cumplimiento</p>
-        <div className="relative flex items-center gap-4 mt-1.5">
-          <div className="relative flex-1 h-1 bg-slate-100 rounded-full">
-            <div 
-              className="absolute top-0 left-0 h-full bg-[#e60000] rounded-full transition-all duration-1000 ease-out" 
-              style={{ width: `${pct}%` }} 
-            />
-            <div 
-              className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#e60000] rounded-full border border-white shadow-sm transition-all duration-1000 ease-out" 
-              style={{ left: `${pct}%`, transform: 'translate(-50%, -50%)' }} 
+      {/* Bottom: label + bar + big percentage */}
+      <div className="relative z-10 mt-4">
+        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Cumplimiento</p>
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-[11px] font-black text-slate-800 shrink-0">{pct}%</span>
+          <span className="text-4xl font-black text-white tracking-tighter leading-none shrink-0">{pct}<span className="text-2xl">%</span></span>
         </div>
       </div>
     </div>
   );
 
-  // Tarjeta informativa sin porcentaje (solo muestra el conteo real)
+  // Tarjeta informativa — solo conteo, sin porcentaje ni meta
   const InfoCard = ({ title, icon, real }: { title: string; icon: React.ReactNode; real: number }) => (
-    <div className="bg-white rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] border border-slate-100/80 flex flex-col justify-between min-h-[140px]">
-      {/* Grid Pattern Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:8px_8px] opacity-40 pointer-events-none" />
-      
-      <div className="flex items-center gap-4 relative z-10">
-        <div className="w-12 h-12 rounded-2xl bg-slate-700 text-white flex items-center justify-center shadow-md shrink-0">
+    <div className="bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_15px_35px_rgba(15,23,42,0.4)] hover:shadow-[0_22px_45px_rgba(15,23,42,0.55)] hover:-translate-y-0.5 flex flex-col justify-between min-h-[160px]">
+      {/* Diagonal stripe pattern */}
+      <div className="absolute inset-0 opacity-[0.05] pointer-events-none"
+        style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} />
+      {/* Glow top-right */}
+      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+
+      {/* Top: icon + title + count */}
+      <div className="flex items-start gap-3 relative z-10">
+        <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 shadow-inner">
           {icon}
         </div>
         <div className="flex flex-col">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
-          <span className="text-3xl font-black text-slate-700 tracking-tighter leading-none mt-0.5">{real}</span>
+          <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">{title}</p>
+          <span className="text-3xl font-black text-white tracking-tighter leading-none mt-0.5">{real}</span>
         </div>
       </div>
 
-      <div className="mt-4 relative z-10">
-        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">Solo informativo — sin meta asignada</p>
+      {/* Bottom: label + ghost number */}
+      <div className="relative z-10 mt-4 flex items-end justify-between">
+        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">En banca</p>
+        <span className="text-5xl font-black text-white/10 tracking-tighter leading-none select-none">{real}</span>
       </div>
     </div>
   );
@@ -398,88 +405,58 @@ const StoreCard: React.FC<{
   restaurantId: string;
   restaurantName: string;
   assignment: StoreAssignment;
-  ideal?: StoreIdeal;
-  allEmployees: Employee[];
   canEdit: boolean;
   onEdit: () => void;
-}> = ({ restaurantId, restaurantName, assignment, ideal, allEmployees, canEdit, onEdit }) => {
+}> = ({ restaurantId, restaurantName, assignment, canEdit, onEdit }) => {
   const members = assignment.members ?? [];
-  const currentIdeal = ideal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 };
-  
-  const adminIdeal = currentIdeal.gerentes + currentIdeal.lideresTurno;
-  const currentAdmin = members.filter(m => m.role !== 'Entrenador').length;
-  const adminPercent = Math.min(100, Math.round((currentAdmin / (adminIdeal || 1)) * 100));
-
-  const opIdeal = currentIdeal.entrenadores;
-  const currentOp = members.filter(m => m.role === 'Entrenador' || m.role === 'Entrenador HRS').length;
-  const opPercent = Math.min(100, Math.round((currentOp / (opIdeal || 1)) * 100));
 
   return (
-    <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_12px_36px_rgba(0,0,0,0.04)] hover:shadow-[0_24px_50px_rgba(0,0,0,0.09)] hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
-      {/* Card Header */}
-      <div className="bg-slate-900/95 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center shrink-0">
-            <Building2 className="w-4 h-4 text-slate-200" />
+    <div className="bg-white rounded-[20px] shadow-md hover:shadow-2xl border border-slate-100/50 hover:border-red-200 transition-all duration-300 group overflow-hidden flex flex-col">
+      {/* Header: KFC Brand Strip */}
+      <div className="flex h-16 border-b border-slate-50">
+        <div className="w-16 bg-[#e60000] flex flex-col items-center justify-center shrink-0 relative overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 flex gap-0.5 pt-1 opacity-20">
+            <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+            <div className="w-0.5 h-4 bg-white/40 rounded-full" />
+            <div className="w-0.5 h-4 bg-white/40 rounded-full" />
           </div>
-          <div className="min-w-0">
-            <p className="text-xs font-black text-white uppercase truncate">{restaurantName || restaurantId}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">CECO: {restaurantId}</p>
+          <Store className="w-6 h-6 text-white relative z-10" />
+          <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
+        </div>
+        <div className="flex-1 flex flex-col justify-center px-4 min-w-0">
+          <h3 className="text-base font-black text-slate-900 italic uppercase tracking-tighter leading-tight group-hover:text-red-700 transition-colors truncate">{restaurantName || restaurantId}</h3>
+          <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 font-bold text-[7px] uppercase tracking-widest">
+            <MapPin className="w-2.5 h-2.5 text-red-500 shrink-0" />
+            <span className="truncate">CECO: {restaurantId}</span>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[7px] text-slate-500 uppercase font-black tracking-widest">Admin</p>
-              <p className={`text-[10px] font-black leading-none mt-0.5 ${adminPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{adminPercent}%</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[7px] text-slate-500 uppercase font-black tracking-widest">Op</p>
-              <p className={`text-[10px] font-black leading-none mt-0.5 ${opPercent >= 100 ? 'text-emerald-400' : 'text-white'}`}>{opPercent}%</p>
-            </div>
-          </div>
-          {canEdit && (
-            <button 
-              onClick={onEdit} 
+        {canEdit && (
+          <div className="flex items-center pr-4 shrink-0">
+            <button
+              onClick={e => { e.stopPropagation(); onEdit(); }}
               className="text-[9px] font-black uppercase px-3 py-1.5 bg-[#e60000] hover:bg-red-700 text-white rounded-lg transition-all"
             >
               Editar
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Card Body */}
-      <div className="p-6 flex-1 space-y-3.5 bg-white">
-        {members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 text-slate-300">
-            <Users className="w-8 h-8 opacity-30 mb-2" />
-            <p className="text-[10px] font-bold uppercase tracking-wider italic">Sin asignaciones</p>
+      {/* Body: member count */}
+      <div className="flex bg-white relative overflow-hidden h-20">
+        <div className="absolute right-0 bottom-0 w-24 h-24 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 0)', backgroundSize: '6px 6px' }} />
+
+        <div className="w-[35%] flex flex-col items-center justify-center p-3 border-r border-slate-50 bg-slate-50/20">
+          <div className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-red-600 mb-1.5 group-hover:scale-110 transition-transform">
+            <Users className="w-4 h-4" />
           </div>
-        ) : (
-          members.map(m => {
-            const emp = allEmployees.find(e => e.id === m.employeeId);
-            return (
-              <div key={m.employeeId} className="flex items-center gap-3 bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100/50 hover:bg-slate-50 transition">
-                <div className="w-7 h-7 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0 shadow-sm">
-                  {emp?.name?.charAt(0) ?? '?'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-slate-800 truncate">{emp?.name ?? m.employeeId}</p>
-                  {emp && <p className="text-[9px] text-slate-400 font-bold tracking-tight truncate uppercase mt-0.5">{emp.title}</p>}
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={`text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${ROLE_COLORS[m.role]}`}>{m.role}</span>
-                  <div className="flex gap-0.5">
-                    {m.certifications.map(cert => (
-                      <span key={cert} className={`text-[6px] font-black px-1.5 py-0.5 rounded border ${CERT_COLORS[cert]}`}>{cert}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+          <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest text-center leading-tight">Asignados</p>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-3 relative z-10">
+          <span className="text-3xl font-black text-red-600 tracking-tighter leading-none">{members.length}</span>
+          <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">En Banca</p>
+        </div>
       </div>
     </div>
   );
@@ -849,7 +826,7 @@ const Banca: React.FC = () => {
               const rest = restaurants.find(r => r.id === restId);
               return (
                 <StoreCard key={restId} restaurantId={restId} restaurantName={rest?.name ?? restId}
-                  assignment={getAssignment(restId)} ideal={bancaData.storeIdeals?.[restId]} allEmployees={employees} canEdit={canEdit}
+                  assignment={getAssignment(restId)} canEdit={canEdit}
                   onEdit={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId })}
                 />
               );
