@@ -334,3 +334,174 @@ WITH CHECK (
 -- ============================================================
 DELETE FROM public.users WHERE username = 'admin' OR id = 'admin-master';
 DELETE FROM auth.users WHERE email = 'admin@kfc.co';
+
+
+-- =========================================================================
+-- SEGURIDAD ADICIONAL: RLS PARA TODAS LAS TABLAS CORE DEL SISTEMA
+-- =========================================================================
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banca ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hierarchy ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monthly_group_stats ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de lectura pública para usuarios autenticados
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.users;
+CREATE POLICY "Permitir lectura a autenticados" ON public.users FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.employees;
+CREATE POLICY "Permitir lectura a autenticados" ON public.employees FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.restaurants;
+CREATE POLICY "Permitir lectura a autenticados" ON public.restaurants FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.grades;
+CREATE POLICY "Permitir lectura a autenticados" ON public.grades FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.banca;
+CREATE POLICY "Permitir lectura a autenticados" ON public.banca FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.hierarchy;
+CREATE POLICY "Permitir lectura a autenticados" ON public.hierarchy FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.monthly_group_stats;
+CREATE POLICY "Permitir lectura a autenticados" ON public.monthly_group_stats FOR SELECT TO authenticated USING (true);
+
+-- Políticas de escritura restrictivas según Rol
+
+-- Tabla 'users' (Solo ADMIN)
+DROP POLICY IF EXISTS "Solo admin puede modificar usuarios" ON public.users;
+CREATE POLICY "Solo admin puede modificar usuarios" ON public.users
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
+-- Tabla 'employees' (ADMIN y COORDINATOR)
+DROP POLICY IF EXISTS "Admin o Coordinator modifican empleados" ON public.employees;
+CREATE POLICY "Admin o Coordinator modifican empleados" ON public.employees
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+);
+
+-- Tabla 'restaurants' (Solo ADMIN)
+DROP POLICY IF EXISTS "Solo admin puede modificar restaurantes" ON public.restaurants;
+CREATE POLICY "Solo admin puede modificar restaurantes" ON public.restaurants
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
+-- Tabla 'grades' (ADMIN y COORDINATOR)
+DROP POLICY IF EXISTS "Admin o Coordinator modifican notas" ON public.grades;
+CREATE POLICY "Admin o Coordinator modifican notas" ON public.grades
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+);
+
+-- Tabla 'banca' (ADMIN y COORDINATOR)
+DROP POLICY IF EXISTS "Admin o Coordinator modifican banca" ON public.banca;
+CREATE POLICY "Admin o Coordinator modifican banca" ON public.banca
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+);
+
+-- Tabla 'hierarchy' (Solo ADMIN)
+DROP POLICY IF EXISTS "Solo admin puede modificar jerarquias" ON public.hierarchy;
+CREATE POLICY "Solo admin puede modificar jerarquias" ON public.hierarchy
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
+-- Tabla 'monthly_group_stats' (Solo ADMIN)
+DROP POLICY IF EXISTS "Solo admin puede modificar estadisticas" ON public.monthly_group_stats;
+CREATE POLICY "Solo admin puede modificar estadisticas" ON public.monthly_group_stats
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
