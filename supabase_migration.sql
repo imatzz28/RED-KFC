@@ -216,7 +216,6 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 CREATE TABLE IF NOT EXISTS safe_hands_personnel (
   id                TEXT PRIMARY KEY, -- Cedula
   name              TEXT NOT NULL,    -- Nombre
-  sa_status         TEXT,             -- Seguridad de Alimentos
   restaurant_id     TEXT,             -- Opcional para filtros
   last_issue_date   DATE,             -- Fecha
   created_at        TIMESTAMPTZ DEFAULT NOW()

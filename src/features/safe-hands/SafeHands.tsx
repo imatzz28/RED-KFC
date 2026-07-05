@@ -155,7 +155,7 @@ const SafeHands: React.FC = () => {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        // Mapeo según CM.xlsx: Cedula, Nombre, Especialista, Fecha
+        // Mapeo: Cedula, Nombre, Fecha
         const newPeople: SafeHandsPerson[] = [];
         const newCerts: SafeHandsCert[] = [];
 
@@ -164,7 +164,6 @@ const SafeHands: React.FC = () => {
           if (!cedula) return;
 
           const name = String(item.Nombre || item.nombre || 'Sin Nombre').trim();
-          const saStatus = String(item.Especialista || item['Seguridad de Alimentos'] || item.sa_status || '').trim();
           const rawDate = item.Fecha || item.fecha || item.Fecha_Emision;
           
           if (!rawDate) return;
@@ -204,7 +203,6 @@ const SafeHands: React.FC = () => {
           newPeople.push({
             id: cedula,
             name: name,
-            saStatus: saStatus,
             lastIssueDate: issueDate
           });
 
@@ -231,6 +229,26 @@ const SafeHands: React.FC = () => {
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const templateData = [
+        {
+          'Cedula': '12345678',
+          'Nombre': 'Juan Perez',
+          'Fecha': '2026-07-04'
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+      XLSX.writeFile(wb, "Plantilla_SafeHands.xlsx");
+    } catch (error) {
+      console.error("Error al descargar la plantilla:", error);
+      alert("Error al generar la plantilla de descarga.");
+    }
   };
 
   // ── Signature Management ───────────────────────────────────────────────────
@@ -362,6 +380,14 @@ const SafeHands: React.FC = () => {
               <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
                 <Signature className="w-5 h-5 text-slate-400" />
               </button>
+              <button 
+                onClick={handleDownloadTemplate} 
+                className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
+                title="Descargar Plantilla Excel para cargar base de datos"
+              >
+                <Download className="w-4 h-4 text-red-600" />
+                <span>Descargar Plantilla</span>
+              </button>
               <label className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
                 <Upload className="w-4 h-4" />
                 <span>Cargar Consolidado</span>
@@ -379,7 +405,7 @@ const SafeHands: React.FC = () => {
              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
              <input 
                type="text" 
-               placeholder="Buscar por nombre, cédula o seguridad de alimentos..." 
+               placeholder="Buscar por nombre o cédula..." 
                className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-red-500 transition-all text-sm font-medium"
                value={search}
                onChange={e => setSearch(e.target.value)}
@@ -408,7 +434,6 @@ const SafeHands: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
-                  <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Seguridad Alimentos</th>
                   <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Emisión</th>
                   <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Vencimiento</th>
                   <th className="px-6 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
@@ -424,9 +449,6 @@ const SafeHands: React.FC = () => {
                       <td className="px-6 py-4">
                         <p className="text-xs font-bold text-slate-700 uppercase">{person.name}</p>
                         <p className="text-[9px] font-mono text-slate-300">{person.id}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[10px] font-black text-slate-500 uppercase">{person.saStatus || '-'}</span>
                       </td>
                       <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase">
                         {formatSpanishDate(cert?.issueDate || '')}

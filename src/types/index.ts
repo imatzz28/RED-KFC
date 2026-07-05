@@ -118,7 +118,6 @@ export interface StoreAssignment {
 export interface SafeHandsPerson {
   id: string; // Cedula
   name: string; // Nombre
-  saStatus?: string; // Seguridad de Alimentos
   restaurantId?: string;
   lastIssueDate?: string; // Fecha
   createdAt?: string;

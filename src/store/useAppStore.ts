@@ -23,7 +23,7 @@ interface AppState {
 
     // Actions
     refreshData: () => void;
-    initData: () => Promise<void>;
+    initData: (force?: boolean) => Promise<void>;
     loadMonthly: () => Promise<void>;
 }
 

@@ -1,5 +1,5 @@
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -816,7 +816,6 @@ export const dataService = {
     return (result || []).map((p: any) => ({
       id: p.id,
       name: p.name,
-      saStatus: p.sa_status,
       restaurantId: p.restaurant_id,
       lastIssueDate: p.last_issue_date,
       createdAt: p.created_at
@@ -828,14 +827,13 @@ export const dataService = {
     if (search) {
       const cleanSearch = search.trim();
       if (cleanSearch) {
-        queryParams += `&or=(name.ilike.*${encodeURIComponent(cleanSearch)}*,id.ilike.*${encodeURIComponent(cleanSearch)}*,sa_status.ilike.*${encodeURIComponent(cleanSearch)}*)`;
+        queryParams += `&or=(name.ilike.*${encodeURIComponent(cleanSearch)}*,id.ilike.*${encodeURIComponent(cleanSearch)}*)`;
       }
     }
     const { data, total } = await dataService.supabaseFetchPaginated('safe_hands_personnel', queryParams, page, limit);
     const parsedData = (data || []).map((p: any) => ({
       id: p.id,
       name: p.name,
-      saStatus: p.sa_status,
       restaurantId: p.restaurant_id,
       lastIssueDate: p.last_issue_date,
       createdAt: p.created_at
@@ -892,7 +890,6 @@ export const dataService = {
     const payload = people.map(p => ({
       id: p.id,
       name: p.name,
-      sa_status: p.saStatus,
       restaurant_id: p.restaurantId,
       last_issue_date: p.lastIssueDate
     }));
@@ -939,7 +936,6 @@ export const dataService = {
           employee: {
             id: p.id,
             name: p.name,
-            saStatus: p.sa_status,
             restaurantId: p.restaurant_id,
             lastIssueDate: p.last_issue_date
           }

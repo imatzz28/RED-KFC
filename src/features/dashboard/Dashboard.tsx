@@ -76,7 +76,7 @@ const Dashboard: React.FC = () => {
 
 
 
-  const scopeStoresSet = useMemo(() => {
+  const scopeStoresSet = useMemo<Set<string>>(() => {
     const isCoordinator = user.role === UserRole.COORDINATOR;
     const isSpecialist = user.role === UserRole.SPECIALIST;
     const assignedRegions = user.assignedRegions || [];
@@ -160,7 +160,7 @@ const Dashboard: React.FC = () => {
       // ── CAMINO B: Tienda específica → grades reales (mismo cálculo que MyStores) ──
       // Carga las notas desde Supabase en tiempo real con herencia correcta.
       if (storeIds.length > 0) {
-        await Promise.all(storeIds.map(sid => dataService.loadGradesForStore(sid, dashboardMonth)));
+        await Promise.all(storeIds.map(sid => dataService.loadGradesForStore(sid as string, dashboardMonth as string)));
         dataService._cache.gradeIndex = null;
       }
 
