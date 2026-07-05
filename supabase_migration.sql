@@ -429,41 +429,43 @@ WITH CHECK (
   )
 );
 
--- Tabla 'grades' (ADMIN y COORDINATOR)
+-- Tabla 'grades' (ADMIN, COORDINATOR y SPECIALIST)
 DROP POLICY IF EXISTS "Admin o Coordinator modifican notas" ON public.grades;
-CREATE POLICY "Admin o Coordinator modifican notas" ON public.grades
+DROP POLICY IF EXISTS "Roles autorizados modifican notas" ON public.grades;
+CREATE POLICY "Roles autorizados modifican notas" ON public.grades
 FOR ALL TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'SPECIALIST')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'SPECIALIST')
   )
 );
 
--- Tabla 'banca' (ADMIN y COORDINATOR)
+-- Tabla 'banca' (ADMIN, COORDINATOR y LIDER)
 DROP POLICY IF EXISTS "Admin o Coordinator modifican banca" ON public.banca;
-CREATE POLICY "Admin o Coordinator modifican banca" ON public.banca
+DROP POLICY IF EXISTS "Roles autorizados modifican banca" ON public.banca;
+CREATE POLICY "Roles autorizados modifican banca" ON public.banca
 FOR ALL TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
   )
 );
 
