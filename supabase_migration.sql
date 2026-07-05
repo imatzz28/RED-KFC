@@ -275,13 +275,15 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 );
 
@@ -293,13 +295,15 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 );
 
@@ -311,13 +315,15 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
-    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(users.role) = 'ADMIN'
   )
 );
 

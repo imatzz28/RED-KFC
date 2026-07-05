@@ -34,7 +34,7 @@ const SafeHands: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR';
+  const canEdit = auth.user?.role === 'ADMIN';
 
   // Debounce search input
   useEffect(() => {
