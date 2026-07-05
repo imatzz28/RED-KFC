@@ -374,8 +374,19 @@ CREATE POLICY "Permitir lectura a autenticados" ON public.monthly_group_stats FO
 
 -- Tabla 'users' (Solo ADMIN)
 DROP POLICY IF EXISTS "Solo admin puede modificar usuarios" ON public.users;
-CREATE POLICY "Solo admin puede modificar usuarios" ON public.users
-FOR ALL TO authenticated
+
+CREATE POLICY "Solo admin puede insertar usuarios" ON public.users
+FOR INSERT TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
+CREATE POLICY "Solo admin puede actualizar usuarios" ON public.users
+FOR UPDATE TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
@@ -390,6 +401,17 @@ WITH CHECK (
       AND UPPER(u.role) = 'ADMIN'
   )
 );
+
+CREATE POLICY "Solo admin puede borrar usuarios" ON public.users
+FOR DELETE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) = 'ADMIN'
+  )
+);
+
 
 -- Tabla 'employees' (ADMIN y COORDINATOR)
 DROP POLICY IF EXISTS "Admin o Coordinator modifican empleados" ON public.employees;

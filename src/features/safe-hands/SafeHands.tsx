@@ -24,8 +24,11 @@ const SafeHands: React.FC = () => {
   // Server-side pagination states
   const [page, setPage] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
+  const [totalCertsCount, setTotalCertsCount] = useState(0);
   const [vigentesCount, setVigentesCount] = useState(0);
   const [vencidosCount, setVencidosCount] = useState(0);
+  const [porVencerCount, setPorVencerCount] = useState(0);
+  const [totalPersonnelCount, setTotalPersonnelCount] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -80,8 +83,11 @@ const SafeHands: React.FC = () => {
       }
 
       setCerts(certsData);
+      setTotalCertsCount(summaryCounts.total);
       setVigentesCount(summaryCounts.vigentes);
       setVencidosCount(summaryCounts.vencidos);
+      setPorVencerCount(summaryCounts.porVencer);
+      setTotalPersonnelCount(summaryCounts.totalPersonnel);
       setSettings(activeSettings);
     } catch (error) {
       console.error("Error loading Safe Hands data:", error);
@@ -353,6 +359,60 @@ const SafeHands: React.FC = () => {
     );
   };
 
+  const StatCard = ({ title, icon, real, color, label }: any) => {
+    const colorStyles: any = {
+      total: {
+        border: 'border-l-4 border-l-slate-400 border-white/5',
+        text: 'text-white',
+        iconBg: 'bg-white/10 text-white',
+        glow: 'bg-white/5'
+      },
+      vigente: {
+        border: 'border-l-4 border-l-emerald-500 border-white/5',
+        text: 'text-emerald-400',
+        iconBg: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        glow: 'bg-emerald-500/10'
+      },
+      por_vencer: {
+        border: 'border-l-4 border-l-amber-500 border-white/5',
+        text: 'text-amber-400',
+        iconBg: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        glow: 'bg-amber-500/10'
+      },
+      vencido: {
+        border: 'border-l-4 border-l-red-500 border-white/5',
+        text: 'text-red-400',
+        iconBg: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        glow: 'bg-red-500/10'
+      }
+    };
+    const style = colorStyles[color] || colorStyles.total;
+    
+    return (
+      <div className={`bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_10px_25px_rgba(15,23,42,0.3)] hover:shadow-[0_18px_35px_rgba(15,23,42,0.45)] hover:-translate-y-0.5 flex items-center justify-between min-h-[90px] border ${style.border}`}>
+        {/* Diagonal stripe pattern */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+          style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} />
+        {/* Glow top-right */}
+        <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full ${style.glow} blur-xl pointer-events-none`} />
+
+        <div className="flex items-center gap-4 relative z-10">
+          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${style.iconBg}`}>
+            {icon}
+          </div>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1.5">{title}</p>
+            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-none">{label}</p>
+          </div>
+        </div>
+
+        <div className="flex items-baseline relative z-10 shrink-0 text-right">
+          <span className={`text-4xl font-black ${style.text} tracking-tighter leading-none`}>{real}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Area */}
@@ -396,6 +456,38 @@ const SafeHands: React.FC = () => {
             </>
           )}
         </div>
+      </div>
+
+      {/* Tarjetas de Estadísticas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-2 animate-in fade-in duration-300">
+        <StatCard 
+          title="Total Carnets" 
+          icon={<ShieldCheck className="w-5 h-5" />} 
+          real={totalCertsCount} 
+          color="total"
+          label="Carnets Cargados"
+        />
+        <StatCard 
+          title="Vigentes" 
+          icon={<CheckCircle2 className="w-5 h-5" />} 
+          real={vigentesCount} 
+          color="vigente"
+          label="Carnets Activos"
+        />
+        <StatCard 
+          title="Por Vencer" 
+          icon={<Clock className="w-5 h-5" />} 
+          real={porVencerCount} 
+          color="por_vencer"
+          label="Próximos 30 días"
+        />
+        <StatCard 
+          title="Vencidos" 
+          icon={<AlertCircle className="w-5 h-5" />} 
+          real={vencidosCount} 
+          color="vencido"
+          label="Carnets Caducados"
+        />
       </div>
 
       {/* Main List Area */}

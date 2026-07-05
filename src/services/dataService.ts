@@ -857,33 +857,39 @@ export const dataService = {
     }));
   },
 
-  getSafeHandsSummaryCounts: async (): Promise<{ vigentes: number, vencidos: number }> => {
+  getSafeHandsSummaryCounts: async (): Promise<{ total: number, vigentes: number, vencidos: number, porVencer: number, totalPersonnel: number }> => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const soon = new Date();
+    soon.setMonth(soon.getMonth() + 1);
+    const soonStr = soon.toISOString().split('T')[0];
     const headers = await getAuthHeaders();
-    
-    // Count vigentes: expiry_date >= today
-    const vigRes = await fetch(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${todayStr}`, {
-      method: 'HEAD',
-      headers: { ...headers, 'Prefer': 'count=exact' }
-    });
-    let vigentes = 0;
-    const vigRange = vigRes.headers.get('content-range');
-    if (vigRange) {
-      vigentes = parseInt(vigRange.split('/')[1]) || 0;
-    }
 
-    // Count vencidos: expiry_date < today
-    const venRes = await fetch(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=lt.${todayStr}`, {
-      method: 'HEAD',
-      headers: { ...headers, 'Prefer': 'count=exact' }
-    });
-    let vencidos = 0;
-    const venRange = venRes.headers.get('content-range');
-    if (venRange) {
-      vencidos = parseInt(venRange.split('/')[1]) || 0;
-    }
+    const fetchCount = async (url: string) => {
+      try {
+        const res = await fetch(url, {
+          method: 'HEAD',
+          headers: { ...headers, 'Prefer': 'count=exact' }
+        });
+        const range = res.headers.get('content-range');
+        if (range) {
+          return parseInt(range.split('/')[1]) || 0;
+        }
+        return 0;
+      } catch (err) {
+        console.error(`Error fetching count from ${url}:`, err);
+        return 0;
+      }
+    };
 
-    return { vigentes, vencidos };
+    const [total, vigentes, porVencer, vencidos, totalPersonnel] = await Promise.all([
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${soonStr}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${todayStr}&expiry_date=lt.${soonStr}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=lt.${todayStr}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_personnel`)
+    ]);
+
+    return { total, vigentes, vencidos, porVencer, totalPersonnel };
   },
 
   saveSafeHandsPersonnel: async (people: SafeHandsPerson[]): Promise<void> => {
