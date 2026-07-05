@@ -256,7 +256,7 @@ ALTER TABLE safe_hands_certs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safe_hands_personnel ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safe_hands_settings ENABLE ROW LEVEL SECURITY;
 
--- Lectura pública para validación
+-- Lectura pública para validación y visualización
 DROP POLICY IF EXISTS "Public validation access" ON safe_hands_certs;
 CREATE POLICY "Public validation access" ON safe_hands_certs FOR SELECT USING (true);
 
@@ -266,13 +266,42 @@ CREATE POLICY "Public person access" ON safe_hands_personnel FOR SELECT USING (t
 DROP POLICY IF EXISTS "Public settings access" ON safe_hands_settings;
 CREATE POLICY "Public settings access" ON safe_hands_settings FOR SELECT USING (true);
 
--- Escritura permitida (para el admin/coordinador desde la app)
--- Nota: En un entorno real, usarías auth.uid() o roles, aquí permitimos a todos para simplificar la integración inicial o a autenticados
+-- Escritura restringida únicamente a administradores
 DROP POLICY IF EXISTS "Allow all for safe_hands_certs" ON safe_hands_certs;
-CREATE POLICY "Allow all for safe_hands_certs" ON safe_hands_certs FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_certs;
+CREATE POLICY "Allow write for admin only" ON safe_hands_certs 
+FOR ALL 
+TO authenticated 
+USING (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+  )
+);
 
 DROP POLICY IF EXISTS "Allow all for safe_hands_personnel" ON safe_hands_personnel;
-CREATE POLICY "Allow all for safe_hands_personnel" ON safe_hands_personnel FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_personnel;
+CREATE POLICY "Allow write for admin only" ON safe_hands_personnel 
+FOR ALL 
+TO authenticated 
+USING (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE users.id = auth.uid()::text AND users.role = 'ADMIN'
+  )
+);
 
 DROP POLICY IF EXISTS "Allow all for safe_hands_settings" ON safe_hands_settings;
 DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_settings;
