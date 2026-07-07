@@ -90,36 +90,36 @@ const PublicValidation: React.FC = () => {
       <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-black rounded-full blur-[150px] opacity-10 -z-10" />
       
       {/* Header KFC Style */}
-      <div className="w-full max-w-4xl pt-16 px-6 flex flex-col items-center">
-        <div className="h-32 mb-8 transition-transform hover:scale-105">
+      <div className="w-full max-w-4xl pt-8 sm:pt-16 px-6 flex flex-col items-center">
+        <div className="h-20 sm:h-32 mb-4 sm:mb-8 transition-transform hover:scale-105">
            <img src="/KFC-Logo-PNG.png" alt="KFC Logo" className="h-full object-contain drop-shadow-2xl" />
         </div>
-        <h1 className="text-5xl font-black text-white italic uppercase tracking-tighter mb-2 text-center drop-shadow-lg">
+        <h1 className="text-3xl sm:text-5xl font-black text-white italic uppercase tracking-tighter mb-2 text-center drop-shadow-lg">
           KFC <span className="font-light opacity-50 mx-1">|</span> SAFE HANDS
         </h1>
-        <p className="text-[10px] font-bold text-white/70 uppercase tracking-[0.3em] text-center max-w-xs leading-relaxed">
-          SISTEMA DE VERIFICACION CARNETS DE MANIPUALCION ALIMENTOS
+        <p className="text-[9px] sm:text-[10px] font-bold text-white/70 uppercase tracking-[0.25em] sm:tracking-[0.3em] text-center max-w-xs sm:max-w-md leading-relaxed">
+          SISTEMA DE VERIFICACIÓN CARNETS DE MANIPULACIÓN ALIMENTOS
         </p>
       </div>
 
       {/* Search Bar - Compact */}
-      <div className="w-full max-w-lg mt-10 px-6 z-10">
+      <div className="w-full max-w-lg mt-6 sm:mt-10 px-6 z-10">
         <form onSubmit={handleSearch} className="relative">
-          <div className="flex items-center bg-white rounded-full border border-white/20 overflow-hidden p-1 shadow-2xl transition-all duration-300">
-            <div className="pl-3 pr-1.5 sm:pl-6 sm:pr-2 shrink-0">
+          <div className="flex items-center bg-white rounded-full border border-white/20 overflow-hidden p-1 sm:p-1.5 shadow-2xl transition-all duration-300">
+            <div className="pl-3.5 pr-1.5 sm:pl-6 sm:pr-2 shrink-0">
               <Search className="w-4 h-4 sm:w-5 sm:h-5 text-[#e60000]" />
             </div>
             <input 
               type="text" 
-              placeholder="Ingrese Cédula o Código Único..." 
-              className="flex-1 py-2 sm:py-4 text-xs sm:text-sm font-black text-slate-800 outline-none placeholder:text-slate-300 bg-transparent min-w-0"
+              placeholder="Cédula o Código Único..." 
+              className="flex-1 py-2 sm:py-3.5 text-xs sm:text-sm font-black text-slate-800 outline-none placeholder:text-slate-300 bg-transparent min-w-0"
               value={searchId}
               onChange={e => setSearchId(e.target.value)}
             />
             <button 
               type="submit"
               disabled={isLoading}
-              className="bg-[#e60000] hover:bg-red-700 text-white px-4 sm:px-10 py-2.5 sm:py-4 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shrink-0"
+              className="bg-[#e60000] hover:bg-red-700 text-white px-5 sm:px-10 py-2.5 sm:py-3.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shrink-0"
             >
               {isLoading ? '...' : 'VALIDAR'}
             </button>
@@ -128,7 +128,7 @@ const PublicValidation: React.FC = () => {
       </div>
 
       {/* Result Container - More Horizontal */}
-      <div className="w-full max-w-2xl mt-10 px-6 pb-20 relative z-10">
+      <div className="w-full max-w-xl mt-6 sm:mt-10 px-6 pb-12 sm:pb-20 relative z-10">
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-300">
             <div className="flex flex-col items-center gap-4 text-center">
@@ -144,69 +144,69 @@ const PublicValidation: React.FC = () => {
         )}
 
         {error && !isLoading && (
-          <div className="bg-white rounded-[40px] p-10 shadow-2xl border border-red-50 text-center space-y-6 animate-in zoom-in-95 duration-500 max-w-md mx-auto">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-10 h-10" />
+          <div className="bg-white rounded-[32px] sm:rounded-[40px] p-8 sm:p-10 shadow-2xl border border-red-50 text-center space-y-6 animate-in zoom-in-95 duration-500 max-w-md mx-auto">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">NO ENCONTRADO</h3>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">NO ENCONTRADO</h3>
               <p className="text-xs text-slate-400 mt-3 font-medium leading-relaxed">{error}</p>
             </div>
           </div>
         )}
 
         {data && !isLoading && (
-          <div className="bg-white rounded-[40px] shadow-2xl border border-slate-50 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 max-w-xl mx-auto">
+          <div className="bg-white rounded-[32px] sm:rounded-[40px] shadow-2xl border border-slate-50 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 max-w-xl mx-auto">
             {/* Dynamic Status Header */}
-            <div className={`p-8 flex flex-col items-center text-center relative overflow-hidden ${getStatus(data.cert.expiryDate) === 'VIGENTE' ? 'bg-emerald-500' : 'bg-red-600'}`}>
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-xl relative z-10">
+            <div className={`p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden ${getStatus(data.cert.expiryDate) === 'VIGENTE' ? 'bg-emerald-500' : 'bg-red-600'}`}>
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-full flex items-center justify-center mb-3 sm:mb-4 shadow-xl relative z-10">
                 {getStatus(data.cert.expiryDate) === 'VIGENTE' ? (
-                  <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                  <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-emerald-500" />
                 ) : (
-                  <XCircle className="w-10 h-10 text-red-600" /> 
+                  <XCircle className="w-7 h-7 sm:w-10 sm:h-10 text-red-600" /> 
                 )}
               </div>
-              <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white relative z-10 mb-1 leading-none">
+              <h2 className="text-3xl sm:text-4xl font-black uppercase italic tracking-tighter text-white relative z-10 mb-1 leading-none">
                 {getStatus(data.cert.expiryDate)}
               </h2>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/80 relative z-10">ESTADO DE CERTIFICACIÓN</p>
+              <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.3em] text-white/80 relative z-10">ESTADO DE CERTIFICACIÓN</p>
             </div>
 
             {/* Content Area - Compact & Horizontal Focus */}
-            <div className="p-8 space-y-8">
+            <div className="p-6 sm:p-8 space-y-6 sm:space-y-8">
               <div className="text-center">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em] mb-2">COLABORADOR</p>
-                <h3 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter leading-tight">{data.employee.name}</h3>
-                <p className="text-sm font-black text-red-600 mt-1 tracking-tight">{data.employee.id}</p>
+                <p className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-[0.4em] mb-1.5 sm:mb-2">COLABORADOR</p>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 uppercase italic tracking-tighter leading-tight">{data.employee.name}</h3>
+                <p className="text-xs sm:text-sm font-black text-red-600 mt-1 tracking-tight">{data.employee.id}</p>
               </div>
 
               {/* Dates Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50/50 p-4 rounded-[24px] border border-slate-100 flex flex-col items-center group hover:border-red-100 transition-all">
-                  <div className="flex items-center gap-2 mb-1">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="bg-slate-50/50 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-slate-100 flex flex-col items-center group hover:border-red-100 transition-all">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
                     <Clock className="w-3 h-3 text-slate-300" />
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">EMISIÓN</p>
+                    <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">EMISIÓN</p>
                   </div>
-                  <p className="text-base font-black text-slate-800 tracking-tight">{data.cert.issueDate}</p>
+                  <p className="text-sm sm:text-base font-black text-slate-800 tracking-tight">{data.cert.issueDate}</p>
                 </div>
-                <div className="bg-slate-50/50 p-4 rounded-[24px] border border-slate-100 flex flex-col items-center group hover:border-red-100 transition-all">
-                  <div className="flex items-center gap-2 mb-1">
+                <div className="bg-slate-50/50 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-slate-100 flex flex-col items-center group hover:border-red-100 transition-all">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
                     <Clock className="w-3 h-3 text-slate-300" />
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">VENCIMIENTO</p>
+                    <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">VENCIMIENTO</p>
                   </div>
-                  <p className="text-base font-black text-slate-800 tracking-tight">{data.cert.expiryDate}</p>
+                  <p className="text-sm sm:text-base font-black text-slate-800 tracking-tight">{data.cert.expiryDate}</p>
                 </div>
               </div>
 
               {/* Specialist Info */}
-              <div className="pt-6 border-t border-dashed border-slate-100 flex items-center justify-between px-2">
-                 <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center">
-                     <UserCheck className="w-5 h-5 text-slate-400" />
+              <div className="pt-5 sm:pt-6 border-t border-dashed border-slate-100 flex items-center justify-between px-1 sm:px-2">
+                 <div className="flex items-center gap-3 sm:gap-4">
+                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                     <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                    </div>
                    <div>
-                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">ESPECIALISTA CAPACITADOR</p>
-                     <p className="text-xs font-black text-slate-900 uppercase italic tracking-tight">
+                     <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 sm:mb-1.5">ESPECIALISTA CAPACITADOR</p>
+                     <p className="text-[10px] sm:text-xs font-black text-slate-900 uppercase italic tracking-tight">
                        {settings?.responsibleName || 'ESPECIALISTA CALIDAD'}
                      </p>
                    </div>
@@ -216,18 +216,18 @@ const PublicValidation: React.FC = () => {
               {/* Download Action */}
               <button 
                 onClick={handleDownload}
-                className="w-full py-4 bg-slate-900 text-white rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+                className="w-full py-3.5 sm:py-4 bg-slate-900 text-white rounded-[16px] sm:rounded-[20px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 sm:gap-3 group"
               >
-                <Download className="w-4 h-4 group-hover:animate-bounce" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:animate-bounce" />
                 DESCARGAR CARNET OFICIAL
               </button>
             </div>
 
             {/* Bottom Code Discreto */}
-            <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 text-center">
-              <div className="inline-flex items-center gap-2">
-                <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.4em]">CÓDIGO ÚNICO:</p>
-                <span className="text-[10px] font-black text-red-600 font-mono tracking-tighter">{data.cert.certificateCode}</span>
+            <div className="bg-slate-50 px-6 sm:px-8 py-3.5 sm:py-4 border-t border-slate-100 text-center">
+              <div className="inline-flex items-center gap-1.5 sm:gap-2">
+                <p className="text-[7px] sm:text-[8px] font-black text-slate-300 uppercase tracking-[0.4em]">CÓDIGO ÚNICO:</p>
+                <span className="text-[9px] sm:text-[10px] font-black text-red-600 font-mono tracking-tighter">{data.cert.certificateCode}</span>
               </div>
             </div>
           </div>
@@ -235,7 +235,7 @@ const PublicValidation: React.FC = () => {
       </div>
 
       {/* Footer KFC Branding */}
-      <div className="mt-auto py-10 text-center opacity-75 flex flex-col items-center gap-2">
+      <div className="mt-auto py-6 sm:py-10 text-center opacity-75 flex flex-col items-center gap-2">
         <button
           type="button"
           onClick={() => setShowPrivacyModal(true)}
