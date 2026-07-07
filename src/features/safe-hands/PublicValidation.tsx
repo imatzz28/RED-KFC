@@ -105,21 +105,23 @@ const PublicValidation: React.FC = () => {
       {/* Search Bar - Compact */}
       <div className="w-full max-w-lg mt-10 px-6 z-10">
         <form onSubmit={handleSearch} className="relative">
-          <div className="flex items-center bg-white rounded-full border border-white/20 overflow-hidden p-1 shadow-2xl transition-all duration-300">
-            <div className="pl-6 pr-2">
-              <Search className="w-5 h-5 text-[#e60000]" />
+          <div className="flex flex-col sm:flex-row sm:items-center bg-white rounded-2xl sm:rounded-full border border-white/20 overflow-hidden p-1.5 sm:p-1 shadow-2xl transition-all duration-300 gap-2 sm:gap-0">
+            <div className="flex items-center flex-1 min-w-0">
+              <div className="pl-4 pr-2 sm:pl-6 sm:pr-2 shrink-0">
+                <Search className="w-5 h-5 text-[#e60000]" />
+              </div>
+              <input 
+                type="text" 
+                placeholder="Ingrese Cédula o Código Único..." 
+                className="flex-1 py-3 sm:py-4 text-sm font-black text-slate-800 outline-none placeholder:text-slate-300 bg-transparent min-w-0"
+                value={searchId}
+                onChange={e => setSearchId(e.target.value)}
+              />
             </div>
-            <input 
-              type="text" 
-              placeholder="Ingrese Cédula o Código Único..." 
-              className="flex-1 py-4 text-sm font-black text-slate-800 outline-none placeholder:text-slate-300 bg-transparent"
-              value={searchId}
-              onChange={e => setSearchId(e.target.value)}
-            />
             <button 
               type="submit"
               disabled={isLoading}
-              className="bg-[#e60000] hover:bg-red-700 text-white px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              className="bg-[#e60000] hover:bg-red-700 text-white px-6 sm:px-10 py-3 sm:py-4 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 w-full sm:w-auto shrink-0"
             >
               {isLoading ? '...' : 'VALIDAR'}
             </button>
