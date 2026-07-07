@@ -5,6 +5,7 @@ import { User, UserRole } from '@/types';
 import { Calendar, User as UserIcon, Menu, Lock, X, Shield, LogOut } from 'lucide-react';
 
 import { useAppStore } from '@/store/useAppStore';
+import { supabase } from '@/services/dataService';
 
 const Header: React.FC = () => {
   const { auth, selectedMonth, setSelectedMonth: onMonthChange, setIsSidebarOpen, handleLogout: onLogout } = useAppStore();
@@ -14,7 +15,33 @@ const Header: React.FC = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
   const [passData, setPassData] = useState({ old: '', new: '' });
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpdatePassword = async () => {
+    if (!passData.new) {
+      alert("La nueva contraseña no puede estar vacía.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passData.new
+      });
+
+      if (error) throw error;
+
+      alert("Contraseña actualizada con éxito.");
+      setShowPassModal(false);
+      setPassData({ old: '', new: '' });
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al actualizar la contraseña: ${err.message || 'Error desconocido'}`);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   const handleIconClick = () => {
     if (dateInputRef.current) {
@@ -31,6 +58,8 @@ const Header: React.FC = () => {
     switch (role) {
       case UserRole.ADMIN: return 'SUPERADMIN';
       case UserRole.COORDINATOR: return 'COORDINADOR';
+      case UserRole.LIDER: return 'LÍDER';
+      case UserRole.GUEST: return 'INVITADO';
       default: return 'ESPECIALISTA';
     }
   };
@@ -128,7 +157,13 @@ const Header: React.FC = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Nueva Contraseña</label>
                 <input type="password" value={passData.new} onChange={e => setPassData({ ...passData, new: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
               </div>
-              <button className="w-full py-5 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 shadow-xl transition-all uppercase tracking-[0.2em] text-[10px] mt-4">Actualizar Clave</button>
+              <button 
+                onClick={handleUpdatePassword}
+                disabled={isUpdatingPassword}
+                className="w-full py-5 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 shadow-xl transition-all uppercase tracking-[0.2em] text-[10px] mt-4 disabled:opacity-50"
+              >
+                {isUpdatingPassword ? 'Actualizando...' : 'Actualizar Clave'}
+              </button>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import {
   BancaData, StoreAssignment, StoreLeader, Certification, BancaRole,
   BANCA_ROLES, Employee, StoreIdeal
 } from '@/types';
-import { Store, Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp } from 'lucide-react';
+import { Store, Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp, Landmark, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const ALL_CERTS: Certification[] = ['EEA', 'GBR', 'GAR', 'GER'];
@@ -468,11 +468,21 @@ const StoreCard: React.FC<{
 type View = { level: 'regions' } | { level: 'zones'; region: string } | { level: 'stores'; region: string; zone: string };
 
 const Banca: React.FC = () => {
-  const { employees, restaurants, auth } = useAppStore();
+  const { employees, restaurants, auth, syncStatus } = useAppStore();
   const [bancaData, setBancaData] = useState<BancaData>(() => dataService.getBancaData());
   const [view, setView] = useState<View>({ level: 'regions' });
   const [modal, setModal] = useState<{ restaurantId: string; restaurantName: string } | null>(null);
   const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    setBancaData(dataService.getBancaData());
+    
+    if (syncStatus !== 'syncing' || (employees.length > 0 && restaurants.length > 0)) {
+      const timer = setTimeout(() => setIsLoading(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [syncStatus, employees.length, restaurants.length]);
 
   const hierarchy = dataService.getHierarchy();
   const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR' || auth.user?.role === 'LIDER';
@@ -650,6 +660,26 @@ const Banca: React.FC = () => {
     const region = hierarchy.regions.find(r => r.name === view.region);
     const zone = region?.zones.find(z => z.name === view.zone);
     summaryIds = zone ? zone.restaurantIds.filter(id => restaurants.some(r => r.id === id)) : [];
+  }
+  const isDataEmpty = bancaData.assignments.length === 0 || employees.length === 0 || restaurants.length === 0;
+
+  if (isLoading && isDataEmpty) {
+    return (
+      <div className="bg-white border border-slate-100 rounded-[32px] shadow-sm p-24 min-h-[500px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-red-100 animate-ping opacity-75"></div>
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center relative border border-red-100">
+              <Landmark className="w-7 h-7 animate-bounce" />
+            </div>
+          </div>
+          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider mt-4">Cargando Panel de Banca...</h4>
+          <p className="text-xs text-slate-400 font-bold max-w-xs leading-relaxed">
+            Por favor espera un momento mientras sincronizamos la información de las tiendas con el servidor.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

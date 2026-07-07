@@ -3,7 +3,8 @@ export enum UserRole {
   ADMIN = 'ADMIN',
   COORDINATOR = 'COORDINATOR',
   SPECIALIST = 'SPECIALIST',
-  LIDER = 'LIDER'
+  LIDER = 'LIDER',
+  GUEST = 'GUEST'
 }
 
 export enum JobTitle {

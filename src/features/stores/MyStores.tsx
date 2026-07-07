@@ -452,13 +452,18 @@ const MyStores: React.FC = () => {
 
           {/* Overlay bloqueador durante carga */}
           {isLoadingGrades && (
-            <div className="absolute inset-0 z-10 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4 rounded-[32px] md:rounded-[40px]">
-              <div className="p-5 bg-slate-900 rounded-3xl shadow-2xl flex items-center gap-4">
-                <RefreshCw className="w-5 h-5 text-red-500 animate-spin" />
-                <div>
-                  <p className="text-[11px] font-black text-white uppercase tracking-widest leading-none">Cargando historial de notas</p>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide mt-1.5">Sincronizando con la base de datos...</p>
+            <div className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4 rounded-[32px] md:rounded-[40px] animate-in fade-in duration-300">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-red-100 animate-ping opacity-75"></div>
+                  <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center relative border border-red-100">
+                    <Store className="w-7 h-7 animate-bounce" />
+                  </div>
                 </div>
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider mt-2">Cargando Historial de Notas...</h4>
+                <p className="text-xs text-slate-400 font-bold max-w-xs leading-relaxed">
+                  Sincronizando con la base de datos...
+                </p>
               </div>
             </div>
           )}

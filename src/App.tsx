@@ -64,12 +64,16 @@ const App: React.FC = () => {
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
           <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/my-stores" element={<MyStores />} />
+            {auth.user?.role !== UserRole.GUEST && (
+              <>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/my-stores" element={<MyStores />} />
+              </>
+            )}
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
               <Route path="/entries-exits" element={<EntriesExitsReport />} />
             )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER) && (
+            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER || auth.user?.role === UserRole.GUEST) && (
               <Route path="/banca" element={<Banca />} />
             )}
             {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
@@ -80,7 +84,7 @@ const App: React.FC = () => {
             )}
             <Route path="/verify" element={<PublicValidation />} />
             <Route path="/verify/:id" element={<PublicValidation />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to={auth.user?.role === UserRole.GUEST ? "/banca" : "/dashboard"} replace />} />
           </Routes>
         </main>
       </div>

@@ -615,10 +615,18 @@ const TrendChart: React.FC<{ dashboardMonth: string, filterRegion: string, filte
   });
 
   if (isLoading) return (
-    <div className="bg-white p-8 rounded-3xl border border-slate-100 h-[400px] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <RefreshCw className="w-8 h-8 text-red-500 animate-spin" />
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculando historial anual...</p>
+    <div className="bg-white border border-slate-100 rounded-[32px] shadow-sm p-24 min-h-[400px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-red-100 animate-ping opacity-75"></div>
+          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center relative border border-red-100">
+            <TrendingUp className="w-7 h-7 animate-bounce" />
+          </div>
+        </div>
+        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider mt-4">Calculando Historial Anual...</h4>
+        <p className="text-xs text-slate-400 font-bold max-w-xs leading-relaxed">
+          Por favor espera un momento mientras procesamos los datos del período de evaluación.
+        </p>
       </div>
     </div>
   );

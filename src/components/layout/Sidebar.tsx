@@ -56,7 +56,7 @@ const Sidebar: React.FC = () => {
       to: '/banca',
       label: 'Banca',
       icon: Landmark,
-      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER],
+      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.GUEST],
       key: 'banca'
     },
     {

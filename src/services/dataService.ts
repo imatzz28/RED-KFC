@@ -1034,5 +1034,19 @@ export const dataService = {
     if (personnelError) {
       throw new Error(`Error al borrar personal de manipulación: ${personnelError.message}`);
     }
+  },
+
+  deleteSafeHandsPerson: async (id: string): Promise<void> => {
+    await dataService.supabaseFetch('safe_hands_personnel', 'DELETE', null, `?id=eq.${id}`);
+  },
+
+  deleteSafeHandsPersonnelBulk: async (ids: string[]): Promise<void> => {
+    if (!ids || ids.length === 0) return;
+    const chunkSize = 100;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const query = `?id=in.(${chunk.map(id => encodeURIComponent(id)).join(',')})`;
+      await dataService.supabaseFetch('safe_hands_personnel', 'DELETE', null, query);
+    }
   }
 };

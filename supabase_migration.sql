@@ -529,3 +529,128 @@ WITH CHECK (
   )
 );
 
+
+-- ============================================================
+-- AUTH USER MANAGEMENT RPC (SECURITY DEFINER)
+-- Permite al panel de admin crear, actualizar clave y borrar
+-- usuarios en auth.users sin usar el Admin SDK client-side.
+-- Implementación Dinámica auto-adaptable a la versión de Supabase.
+-- ============================================================
+CREATE OR REPLACE FUNCTION manage_user_auth(
+  p_username TEXT,
+  p_password TEXT,
+  p_action TEXT
+) RETURNS TEXT AS $$
+DECLARE
+  v_user_id UUID;
+  v_email TEXT;
+  v_encrypted_password TEXT;
+  v_sql TEXT;
+  v_cols TEXT[] := ARRAY[]::TEXT[];
+  v_vals TEXT[] := ARRAY[]::TEXT[];
+  v_col RECORD;
+BEGIN
+  v_email := LOWER(p_username) || '@kfc.co';
+  
+  -- Verificar accion
+  IF p_action = 'CREATE' THEN
+    -- Verificar si ya existe en auth.users
+    SELECT id INTO v_user_id FROM auth.users WHERE email = v_email;
+    IF v_user_id IS NOT NULL THEN
+      RETURN v_user_id::TEXT;
+    END IF;
+    
+    v_user_id := gen_random_uuid();
+    v_encrypted_password := crypt(p_password, gen_salt('bf', 10));
+    
+    -- Columnas base obligatorias comunes (inicializadas como ARRAY)
+    v_cols := ARRAY['id', 'instance_id', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at', 'aud', 'role', 'raw_app_meta_data', 'raw_user_meta_data'];
+    v_vals := ARRAY[quote_literal(v_user_id::text), quote_literal('00000000-0000-0000-0000-000000000000'), quote_literal(v_email), quote_literal(v_encrypted_password), 'NOW()', 'NOW()', 'NOW()', quote_literal('authenticated'), quote_literal('authenticated'), quote_literal('{"provider":"email","providers":["email"]}'), quote_literal('{}')];
+    
+    -- Inspeccionar dinámicamente columnas existentes en la tabla auth.users
+    -- y setear valores seguros por defecto para evitar errores de Scan de GoTrue (NULL a tipo estricto)
+    FOR v_col IN 
+      SELECT column_name::text as colname
+      FROM information_schema.columns 
+      WHERE table_schema = 'auth' AND table_name = 'users'
+    LOOP
+      IF v_col.colname = 'is_super_admin' THEN
+        v_cols := array_append(v_cols, 'is_super_admin');
+        v_vals := array_append(v_vals, 'FALSE');
+      ELSIF v_col.colname = 'is_sso_user' THEN
+        v_cols := array_append(v_cols, 'is_sso_user');
+        v_vals := array_append(v_vals, 'FALSE');
+      ELSIF v_col.colname = 'email_change_confirm_status' THEN
+        v_cols := array_append(v_cols, 'email_change_confirm_status');
+        v_vals := array_append(v_vals, '0');
+      ELSIF v_col.colname = 'confirmation_token' THEN
+        v_cols := array_append(v_cols, 'confirmation_token');
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'recovery_token' THEN
+        v_cols := array_append(v_cols, 'recovery_token');
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'phone_change' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change_token_new' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'phone_change_token_new' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change_token_current' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'reauthentication_token' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      END IF;
+    END LOOP;
+    
+    -- Compilar y ejecutar la inserción dinámica
+    v_sql := 'INSERT INTO auth.users (' || array_to_string(v_cols, ', ') || ') VALUES (' || array_to_string(v_vals, ', ') || ')';
+    EXECUTE v_sql;
+    
+    -- Insertar en auth.identities
+    INSERT INTO auth.identities (
+      id,
+      user_id,
+      identity_data,
+      provider,
+      last_sign_in_at,
+      created_at,
+      updated_at,
+      provider_id
+    ) VALUES (
+      gen_random_uuid(),
+      v_user_id,
+      json_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true, 'phone_verified', false)::jsonb,
+      'email',
+      NOW(),
+      NOW(),
+      NOW(),
+      v_email
+    );
+    
+    RETURN v_user_id::TEXT;
+    
+  ELSIF p_action = 'UPDATE_PASSWORD' THEN
+    v_encrypted_password := crypt(p_password, gen_salt('bf', 10));
+    UPDATE auth.users 
+    SET encrypted_password = v_encrypted_password,
+        updated_at = NOW()
+    WHERE email = v_email;
+    RETURN 'PASSWORD_UPDATED';
+    
+  ELSIF p_action = 'DELETE' THEN
+    DELETE FROM auth.users WHERE email = v_email;
+    RETURN 'USER_DELETED';
+  ELSE
+    RAISE EXCEPTION 'Accion no valida: %', p_action;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+

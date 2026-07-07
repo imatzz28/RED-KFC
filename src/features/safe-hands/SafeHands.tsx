@@ -36,6 +36,11 @@ const SafeHands: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  
+  // Bulk delete states
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const canEdit = auth.user?.role === 'ADMIN';
 
@@ -166,22 +171,40 @@ const SafeHands: React.FC = () => {
         const newCerts: SafeHandsCert[] = [];
 
         data.forEach((item: any) => {
-          const cedula = String(item.Cedula || item.cedula || item.Cédula || '').trim();
+          // Obtener claves de forma insensible a mayúsculas/minúsculas y acentos
+          const getVal = (prefixes: string[]) => {
+            const keys = Object.keys(item);
+            for (const key of keys) {
+              const cleanKey = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              if (prefixes.some(p => cleanKey === p.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
+                return item[key];
+              }
+            }
+            return undefined;
+          };
+
+          const cedula = String(getVal(['cedula', 'id', 'documento']) || '').trim();
           if (!cedula) return;
 
-          const name = String(item.Nombre || item.nombre || 'Sin Nombre').trim();
-          const rawDate = item.Fecha || item.fecha || item.Fecha_Emision;
+          const name = String(getVal(['nombre', 'colaborador', 'empleado']) || 'Sin Nombre').trim();
+          const rawDate = getVal(['fecha', 'fecha emision', 'fecha_emision', 'emision', 'fecha_de_emision']);
           
           if (!rawDate) return;
 
           let issueDate = '';
 
           if (rawDate instanceof Date) {
-            // Si ya es un objeto Date (gracias a cellDates: true)
-            issueDate = rawDate.toISOString().split('T')[0];
+            // Extraer año, mes y día locales para evitar cambios de zona horaria (timezone shift)
+            const year = rawDate.getFullYear();
+            const month = String(rawDate.getMonth() + 1).padStart(2, '0');
+            const day = String(rawDate.getDate()).padStart(2, '0');
+            issueDate = `${year}-${month}-${day}`;
           } else {
             const dateStr = String(rawDate).trim();
-            if (dateStr.includes(' de ')) {
+            const matchYMD = dateStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+            if (matchYMD) {
+              issueDate = `${matchYMD[1]}-${matchYMD[2].padStart(2, '0')}-${matchYMD[3].padStart(2, '0')}`;
+            } else if (dateStr.includes(' de ')) {
               issueDate = parseSpanishDate(dateStr);
             } else if (dateStr.includes('/')) {
               // Formato DD/MM/YYYY
@@ -196,7 +219,10 @@ const SafeHands: React.FC = () => {
               // Intento estándar
               const d = new Date(rawDate);
               if (!isNaN(d.getTime())) {
-                issueDate = d.toISOString().split('T')[0];
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                issueDate = `${year}-${month}-${day}`;
               }
             }
           }
@@ -204,6 +230,8 @@ const SafeHands: React.FC = () => {
           if (!issueDate || issueDate === 'NaN-NaN-NaN' || issueDate.includes('undefined') || issueDate.startsWith('1970')) return;
 
           const d = new Date(issueDate);
+          if (isNaN(d.getTime())) return;
+          
           const expiryDate = new Date(d.setFullYear(d.getFullYear() + 1)).toISOString().split('T')[0];
 
           newPeople.push({
@@ -257,6 +285,92 @@ const SafeHands: React.FC = () => {
     }
   };
 
+  const handleDownloadDeleteTemplate = () => {
+    try {
+      const templateData = [
+        {
+          'Cedula': '12345678'
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Eliminacion_Masiva");
+      XLSX.writeFile(wb, "Plantilla_Eliminacion_SafeHands.xlsx");
+    } catch (error) {
+      console.error("Error al descargar la plantilla de eliminación:", error);
+      alert("Error al generar la plantilla de eliminación.");
+    }
+  };
+
+  const handleExcelDeleteUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        const idsToDelete: string[] = [];
+        data.forEach((item: any) => {
+          const getVal = (prefixes: string[]) => {
+            const keys = Object.keys(item);
+            for (const key of keys) {
+              const cleanKey = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              if (prefixes.some(p => cleanKey === p.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
+                return item[key];
+              }
+            }
+            return undefined;
+          };
+
+          const cedula = String(getVal(['cedula', 'id', 'documento']) || '').trim();
+          if (cedula) {
+            idsToDelete.push(cedula);
+          }
+        });
+
+        if (idsToDelete.length === 0) {
+          alert("No se encontraron cédulas/identificaciones en el archivo Excel.");
+          return;
+        }
+
+        setBulkDeleteIds(idsToDelete);
+        setShowBulkDeleteConfirm(true);
+      } catch (err) {
+        console.error(err);
+        alert("Error al procesar el archivo Excel. Verifica el formato de la plantilla.");
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      await dataService.deleteSafeHandsPersonnelBulk(bulkDeleteIds);
+      setShowBulkDeleteConfirm(false);
+      setBulkDeleteIds([]);
+      setToastMessage(`¡${bulkDeleteIds.length} registros eliminados con éxito!`);
+      setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      loadData(page, debouncedSearch);
+    } catch (err) {
+      console.error("Error doing bulk delete:", err);
+      alert("Error al realizar la eliminación masiva.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // ── Signature Management ───────────────────────────────────────────────────
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -301,6 +415,23 @@ const SafeHands: React.FC = () => {
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Error al generar el certificado.");
+    }
+  };
+
+  const handleDeletePerson = async (id: string, name: string) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${name} (${id}) y su carnet de manipulación?`)) {
+      return;
+    }
+    try {
+      await dataService.deleteSafeHandsPerson(id);
+      setToastMessage("¡Registro eliminado con éxito!");
+      setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      loadData(page, debouncedSearch);
+    } catch (error) {
+      console.error("Error deleting person:", error);
+      alert("Error al eliminar el registro.");
     }
   };
 
@@ -430,13 +561,6 @@ const SafeHands: React.FC = () => {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
-              <button 
-                onClick={() => setShowDeleteConfirm(true)} 
-                className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-600 hover:bg-red-50/20 transition-all shadow-sm group"
-                title="Borrar todos los datos"
-              >
-                <Trash2 className="w-5 h-5 text-red-500 group-hover:scale-105 transition-transform" />
-              </button>
               <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
                 <Signature className="w-5 h-5 text-slate-400" />
               </button>
@@ -446,12 +570,25 @@ const SafeHands: React.FC = () => {
                 title="Descargar Plantilla Excel para cargar base de datos"
               >
                 <Download className="w-4 h-4 text-red-600" />
-                <span>Descargar Plantilla</span>
+                <span>Plantilla Carga</span>
               </button>
               <label className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
                 <Upload className="w-4 h-4" />
                 <span>Cargar Consolidado</span>
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
+              </label>
+              <button 
+                onClick={handleDownloadDeleteTemplate} 
+                className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
+                title="Descargar Plantilla Excel para eliminación masiva"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+                <span>Plantilla Borrado</span>
+              </button>
+              <label className="flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
+                <Trash2 className="w-4 h-4 text-red-500" />
+                <span>Eliminación Masiva</span>
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelDeleteUpload} />
               </label>
             </>
           )}
@@ -516,9 +653,19 @@ const SafeHands: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-20 animate-pulse">
-            <div className="w-12 h-12 border-4 border-slate-200 border-t-red-600 rounded-full animate-spin mb-4" />
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Cargando Personal Safe Hands...</p>
+          <div className="flex-1 flex flex-col items-center justify-center py-20 animate-in fade-in duration-300">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-red-100 animate-ping opacity-75"></div>
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center relative border border-red-100">
+                  <ShieldCheck className="w-7 h-7 animate-bounce" />
+                </div>
+              </div>
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider mt-4">Cargando Personal...</h4>
+              <p className="text-xs text-slate-400 font-bold max-w-xs leading-relaxed">
+                Sincronizando registros de Safe Hands con la base de datos.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -554,16 +701,22 @@ const SafeHands: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 transition-all">
                           {cert && (
-                            <>
-                              
-                              <button 
-                                onClick={() => handleDownload(cert, person)}
-                                className="p-2 bg-white border border-slate-100 rounded-lg text-red-600 hover:bg-red-50 transition-all shadow-sm"
-                                title="Descargar PDF"
-                              >
-                                <FileDown className="w-4 h-4" />
-                              </button>
-                            </>
+                            <button 
+                              onClick={() => handleDownload(cert, person)}
+                              className="p-2 bg-white border border-slate-100 rounded-lg text-red-600 hover:bg-red-50 transition-all shadow-sm"
+                              title="Descargar PDF"
+                            >
+                              <FileDown className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button 
+                              onClick={() => handleDeletePerson(person.id, person.name)}
+                              className="p-2 bg-white border border-slate-100 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all shadow-sm"
+                              title="Eliminar registro"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -731,6 +884,57 @@ const SafeHands: React.FC = () => {
                    </>
                  ) : (
                    <span>Confirmar Borrado</span>
+                 )}
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => { if (!isBulkDeleting) setShowBulkDeleteConfirm(false); }} />
+          <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-red-50 bg-slate-900 text-white">
+              <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-red-500 animate-pulse" />
+                Eliminación Masiva
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
+                Confirmar eliminación masiva de colaboradores
+              </p>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-[10px] font-bold text-red-600 uppercase leading-relaxed">
+                ¡Atención! Se eliminarán <strong>{bulkDeleteIds.length}</strong> colaboradores y sus respectivos carnets de manipulación de alimentos de forma permanente. Esta acción es irreversible.
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50 flex gap-3">
+               <button 
+                 disabled={isBulkDeleting}
+                 onClick={() => {
+                   setShowBulkDeleteConfirm(false);
+                   setBulkDeleteIds([]);
+                 }} 
+                 className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 disabled:opacity-50"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 disabled={isBulkDeleting}
+                 onClick={handleConfirmBulkDelete} 
+                 className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+               >
+                 {isBulkDeleting ? (
+                   <>
+                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                     <span>Eliminando...</span>
+                   </>
+                 ) : (
+                   <span>Confirmar</span>
                  )}
                </button>
             </div>

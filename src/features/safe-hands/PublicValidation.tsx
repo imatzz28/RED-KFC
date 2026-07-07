@@ -5,7 +5,7 @@ import { SafeHandsCert, SafeHandsPerson, SafeHandsSettings } from '@/types';
 import { 
   ShieldCheck, Search, CheckCircle2, XCircle, 
   AlertTriangle, Clock, MapPin, Building2,
-  ChevronLeft, Download, UserCheck
+  ChevronLeft, Download, UserCheck, X
 } from 'lucide-react';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
@@ -16,6 +16,7 @@ const PublicValidation: React.FC = () => {
   const [settings, setSettings] = useState<SafeHandsSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   useEffect(() => {
     document.title = "KFC | Safe Hands";
@@ -60,9 +61,10 @@ const PublicValidation: React.FC = () => {
   };
 
   const handleDownload = async () => {
-    if (!data || !settings) return;
+    if (!data) return;
     try {
-      await safeHandsGenerator.downloadCertificate(data.cert, data.employee as any, settings);
+      const activeSettings = settings || { responsibleName: 'ESPECIALISTA CALIDAD' };
+      await safeHandsGenerator.downloadCertificate(data.cert, data.employee as any, activeSettings);
     } catch (error) {
       console.error("Error downloading:", error);
       alert("Error al generar el PDF.");
@@ -128,9 +130,16 @@ const PublicValidation: React.FC = () => {
       {/* Result Container - More Horizontal */}
       <div className="w-full max-w-2xl mt-10 px-6 pb-20 relative z-10">
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-            <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">VERIFICANDO...</p>
+          <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-300">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-75"></div>
+                <div className="w-16 h-16 bg-white text-red-600 rounded-full flex items-center justify-center relative shadow-md">
+                  <ShieldCheck className="w-7 h-7 animate-bounce" />
+                </div>
+              </div>
+              <h4 className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mt-4">Cargando...</h4>
+            </div>
           </div>
         )}
 
@@ -226,9 +235,85 @@ const PublicValidation: React.FC = () => {
       </div>
 
       {/* Footer KFC Branding */}
-      <div className="mt-auto py-10 text-center opacity-70">
+      <div className="mt-auto py-10 text-center opacity-75 flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowPrivacyModal(true)}
+          className="text-[9px] font-black text-white/50 hover:text-white uppercase tracking-widest underline transition-colors cursor-pointer"
+        >
+          Política de Tratamiento de Datos
+        </button>
         <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white">© 2026 RED KFC - A2M LABS</p>
       </div>
+
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black uppercase tracking-tighter flex items-center italic text-base">
+                <ShieldCheck className="w-5 h-5 mr-3 text-red-500" />
+                Tratamiento de Datos Personales
+              </h3>
+              <button onClick={() => setShowPrivacyModal(false)} className="hover:text-red-500 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto space-y-6 text-slate-600 text-xs font-medium leading-relaxed text-left">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">POLÍTICA DE PRIVACIDAD Y HABEAS DATA - LEY 1581 DE 2012</p>
+              
+              <div className="space-y-2">
+                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-wider">1. Introducción y Normativa</h4>
+                <p>
+                  De conformidad con lo dispuesto en la Ley 1581 de 2012 y el Decreto 1377 de 2013 de la República de Colombia, la plataforma **RED KFC (Ruta de Entrenamiento y Desempeño)** adopta la presente Política de Tratamiento de Datos Personales para garantizar el derecho constitucional de Habeas Data de los colaboradores y usuarios del sistema.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-wider">2. Finalidad de los Datos Recolectados</h4>
+                <p>
+                  Los datos personales suministrados (incluyendo nombre, identificación, cargo, histórico de evaluaciones de curvas de desempeño y certificaciones operativas como "Safe Hands") serán tratados exclusivamente para las siguientes finalidades:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Registrar y administrar los accesos a la plataforma de entrenamiento.</li>
+                  <li>Realizar el seguimiento, calificación y control de las evaluaciones de competencias del personal.</li>
+                  <li>Emitir y validar públicamente certificados de manipulación e inocuidad alimentaria ("Safe Hands").</li>
+                  <li>Generar reportes consolidados de cumplimiento e historial de entrenamiento para gerencia y auditorías de calidad.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-wider">3. Derechos del Titular de los Datos</h4>
+                <p>
+                  Como titular de los datos personales, el colaborador tiene derecho a:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Conocer, actualizar y rectificar sus datos personales frente a los administradores del sistema.</li>
+                  <li>Solicitar prueba de la autorización del tratamiento de datos.</li>
+                  <li>Ser informado respecto del uso que se le ha dado a sus datos.</li>
+                  <li>Revocar la autorización o solicitar la supresión de sus datos de la base de datos cuando no exista un deber legal o contractual de permanecer en ella.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-wider">4. Autorización de Uso</h4>
+                <p>
+                  Al acceder y registrarse en la plataforma, el titular autoriza expresamente el tratamiento de sus datos personales bajo los estrictos términos aquí descritos, garantizando que el uso de los mismos responde exclusivamente al desarrollo del plan de capacitación y entrenamiento operativo de la compañía.
+                </p>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 shrink-0">
+              <button 
+                onClick={() => setShowPrivacyModal(false)}
+                className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-xl transition-all uppercase tracking-widest text-[10px]"
+              >
+                Entendido y Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
