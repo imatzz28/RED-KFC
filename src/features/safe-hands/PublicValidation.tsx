@@ -86,8 +86,10 @@ const PublicValidation: React.FC = () => {
       }}
     >
       {/* Background Decor - Vignette effect */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-[600px] h-[600px] bg-black rounded-full blur-[150px] opacity-20 -z-10" />
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-black rounded-full blur-[150px] opacity-10 -z-10" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-[600px] h-[600px] bg-black rounded-full blur-[150px] opacity-20" />
+        <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-black rounded-full blur-[150px] opacity-10" />
+      </div>
       
       {/* Header KFC Style */}
       <div className="w-full max-w-4xl pt-8 sm:pt-16 px-6 flex flex-col items-center">
