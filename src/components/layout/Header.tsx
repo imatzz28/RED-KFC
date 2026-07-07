@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { User, UserRole } from '@/types';
 import { Calendar, User as UserIcon, Menu, Lock, X, Shield, LogOut } from 'lucide-react';
@@ -10,34 +10,64 @@ import { supabase } from '@/services/dataService';
 const Header: React.FC = () => {
   const { auth, selectedMonth, setSelectedMonth: onMonthChange, setIsSidebarOpen, handleLogout: onLogout } = useAppStore();
   const location = useLocation();
-  const user = auth.user!;
+  const user = auth.user;
   const onMenuClick = () => setIsSidebarOpen(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
   const [passData, setPassData] = useState({ old: '', new: '' });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar el dropdown al hacer click fuera de él
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileMenu]);
 
   const handleUpdatePassword = async () => {
-    if (!passData.new) {
-      alert("La nueva contraseña no puede estar vacía.");
+    if (!passData.old) {
+      alert('Debes ingresar tu contraseña actual.');
+      return;
+    }
+    if (!passData.new || passData.new.length < 6) {
+      alert('La nueva contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (passData.old === passData.new) {
+      alert('La nueva contraseña debe ser diferente a la actual.');
       return;
     }
 
     setIsUpdatingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passData.new
+      // Verificar contraseña actual re-autenticando antes de cambiarla
+      const email = user?.username?.includes('@') ? user.username : `${user?.username}@kfc.co`;
+      const { error: reAuthError } = await supabase.auth.signInWithPassword({
+        email: email || '',
+        password: passData.old
       });
+      if (reAuthError) {
+        alert('La contraseña actual es incorrecta.');
+        return;
+      }
 
+      const { error } = await supabase.auth.updateUser({ password: passData.new });
       if (error) throw error;
 
-      alert("Contraseña actualizada con éxito.");
+      alert('Contraseña actualizada con éxito.');
       setShowPassModal(false);
       setPassData({ old: '', new: '' });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
       console.error(err);
-      alert(`Error al actualizar la contraseña: ${err.message || 'Error desconocido'}`);
+      alert(`Error al actualizar la contraseña: ${msg}`);
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -97,9 +127,9 @@ const Header: React.FC = () => {
 
       <div className="flex items-center space-x-3 md:space-x-5">
         <div className="text-right hidden sm:block">
-          <p className="text-sm font-black text-slate-800 leading-none truncate max-w-[150px] uppercase italic">{user.username}</p>
+          <p className="text-sm font-black text-slate-800 leading-none truncate max-w-[150px] uppercase italic">{user?.username}</p>
           <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1.5 px-2 py-0.5 bg-slate-100 rounded inline-block">
-            {getRoleLabel(user.role)}
+            {user ? getRoleLabel(user.role) : ''}
           </p>
         </div>
 
@@ -121,7 +151,7 @@ const Header: React.FC = () => {
         </div>
 
         {showProfileMenu && (
-          <div className="absolute right-8 top-16 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 animate-in fade-in slide-in-from-top-2">
+          <div ref={profileMenuRef} className="absolute right-8 top-16 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 animate-in fade-in slide-in-from-top-2">
             <button
               onClick={() => { setShowPassModal(true); setShowProfileMenu(false); }}
               className="w-full flex items-center space-x-3 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition"

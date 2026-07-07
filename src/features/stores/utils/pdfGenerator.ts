@@ -211,8 +211,8 @@ export const generateStorePdf = async (
 
                 // Relación: Altura de fila = (FontSize * 0.352777) + (2 * Padding)
                 // Intentamos un balance donde FontSize sea legible pero Padding no sea cero
-                let dynamicFontSize = Math.min(7.5, Math.max(2.8, targetRowHeight * 1.3));
-                let dynamicPadding = Math.max(0.1, (targetRowHeight - (dynamicFontSize * 0.3528)) / 2.2);
+                const dynamicFontSize = Math.min(7.5, Math.max(2.8, targetRowHeight * 1.3));
+                const dynamicPadding = Math.max(0.1, (targetRowHeight - (dynamicFontSize * 0.3528)) / 2.2);
 
                 autoTable(doc, {
                     startY: startTableY,

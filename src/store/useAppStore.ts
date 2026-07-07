@@ -5,7 +5,7 @@ import { dataService } from '@/services/dataService';
 interface AppState {
     // Auth
     auth: AuthState;
-    handleLogin: (user: User) => void;
+    handleLogin: (user: User) => Promise<void>;
     handleLogout: () => void;
 
     // Data
@@ -104,7 +104,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 'la_akademia_summary', 'la_akademia_hierarchy', 'la_akademia_users', 'la_akademia_banca'
             ];
             await Promise.all(APP_KEYS.map(key => localforage.removeItem(key)));
-        } catch {}
+        } catch (err) {
+            console.error('[handleLogout] Error al cerrar sesión en Supabase. La sesión local fue limpiada de todas formas.', err);
+        }
         set({ 
             auth: { user: null, isAuthenticated: false }, 
             filteredEmployees: [],
@@ -150,7 +152,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 
                 set({ selectedMonth: evalMonthPrefix });
             }
-        } catch {}
+        } catch (err) {
+            console.warn('[initData] Error al calcular mes óptimo desde meses asentados. Usando mes actual como fallback.', err);
+        }
 
         await dataService.loadGradesSummary(get().selectedMonth);
 
@@ -170,9 +174,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 // Si el token JWT vence, Supabase emite SIGNED_OUT y la app hace logout limpio.
 // La bandera _isLoggingOut evita el loop: el propio handleLogout dispara SIGNED_OUT,
 // sin la bandera el listener volvería a llamar handleLogout indefinidamente.
+// Guardamos la suscripción para poder cancelarla si fuera necesario
+let _authSubscription: { unsubscribe: () => void } | null = null;
 (async () => {
     const { supabase } = await import('@/services/dataService');
-    supabase.auth.onAuthStateChange((event) => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT') {
             const store = useAppStore.getState();
             // Solo actuar si es una expiración externa (no un logout iniciado por nosotros)
@@ -182,4 +188,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             }
         }
     });
+    _authSubscription = data.subscription;
 })();
+
+export const unsubscribeAuth = () => _authSubscription?.unsubscribe();

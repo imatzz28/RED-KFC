@@ -21,6 +21,10 @@ const PublicValidation: React.FC = () => {
   useEffect(() => {
     document.title = "KFC | Safe Hands";
     loadSettings();
+    return () => { document.title = 'R.E.D — Ruta de Entrenamiento y Desarrollo'; };
+  }, []);
+
+  useEffect(() => {
     if (id) {
       validateCert(id);
     }
@@ -72,7 +76,9 @@ const PublicValidation: React.FC = () => {
   };
 
   const getStatus = (expiryDate: string) => {
-    const expiry = new Date(expiryDate);
+    // Usamos T23:59:59 para evitar bug de timezone UTC vs Colombia (UTC-5)
+    // Sin esto, un cert que vence el día 4 aparece como VENCIDO desde el 3 a las 7pm
+    const expiry = new Date(expiryDate + 'T23:59:59');
     const today = new Date();
     return expiry < today ? 'VENCIDO' : 'VIGENTE';
   };

@@ -9,7 +9,6 @@ import Header from '@/components/layout/Header';
 import MyStores from '@/features/stores/MyStores';
 import EntriesExitsReport from '@/features/reports/EntriesExitsReport';
 import Banca from '@/features/banca/Banca';
-import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import SafeHands from '@/features/safe-hands/SafeHands';

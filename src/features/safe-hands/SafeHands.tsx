@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import { SafeHandsCert, SafeHandsSettings, SafeHandsPerson } from '@/types';
+import { UserRole } from '@/types';
 import { 
   ShieldCheck, Upload, Download, Search, 
   FileDown, Trash2, Signature,
@@ -42,7 +43,7 @@ const SafeHands: React.FC = () => {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  const canEdit = auth.user?.role === 'ADMIN';
+  const canEdit = auth.user?.role === UserRole.ADMIN;
 
   // Debounce search input
   useEffect(() => {
@@ -260,6 +261,7 @@ const SafeHands: React.FC = () => {
         alert("Error al procesar el archivo Excel. Verifica el formato de CM.xlsx.");
       } finally {
         setIsUploading(false);
+        e.target.value = ''; // Permite volver a subir el mismo archivo
       }
     };
     reader.readAsBinaryString(file);
@@ -362,7 +364,7 @@ const SafeHands: React.FC = () => {
       setTimeout(() => {
         setToastMessage(null);
       }, 3000);
-      loadData(page, debouncedSearch);
+      await loadData(page, debouncedSearch);
     } catch (err) {
       console.error("Error doing bulk delete:", err);
       alert("Error al realizar la eliminación masiva.");
@@ -428,7 +430,7 @@ const SafeHands: React.FC = () => {
       setTimeout(() => {
         setToastMessage(null);
       }, 3000);
-      loadData(page, debouncedSearch);
+      await loadData(page, debouncedSearch);
     } catch (error) {
       console.error("Error deleting person:", error);
       alert("Error al eliminar el registro.");
@@ -464,7 +466,9 @@ const SafeHands: React.FC = () => {
   const getEmpStatus = (empId: string) => {
     const cert = certs.find(c => c.employeeId === empId);
     if (!cert) return 'PENDIENTE';
-    const expiry = new Date(cert.expiryDate);
+    // Usamos T23:59:59 para evitar el bug de timezone UTC vs Colombia (UTC-5)
+    // Sin esto, un cert que vence el día 4 aparece como VENCIDO desde el día 3 a las 7pm
+    const expiry = new Date(cert.expiryDate + 'T23:59:59');
     const today = new Date();
     if (expiry < today) return 'VENCIDO';
     const soon = new Date();

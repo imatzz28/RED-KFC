@@ -780,21 +780,8 @@ export const dataService = {
       return emp;
     }).filter(e => e !== null) as Employee[];
 
-    const uniqueStoresInExcel = new Set(filteredRawData.map(item => String(item.Nombre_Ceco || item.nombre_ceco || '').trim().toUpperCase()));
-
-    // La lógica de retiros implícitos se desactiva por solicitud del usuario:
-    // "si el ID del usuario no aparece en el siguiente activos y retirados, la app no lo debera marcar como retirado"
+    // La lógica de retiros implícitos se desactiva por solicitud del usuario
     const implicitRetires: Employee[] = [];
-    /*
-    const implicitRetires = currentEmployees
-      .filter(e => !importedIds.has(e.id) && e.active && uniqueStoresInExcel.has(e.restaurant_id))
-      .map(e => ({
-        ...e,
-        active: false,
-        exit_date: today,
-        history: [...(e.history || []), { date: today, restaurantName: e.restaurant_id, action: 'RETIRO' as const }]
-      }));
-    */
 
     const allProcessedMap = new Map<string, Employee>();
     importedEmployees.forEach(e => allProcessedMap.set(e.id, e));
@@ -918,10 +905,12 @@ export const dataService = {
   },
 
   getPublicCert: async (codeOrId: string): Promise<{ cert: SafeHandsCert, employee: SafeHandsPerson } | null> => {
+    // Sanitizamos el input del usuario con encodeURIComponent para evitar manipulación de la query REST
+    const safeCode = encodeURIComponent(codeOrId.trim());
     // Buscar por código de certificado primero, luego por ID de empleado
-    let result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?certificate_code=eq.${codeOrId}`);
+    let result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?certificate_code=eq.${safeCode}`);
     if (!result || result.length === 0) {
-      result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?employee_id=eq.${codeOrId}&order=expiry_date.desc&limit=1`);
+      result = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?employee_id=eq.${safeCode}&order=expiry_date.desc&limit=1`);
     }
 
     if (result && result.length > 0) {
