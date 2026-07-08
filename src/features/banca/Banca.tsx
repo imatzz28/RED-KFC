@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
   BancaData, StoreAssignment, StoreLeader, Certification, BancaRole,
-  BANCA_ROLES, Employee, StoreIdeal
+  BANCA_ROLES, Employee, StoreIdeal, UserRole
 } from '@/types';
 import { Store, Building2, Users, Award, X, Save, Search, ChevronRight, UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp, Landmark, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -151,7 +151,8 @@ const EditModal: React.FC<{
   allEmployees: Employee[];
   onClose: () => void;
   onSave: (a: StoreAssignment, ideal: StoreIdeal) => Promise<void>;
-}> = ({ restaurantId, restaurantName, initialAssignment, initialIdeal, allEmployees, onClose, onSave }) => {
+  readOnly?: boolean;
+}> = ({ restaurantId, restaurantName, initialAssignment, initialIdeal, allEmployees, onClose, onSave, readOnly = false }) => {
   const [members, setMembers] = useState<StoreLeader[]>([...(initialAssignment.members ?? [])]);
   const [ideal, setIdeal] = useState<StoreIdeal>(initialIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 });
   const [saving, setSaving] = useState(false);
@@ -178,45 +179,56 @@ const EditModal: React.FC<{
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+          {readOnly && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Modo consulta — Solo visualización</span>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4 pb-6 border-b border-slate-50">
             <div>
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Gerentes</label>
-              <input type="number" min="0" value={ideal.gerentes} onChange={e => setIdeal({...ideal, gerentes: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+              <input type="number" min="0" value={ideal.gerentes} readOnly={readOnly} onChange={e => !readOnly && setIdeal({...ideal, gerentes: parseInt(e.target.value) || 0})} className={`w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-black text-center outline-none transition-all ${readOnly ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-red-400'}`} />
             </div>
             <div>
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Líderes</label>
-              <input type="number" min="0" value={ideal.lideresTurno} onChange={e => setIdeal({...ideal, lideresTurno: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+              <input type="number" min="0" value={ideal.lideresTurno} readOnly={readOnly} onChange={e => !readOnly && setIdeal({...ideal, lideresTurno: parseInt(e.target.value) || 0})} className={`w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-black text-center outline-none transition-all ${readOnly ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-red-400'}`} />
             </div>
             <div>
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ideal Entrenadores</label>
-              <input type="number" min="0" value={ideal.entrenadores} onChange={e => setIdeal({...ideal, entrenadores: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center outline-none focus:border-red-400 transition-all" />
+              <input type="number" min="0" value={ideal.entrenadores} readOnly={readOnly} onChange={e => !readOnly && setIdeal({...ideal, entrenadores: parseInt(e.target.value) || 0})} className={`w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-black text-center outline-none transition-all ${readOnly ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-red-400'}`} />
             </div>
           </div>
 
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Agregar persona</p>
-            <EmployeeSearch
-              allEmployees={allEmployees}
-              excludeIds={members.map(m => m.employeeId)}
-              onSelect={emp => setMembers(prev => [...prev, { employeeId: emp.id, role: 'Líder de turno', certifications: [] }])}
-            />
-          </div>
+          {!readOnly && (
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Agregar persona</p>
+              <EmployeeSearch
+                allEmployees={allEmployees}
+                excludeIds={members.map(m => m.employeeId)}
+                onSelect={emp => setMembers(prev => [...prev, { employeeId: emp.id, role: 'Líder de turno', certifications: [] }])}
+              />
+            </div>
+          )}
 
           {members.length > 0 ? (
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Equipo asignado ({members.length})</p>
               <div className="space-y-2">
                 {members.map((m, idx) => (
-                  <MemberRow key={m.employeeId} leader={m}
-                    employee={allEmployees.find(e => e.id === m.employeeId)}
-                    onChangeRole={role => setMembers(prev => prev.map((x, i) => i === idx ? { ...x, role } : x))}
-                    onToggleCert={cert => setMembers(prev => prev.map((x, i) => {
-                      if (i !== idx) return x;
-                      const certs = x.certifications.includes(cert) ? x.certifications.filter(c => c !== cert) : [...x.certifications, cert];
-                      return { ...x, certifications: certs };
-                    }))}
-                    onRemove={() => setMembers(prev => prev.filter((_, i) => i !== idx))}
-                  />
+                  readOnly ? (
+                    <ReadOnlyMemberRow key={m.employeeId} leader={m} employee={allEmployees.find(e => e.id === m.employeeId)} />
+                  ) : (
+                    <MemberRow key={m.employeeId} leader={m}
+                      employee={allEmployees.find(e => e.id === m.employeeId)}
+                      onChangeRole={role => setMembers(prev => prev.map((x, i) => i === idx ? { ...x, role } : x))}
+                      onToggleCert={cert => setMembers(prev => prev.map((x, i) => {
+                        if (i !== idx) return x;
+                        const certs = x.certifications.includes(cert) ? x.certifications.filter(c => c !== cert) : [...x.certifications, cert];
+                        return { ...x, certifications: certs };
+                      }))}
+                      onRemove={() => setMembers(prev => prev.filter((_, i) => i !== idx))}
+                    />
+                  )
                 ))}
               </div>
             </div>
@@ -224,17 +236,24 @@ const EditModal: React.FC<{
             <div className="text-center py-8 text-slate-300">
               <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
               <p className="text-sm font-bold">Sin personas asignadas</p>
-              <p className="text-xs">Busca y agrega colaboradores arriba</p>
+              <p className="text-xs">{readOnly ? 'Esta tienda no tiene personal en banca.' : 'Busca y agrega colaboradores arriba'}</p>
             </div>
           )}
         </div>
 
         <div className="px-8 py-5 border-t border-slate-50 shrink-0">
-          <button onClick={handleSave} disabled={saving}
-            className="w-full bg-red-600 text-white font-black py-4 rounded-2xl hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
-            {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
+          {readOnly ? (
+            <button onClick={onClose}
+              className="w-full bg-slate-100 text-slate-700 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 uppercase tracking-widest text-xs">
+              Cerrar
+            </button>
+          ) : (
+            <button onClick={handleSave} disabled={saving}
+              className="w-full bg-red-600 text-white font-black py-4 rounded-2xl hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
+              {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -399,6 +418,45 @@ const ComplianceSummary: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Read-Only Member Row (para rol GUEST)
+// ─────────────────────────────────────────────────────────────────────────────
+const ReadOnlyMemberRow: React.FC<{
+  leader: StoreLeader;
+  employee: Employee | undefined;
+}> = ({ leader, employee }) => (
+  <div className="flex flex-col gap-2 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm">
+    <div className="flex items-center gap-3">
+      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-500 shrink-0">
+        {employee?.name?.charAt(0) ?? '?'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-slate-800 truncate">{employee?.name ?? leader.employeeId}</p>
+        {employee && (
+          <p className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+            <span className="font-bold uppercase tracking-wide bg-slate-100 px-1.5 py-0.5 rounded">{employee.title}</span>
+            <span className="opacity-50">|</span>
+            <span className="font-mono text-[9px] uppercase tracking-widest">{employee.restaurant_id}</span>
+          </p>
+        )}
+      </div>
+    </div>
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-full ${ROLE_COLORS[leader.role]}`}>
+        {leader.role}
+      </span>
+      {leader.certifications.length > 0 && (
+        <div className="flex items-center gap-1 ml-auto">
+          <Award className="w-3 h-3 text-slate-300" />
+          {leader.certifications.map(cert => (
+            <span key={cert} className={`text-[9px] font-black px-2 py-1 rounded-full border ${CERT_COLORS[cert]}`}>{cert}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Store Card
 // ─────────────────────────────────────────────────────────────────────────────
 const StoreCard: React.FC<{
@@ -406,8 +464,10 @@ const StoreCard: React.FC<{
   restaurantName: string;
   assignment: StoreAssignment;
   canEdit: boolean;
+  canView: boolean;
   onEdit: () => void;
-}> = ({ restaurantId, restaurantName, assignment, canEdit, onEdit }) => {
+  onView: () => void;
+}> = ({ restaurantId, restaurantName, assignment, canEdit, canView, onEdit, onView }) => {
   const members = assignment.members ?? [];
 
   return (
@@ -437,6 +497,16 @@ const StoreCard: React.FC<{
               className="text-[9px] font-black uppercase px-3 py-1.5 bg-[#e60000] hover:bg-red-700 text-white rounded-lg transition-all"
             >
               Editar
+            </button>
+          </div>
+        )}
+        {!canEdit && canView && (
+          <div className="flex items-center pr-4 shrink-0">
+            <button
+              onClick={e => { e.stopPropagation(); onView(); }}
+              className="text-[9px] font-black uppercase px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
+            >
+              Ver
             </button>
           </div>
         )}
@@ -471,7 +541,7 @@ const Banca: React.FC = () => {
   const { employees, restaurants, auth, syncStatus } = useAppStore();
   const [bancaData, setBancaData] = useState<BancaData>(() => dataService.getBancaData());
   const [view, setView] = useState<View>({ level: 'regions' });
-  const [modal, setModal] = useState<{ restaurantId: string; restaurantName: string } | null>(null);
+  const [modal, setModal] = useState<{ restaurantId: string; restaurantName: string; readOnly?: boolean } | null>(null);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -485,7 +555,8 @@ const Banca: React.FC = () => {
   }, [syncStatus, employees.length, restaurants.length]);
 
   const hierarchy = dataService.getHierarchy();
-  const canEdit = auth.user?.role === 'ADMIN' || auth.user?.role === 'COORDINATOR' || auth.user?.role === 'LIDER';
+  const canEdit = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER;
+  const canView = auth.user?.role === UserRole.GUEST; // GUEST puede ver pero no modificar
 
   // ── Migración: Licencia en Curso → Potencial ─────────────────────────────
   React.useEffect(() => {
@@ -818,8 +889,9 @@ const Banca: React.FC = () => {
               const rest = restaurants.find(r => r.id === restId);
               return (
                 <StoreCard key={restId} restaurantId={restId} restaurantName={rest?.name ?? restId}
-                  assignment={getAssignment(restId)} canEdit={canEdit}
-                  onEdit={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId })}
+                  assignment={getAssignment(restId)} canEdit={canEdit} canView={canView}
+                  onEdit={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId, readOnly: false })}
+                  onView={() => setModal({ restaurantId: restId, restaurantName: rest?.name ?? restId, readOnly: true })}
                 />
               );
             })}
@@ -831,7 +903,7 @@ const Banca: React.FC = () => {
       {modal && modalAssignment && (
         <EditModal restaurantId={modal.restaurantId} restaurantName={modal.restaurantName}
           initialAssignment={modalAssignment} initialIdeal={bancaData.storeIdeals?.[modal.restaurantId]} allEmployees={employees}
-          onClose={() => setModal(null)} onSave={handleSave}
+          onClose={() => setModal(null)} onSave={handleSave} readOnly={modal.readOnly ?? false}
         />
       )}
     </div>
