@@ -162,10 +162,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Se llama desde el Dashboard cuando el filtro es zona / región / nacional.
 -- ============================================================
 CREATE OR REPLACE FUNCTION get_dashboard_stats(
-  p_month    TEXT,
-  p_store_id TEXT DEFAULT NULL,
-  p_zone     TEXT DEFAULT NULL,
-  p_region   TEXT DEFAULT NULL
+  p_month     TEXT,
+  p_store_ids TEXT[] DEFAULT NULL
 )
 RETURNS TABLE (
   group_id       TEXT,
@@ -195,13 +193,8 @@ BEGIN
       END, 1
     ) AS approval_rate
   FROM monthly_group_stats mgs
-  LEFT JOIN (
-    SELECT TRIM(UPPER(id)) as norm_id, zone, region FROM restaurants
-  ) r ON r.norm_id = TRIM(UPPER(mgs.restaurant_id))
   WHERE mgs.month = (p_month || '-01')::DATE
-    AND (p_store_id IS NULL OR TRIM(UPPER(mgs.restaurant_id)) = TRIM(UPPER(p_store_id)))
-    AND (p_zone    IS NULL OR r.zone   = p_zone)
-    AND (p_region  IS NULL OR r.region = p_region)
+    AND (p_store_ids IS NULL OR TRIM(UPPER(mgs.restaurant_id)) = ANY(p_store_ids))
   GROUP BY mgs.group_id
   ORDER BY mgs.group_id;
 END;
@@ -561,7 +554,7 @@ BEGIN
     END IF;
     
     v_user_id := gen_random_uuid();
-    v_encrypted_password := crypt(p_password, gen_salt('bf', 10));
+    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
     
     -- Columnas base obligatorias comunes (inicializadas como ARRAY)
     v_cols := ARRAY['id', 'instance_id', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at', 'aud', 'role', 'raw_app_meta_data', 'raw_user_meta_data'];
@@ -638,7 +631,7 @@ BEGIN
     RETURN v_user_id::TEXT;
     
   ELSIF p_action = 'UPDATE_PASSWORD' THEN
-    v_encrypted_password := crypt(p_password, gen_salt('bf', 10));
+    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
     UPDATE auth.users 
     SET encrypted_password = v_encrypted_password,
         updated_at = NOW()

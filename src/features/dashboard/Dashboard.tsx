@@ -115,25 +115,12 @@ const Dashboard: React.FC = () => {
       // Datos precalculados en monthly_group_stats (históricos y correctos).
       // Un solo request HTTP, sin importar cuántas tiendas haya en el scope.
       if (!isSingleStore) {
-        // Para SPECIALIST: forzar la zona asignada si no hay filtro manual
-        const effectiveZone = filterZone !== 'all'
-          ? filterZone
-          : (user.role === UserRole.SPECIALIST && user.assignedZones?.length > 0)
-            ? user.assignedZones[0]
-            : undefined;
-
-        // Para COORDINATOR: forzar la región asignada si no hay filtro manual
-        const effectiveRegion = filterRegion !== 'all'
-          ? filterRegion
-          : (user.role === UserRole.COORDINATOR && user.assignedRegions?.length > 0)
-            ? user.assignedRegions[0]
-            : undefined;
-
+        // Para evitar errores cuando un Especialista no tiene zona pero tiene tiendas,
+        // o tiene múltiples zonas, simplemente le pasamos a Supabase el array exacto
+        // de tiendas a las que tiene acceso (storeIds).
         const rpcData = await dataService.getDashboardStats(
           dashboardMonth,
-          undefined,
-          effectiveZone,
-          effectiveRegion
+          storeIds
         );
 
         const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => {

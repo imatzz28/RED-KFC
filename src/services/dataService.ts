@@ -486,16 +486,12 @@ export const dataService = {
    */
   getDashboardStats: async (
     month: string,
-    storeId?: string,
-    zone?: string,
-    region?: string
+    storeIds?: string[]
   ): Promise<any[]> => {
     try {
       const result = await dataService.supabaseFetchRPC('get_dashboard_stats', {
-        p_month:    month,
-        p_store_id: storeId  || null,
-        p_zone:     zone     || null,
-        p_region:   region   || null
+        p_month:     month,
+        p_store_ids: storeIds && storeIds.length > 0 ? storeIds : null
       });
       return Array.isArray(result) ? result : [];
     } catch (e) {

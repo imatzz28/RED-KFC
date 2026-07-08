@@ -239,6 +239,13 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       return;
     }
     
+    // Limpiar el sufijo @kfc.co si el usuario lo ingresó por error
+    const cleanUsername = newUser.username.includes('@') 
+      ? newUser.username.split('@')[0].trim() 
+      : newUser.username.trim();
+    
+    const userToProcess = { ...newUser, username: cleanUsername };
+    
     // Validate password for new user
     if (!selectedUser && !password) {
       alert("La contraseña es obligatoria para nuevos usuarios.");
@@ -252,7 +259,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       if (!selectedUser) {
         // 1. Crear en auth.users mediante RPC
         const { data: generatedId, error: rpcError } = await supabase.rpc('manage_user_auth', {
-          p_username: newUser.username!,
+          p_username: userToProcess.username!,
           p_password: password,
           p_action: 'CREATE'
         });
@@ -264,7 +271,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       } else if (password) {
         // 2. Modificar contraseña mediante RPC si se ingresó una para un usuario existente
         const { error: rpcError } = await supabase.rpc('manage_user_auth', {
-          p_username: newUser.username!,
+          p_username: userToProcess.username!,
           p_password: password,
           p_action: 'UPDATE_PASSWORD'
         });
@@ -276,14 +283,14 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
       // 3. Crear o actualizar perfil en public.users
       const userToSave: User = selectedUser
-        ? { ...selectedUser, ...newUser as User }
+        ? { ...selectedUser, ...userToProcess as User }
         : {
           id: userId!,
-          username: newUser.username!,
-          role: currentUser.role === UserRole.COORDINATOR ? UserRole.SPECIALIST : newUser.role!,
-          assignedZones: newUser.assignedZones || [],
-          assignedRestaurants: newUser.assignedRestaurants || [],
-          assignedRegions: newUser.assignedRegions || []
+          username: userToProcess.username!,
+          role: currentUser.role === UserRole.COORDINATOR ? UserRole.SPECIALIST : userToProcess.role!,
+          assignedZones: userToProcess.assignedZones || [],
+          assignedRestaurants: userToProcess.assignedRestaurants || [],
+          assignedRegions: userToProcess.assignedRegions || []
         };
 
       const updatedUsersList = selectedUser
