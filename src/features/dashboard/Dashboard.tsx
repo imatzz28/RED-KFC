@@ -79,26 +79,40 @@ const Dashboard: React.FC = () => {
   const scopeStoresSet = useMemo<Set<string>>(() => {
     const isCoordinator = user.role === UserRole.COORDINATOR;
     const isSpecialist = user.role === UserRole.SPECIALIST;
-    const assignedRegions = user.assignedRegions || [];
-    const assignedZones = user.assignedZones || [];
-    const assignedRestaurants = user.assignedRestaurants || [];
+    
+    // Normalizar a mayúsculas y sin espacios para evitar problemas de matching
+    const assignedRegions = (user.assignedRegions || []).map(r => String(r).trim().toUpperCase());
+    const assignedZones = (user.assignedZones || []).map(z => String(z).trim().toUpperCase());
+    const assignedRestaurants = (user.assignedRestaurants || []).map(s => String(s).trim().toUpperCase());
 
     return new Set(restaurants
       .filter(r => {
+        const normRegion = String(r.region || '').trim().toUpperCase();
+        const normZone = String(r.zone || '').trim().toUpperCase();
+        const normStoreId = String(r.id || '').trim().toUpperCase();
+
         // Filtro por rol base (sin filtros manuales seleccionados)
-        if (isCoordinator && filterRegion === 'all' && !assignedRegions.includes(r.region)) return false;
+        if (isCoordinator && filterRegion === 'all' && !assignedRegions.includes(normRegion)) return false;
+        
         if (isSpecialist) {
-          const inZone = assignedZones.includes(r.zone);
-          const inStore = assignedRestaurants.includes(r.id);
+          const inZone = assignedZones.includes(normZone);
+          const inStore = assignedRestaurants.includes(normStoreId);
           if (!inZone && !inStore) return false;
         }
 
         // Filtros manuales del usuario
         const matchRegion = filterRegion === 'all'
           ? true
-          : r.region === filterRegion;
-        const matchZone = filterZone === 'all' ? true : r.zone === filterZone;
-        const matchStore = filterStore === 'all' ? true : r.id === filterStore;
+          : normRegion === String(filterRegion).trim().toUpperCase();
+          
+        const matchZone = filterZone === 'all' 
+          ? true 
+          : normZone === String(filterZone).trim().toUpperCase();
+          
+        const matchStore = filterStore === 'all' 
+          ? true 
+          : normStoreId === String(filterStore).trim().toUpperCase();
+          
         return matchRegion && matchZone && matchStore;
       })
       .map(r => r.id.trim().toUpperCase())
