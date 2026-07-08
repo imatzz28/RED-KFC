@@ -489,9 +489,15 @@ export const dataService = {
     storeIds?: string[]
   ): Promise<any[]> => {
     try {
+      // Si el usuario provee un arreglo vacío (no tiene tiendas permitidas), 
+      // retornamos 0s en lugar de enviar NULL a la BD (que devolvería nivel Nacional).
+      if (storeIds && storeIds.length === 0) {
+        return [];
+      }
+
       const result = await dataService.supabaseFetchRPC('get_dashboard_stats', {
         p_month:     month,
-        p_store_ids: storeIds && storeIds.length > 0 ? storeIds : null
+        p_store_ids: storeIds || null
       });
       return Array.isArray(result) ? result : [];
     } catch (e) {
