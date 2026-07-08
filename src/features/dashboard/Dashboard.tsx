@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
     );
   }, [restaurants, filterRegion, filterZone, filterStore, user]);
 
-  const { data: statsMap, isLoading: isLoadingStats } = useQuery({
+  const { data: statsMap, isFetching: isFetchingStats } = useQuery({
     queryKey: ['dashboard-stats', dashboardMonth, filterRegion, filterZone, filterStore],
     queryFn: async () => {
       const storeIds    = Array.from(scopeStoresSet);
@@ -406,27 +406,43 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Panel de Indicadores Principales */}
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
-      </div>
+      {/* Panel de Indicadores Principales y Gráfica Principal con Loader */}
+      <div className="relative">
+        {isFetchingStats && (
+          <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center animate-in fade-in duration-300">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-red-100 animate-ping opacity-75"></div>
+              <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center relative border border-red-100 shadow-sm">
+                <RefreshCw className="w-6 h-6 animate-spin" />
+              </div>
+            </div>
+            <p className="mt-4 text-[10px] font-black text-slate-800 uppercase tracking-widest bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
+              Cargando métricas...
+            </p>
+          </div>
+        )}
 
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center mb-8"><TrendingUp className="w-4 h-4 mr-2 text-red-500" /> Desempeño por Grupo</h3>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.groupAvgs} margin={{ top: 20, right: 0, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
-              <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
-              <Tooltip cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="avg" radius={[10, 10, 0, 0]} barSize={45}>
-                <LabelList dataKey="avg" position="top" formatter={(v: number) => `${v}%`} style={{ fontSize: '10px', fontWeight: '900', fill: '#64748b' }} />
-                {stats.groupAvgs.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.avg >= APPROVAL_THRESHOLD ? '#10b981' : '#ef4444'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className={`grid grid-cols-2 gap-4 transition-opacity duration-300 ${isFetchingStats ? 'opacity-50 blur-[1px]' : 'opacity-100'}`}>
+          <StatCard icon={<Users className="w-5 h-5" />} label="Equipo" value={stats.totalEmployees} />
+          <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Curva Global" value={`${stats.globalProgress}%`} color="blue" />
+        </div>
+
+        <div className={`bg-white p-8 rounded-3xl shadow-sm border border-slate-100 mt-6 transition-opacity duration-300 ${isFetchingStats ? 'opacity-50 blur-[1px]' : 'opacity-100'}`}>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center mb-8"><TrendingUp className="w-4 h-4 mr-2 text-red-500" /> Desempeño por Grupo</h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.groupAvgs} margin={{ top: 20, right: 0, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
+                <Tooltip cursor={{ fill: '#f8fafc' }} />
+                <Bar dataKey="avg" radius={[10, 10, 0, 0]} barSize={45}>
+                  <LabelList dataKey="avg" position="top" formatter={(v: number) => `${v}%`} style={{ fontSize: '10px', fontWeight: '900', fill: '#64748b' }} />
+                  {stats.groupAvgs.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.avg >= APPROVAL_THRESHOLD ? '#10b981' : '#ef4444'} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
