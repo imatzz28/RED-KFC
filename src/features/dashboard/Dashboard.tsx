@@ -563,24 +563,11 @@ const TrendChart: React.FC<{ dashboardMonth: string, filterRegion: string, filte
       if (months.length === 0) return [];
 
       const history = await Promise.all(months.map(async (m) => {
-        // Aplicar scope del usuario igual que en las métricas principales
-        const effectiveZone = filterZone !== 'all'
-          ? filterZone
-          : (user.role === UserRole.SPECIALIST && user.assignedZones?.length > 0)
-            ? user.assignedZones[0]
-            : undefined;
-
-        const effectiveRegion = filterRegion !== 'all'
-          ? filterRegion
-          : (user.role === UserRole.COORDINATOR && user.assignedRegions?.length > 0)
-            ? user.assignedRegions[0]
-            : undefined;
-
+        // En lugar de usar filtros parciales, enviamos el array completo de tiendas (storeIds)
+        // que ya tiene aplicado el scope del usuario, igual que en las métricas principales.
         const rpcData = await dataService.getDashboardStats(
           m,
-          filterStore !== 'all' ? filterStore : undefined,
-          effectiveZone,
-          effectiveRegion
+          storeIds
         );
 
         const dataPoint: any = { 
