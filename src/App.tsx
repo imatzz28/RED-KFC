@@ -13,6 +13,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import SafeHands from '@/features/safe-hands/SafeHands';
 import PublicValidation from '@/features/safe-hands/PublicValidation';
+import Schedules from '@/features/schedules/Schedules';
 
 const App: React.FC = () => {
   const {
@@ -63,27 +64,49 @@ const App: React.FC = () => {
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
           <Routes>
-            {auth.user?.role !== UserRole.GUEST && (
-              <>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/my-stores" element={<MyStores />} />
-              </>
-            )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
-              <Route path="/entries-exits" element={<EntriesExitsReport />} />
-            )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER || auth.user?.role === UserRole.GUEST) && (
-              <Route path="/banca" element={<Banca />} />
-            )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR) && (
-              <Route path="/admin" element={<AdminPanel />} />
-            )}
-            {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER) && (
-              <Route path="/safe-hands" element={<SafeHands />} />
-            )}
-            <Route path="/verify" element={<PublicValidation />} />
-            <Route path="/verify/:id" element={<PublicValidation />} />
-            <Route path="*" element={<Navigate to={auth.user?.role === UserRole.GUEST ? "/banca" : "/dashboard"} replace />} />
+            {/* Helper: verifica si el usuario actual puede acceder a un módulo */}
+            {(() => {
+              const user = auth.user!;
+              const isGuest = user.role === UserRole.GUEST;
+              const guestMods: string[] = isGuest
+                ? (user.allowedModules?.length ? user.allowedModules : ['banca'])
+                : [];
+              const guestCan = (mod: string) => isGuest && guestMods.includes(mod);
+              const nonGuest = (roles: UserRole[]) => !isGuest && roles.includes(user.role);
+
+              // Redirect destino para GUEST: primer módulo habilitado
+              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands'];
+              const guestHome = MODULE_ORDER.find(m => guestMods.includes(m)) ?? 'banca';
+
+              return (
+                <>
+                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('dashboard')) && (
+                    <Route path="/dashboard" element={<Dashboard />} />
+                  )}
+                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('my-stores')) && (
+                    <Route path="/my-stores" element={<MyStores />} />
+                  )}
+                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('entries-exits')) && (
+                    <Route path="/entries-exits" element={<EntriesExitsReport />} />
+                  )}
+                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || isGuest) && (
+                    <Route path="/banca" element={<Banca />} />
+                  )}
+                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (
+                    <Route path="/safe-hands" element={<SafeHands />} />
+                  )}
+                  {nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) && (
+                    <Route path="/schedules" element={<Schedules />} />
+                  )}
+                  {nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) && (
+                    <Route path="/admin" element={<AdminPanel />} />
+                  )}
+                  <Route path="/verify" element={<PublicValidation />} />
+                  <Route path="/verify/:id" element={<PublicValidation />} />
+                  <Route path="*" element={<Navigate to={isGuest ? `/${guestHome}` : '/dashboard'} replace />} />
+                </>
+              );
+            })()}
           </Routes>
         </main>
       </div>

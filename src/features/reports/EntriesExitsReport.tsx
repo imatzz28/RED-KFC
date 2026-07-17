@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { Employee, JobTitle, Restaurant } from '@/types';
+import { Employee, JobTitle, Restaurant, UserRole } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowUpCircle, ArrowDownCircle, Filter, Calendar, Briefcase, ChevronDown, X, PieChart, TrendingUp, ChevronRight, RefreshCw, Search, HardHat, Crown, MapPin } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -36,7 +36,8 @@ const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 const ALL_MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 const EntriesExitsReport: React.FC = () => {
-  const { filteredEmployees: employees, restaurants } = useAppStore();
+  const { filteredEmployees: employees, restaurants, auth } = useAppStore();
+  const user = auth.user!;
   const currentYear = new Date().getFullYear();
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
 
@@ -69,23 +70,36 @@ const EntriesExitsReport: React.FC = () => {
   };
 
   // ── Filtros dinámicos ──────────────────────────────────────────────────
-  const dynamicRegions = useMemo(() =>
-    Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort(),
-    [restaurants]
-  );
+  const dynamicRegions = useMemo(() => {
+    let all = Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
+      all = all.filter(r => (user.assignedRegions || []).includes(r));
+    }
+    return all;
+  }, [restaurants, user]);
 
   const dynamicZones = useMemo(() => {
     let base = restaurants;
-    if (filterRegion !== 'all') base = base.filter(r => r.region === filterRegion);
+    if (filterRegion !== 'all') {
+      base = base.filter(r => r.region === filterRegion);
+    } else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
+      base = base.filter(r => (user.assignedRegions || []).includes(r.region));
+    }
     return Array.from(new Set(base.map(r => r.zone))).filter(Boolean).sort();
-  }, [restaurants, filterRegion]);
+  }, [restaurants, filterRegion, user]);
 
   const dynamicStores = useMemo(() => {
     let base = restaurants;
-    if (filterRegion !== 'all') base = base.filter(r => r.region === filterRegion);
-    if (filterZone !== 'all') base = base.filter(r => r.zone === filterZone);
+    if (filterRegion !== 'all') {
+      base = base.filter(r => r.region === filterRegion);
+    } else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
+      base = base.filter(r => (user.assignedRegions || []).includes(r.region));
+    }
+    if (filterZone !== 'all') {
+      base = base.filter(r => r.zone === filterZone);
+    }
     return base.sort((a, b) => a.name.localeCompare(b.name));
-  }, [restaurants, filterRegion, filterZone]);
+  }, [restaurants, filterRegion, filterZone, user]);
 
   // ── Mapa de restaurantes ───────────────────────────────────────────────
   const restaurantMap = useMemo(() => {

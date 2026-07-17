@@ -555,8 +555,17 @@ const Banca: React.FC = () => {
   }, [syncStatus, employees.length, restaurants.length]);
 
   const hierarchy = dataService.getHierarchy();
-  const canEdit = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER;
-  const canView = auth.user?.role === UserRole.GUEST; // GUEST puede ver pero no modificar
+  const user = auth.user!;
+  const canEdit = user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || (user.role === UserRole.GUEST && user.guestCanEdit === true);
+  const canView = user.role === UserRole.GUEST && !user.guestCanEdit; // GUEST sin edición
+
+  // Regiones visibles según el rol
+  const visibleRegionNames = useMemo(() => {
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
+      return new Set(user.assignedRegions || []);
+    }
+    return null; // null = todas
+  }, [user]);
 
   // ── Migración: Licencia en Curso → Potencial ─────────────────────────────
   React.useEffect(() => {
@@ -662,8 +671,13 @@ const Banca: React.FC = () => {
   // ── View: Regions ──────────────────────────────────────────────────────────
   const regionsView = useMemo(() => {
     const q = search.toLowerCase();
-    return hierarchy.regions.filter(r => !q || r.name.toLowerCase().includes(q));
-  }, [hierarchy, search]);
+    let regions = hierarchy.regions;
+    // Filtrar por regiones asignadas para COORDINATOR y LIDER
+    if (visibleRegionNames) {
+      regions = regions.filter(r => visibleRegionNames.has(r.name));
+    }
+    return regions.filter(r => !q || r.name.toLowerCase().includes(q));
+  }, [hierarchy, search, visibleRegionNames]);
 
   // ── View: Zones ────────────────────────────────────────────────────────────
   const zonesView = useMemo(() => {
@@ -719,7 +733,10 @@ const Banca: React.FC = () => {
   let summaryIds: string[] = [];
 
   if (view.level === 'regions') {
-    summaryIds = hierarchy.regions.flatMap(r => r.zones.flatMap(z => z.restaurantIds)).filter(id => restaurants.some(r => r.id === id));
+    const scopeRegions = visibleRegionNames
+      ? hierarchy.regions.filter(r => visibleRegionNames.has(r.name))
+      : hierarchy.regions;
+    summaryIds = scopeRegions.flatMap(r => r.zones.flatMap(z => z.restaurantIds)).filter(id => restaurants.some(r => r.id === id));
   } else if (view.level === 'zones') {
     summaryTitle = `Cumplimiento Región: ${view.region}`;
     summarySubtitle = "Resumen regional";

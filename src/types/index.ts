@@ -35,6 +35,9 @@ export interface User {
   assignedZones: string[];
   assignedRestaurants: string[];
   assignedRegions: string[]; // Campo para filtrar por regiones
+  // GUEST granular permissions
+  allowedModules?: string[];  // e.g. ['dashboard','banca','safe-hands']
+  guestCanEdit?: boolean;     // false = solo lectura (default)
 }
 
 export interface StoreHistory {
@@ -137,5 +140,17 @@ export interface SafeHandsCert {
 
 export interface SafeHandsSettings {
   signatureBase64?: string;
-  responsibleName: string;
+  responsibleName?: string;
+  updatedAt?: string;
+}
+
+export interface DailySchedule {
+  id?: string;
+  employee_id: string; // Cédula del especialista (snake_case para matching directo de base de datos)
+  date: string;        // YYYY-MM-DD
+  shift_type: 'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad';
+  check_in?: string;   // HH:MM
+  check_out?: string;  // HH:MM
+  restaurant_id?: string; // CECO
+  created_at?: string;
 }

@@ -647,3 +647,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
+
+-- ============================================================
+-- 5. TABLA DE HORARIOS (SCHEDULES)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.schedules (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id   TEXT NOT NULL,       -- Cédula del especialista
+  date          DATE NOT NULL,       -- Fecha del turno (YYYY-MM-DD)
+  shift_type    TEXT NOT NULL,       -- 'Laboral', 'Capacitación', 'Descanso', 'Incapacidad'
+  check_in      TEXT,                -- Formato 'HH:MM' (ej. '08:00')
+  check_out     TEXT,                -- Formato 'HH:MM' (ej. '16:00')
+  restaurant_id TEXT,              -- CECO de la tienda asignada
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, date)
+);
+
+-- Habilitar RLS en la tabla
+ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS para Horarios
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.schedules;
+CREATE POLICY "Permitir lectura a autenticados" ON public.schedules
+  FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir gestión de turnos a gestores" ON public.schedules;
+CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
+  FOR ALL TO authenticated USING (true);
+

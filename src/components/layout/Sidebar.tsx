@@ -12,7 +12,8 @@ import {
   Cloud, 
   CloudOff,
   RefreshCw,
-  ChevronRight 
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -49,7 +50,7 @@ const Sidebar: React.FC = () => {
       to: '/entries-exits',
       label: 'Ingresos y Retiros',
       icon: ArrowUpDown,
-      roles: [UserRole.ADMIN, UserRole.COORDINATOR],
+      roles: [UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR],
       key: 'entries-exits'
     },
     {
@@ -67,15 +68,28 @@ const Sidebar: React.FC = () => {
       key: 'safe-hands'
     },
     {
+      to: '/schedules',
+      label: 'Horarios',
+      icon: Calendar,
+      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER],
+      key: 'schedules'
+    },
+    {
       to: '/admin',
       label: role === UserRole.ADMIN ? 'Administración' : 'Gestión Equipo',
       icon: role === UserRole.ADMIN ? ShieldAlert : Settings,
-      roles: [UserRole.ADMIN, UserRole.COORDINATOR],
+      roles: [UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR],
       key: 'admin'
     }
   ];
 
-  const allowedItems = menuItems.filter(item => item.roles.includes(role));
+  const allowedItems = menuItems.filter(item => {
+    if (role === UserRole.GUEST) {
+      const guestMods = auth.user?.allowedModules?.length ? auth.user.allowedModules : ['banca'];
+      return guestMods.includes(item.key);
+    }
+    return item.roles.includes(role);
+  });
 
   return (
     <aside className={sidebarClasses}>

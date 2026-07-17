@@ -64,7 +64,7 @@ const MyStores: React.FC = () => {
 
   const dynamicRegions = useMemo(() => {
     const all = Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
-    if (user.role === UserRole.COORDINATOR) {
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
       return all.filter(r => user.assignedRegions?.includes(r));
     }
     return all;
@@ -74,7 +74,7 @@ const MyStores: React.FC = () => {
     let base = restaurants;
     if (filterRegion !== 'all') {
       base = base.filter(r => r.region === filterRegion);
-    } else if (user.role === UserRole.COORDINATOR) {
+    } else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
       base = base.filter(r => user.assignedRegions?.includes(r.region));
     }
 
@@ -87,7 +87,7 @@ const MyStores: React.FC = () => {
 
   const assigned = useMemo(() => {
     let base = restaurants;
-    if (user.role === UserRole.COORDINATOR) {
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
       base = restaurants.filter(r => user.assignedRegions?.includes(r.region));
     } else if (user.role === UserRole.SPECIALIST) {
       base = restaurants.filter(r => user.assignedRestaurants.includes(r.id) || user.assignedZones.includes(r.zone));

@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
 
   const dynamicRegions = useMemo(() => {
     let regions = Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
-    if (user.role === UserRole.COORDINATOR) {
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
       regions = regions.filter(r => user.assignedRegions.includes(r));
     }
     return regions;
@@ -56,7 +56,7 @@ const Dashboard: React.FC = () => {
   const dynamicZones = useMemo(() => {
     let baseStores = restaurants;
     if (filterRegion !== 'all') baseStores = baseStores.filter(r => r.region === filterRegion);
-    else if (user.role === UserRole.COORDINATOR) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
+    else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
 
     let zones = Array.from(new Set(baseStores.map(r => r.zone))).filter(Boolean).sort();
     if (user.role === UserRole.SPECIALIST) zones = zones.filter(z => user.assignedZones.includes(z));
@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
   const dynamicStores = useMemo(() => {
     let baseStores = restaurants;
     if (filterRegion !== 'all') baseStores = baseStores.filter(r => r.region === filterRegion);
-    else if (user.role === UserRole.COORDINATOR) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
+    else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
 
     if (filterZone !== 'all') baseStores = baseStores.filter(r => r.zone === filterZone);
     if (user.role === UserRole.SPECIALIST) baseStores = baseStores.filter(r => user.assignedRestaurants.includes(r.id) || user.assignedZones.includes(r.zone));
@@ -77,7 +77,7 @@ const Dashboard: React.FC = () => {
 
 
   const scopeStoresSet = useMemo<Set<string>>(() => {
-    const isCoordinator = user.role === UserRole.COORDINATOR;
+    const isCoordinatorOrLiderOrGuest = user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST;
     const isSpecialist = user.role === UserRole.SPECIALIST;
     
     // Normalizar a mayúsculas y sin espacios para evitar problemas de matching
@@ -91,9 +91,7 @@ const Dashboard: React.FC = () => {
         const normZone = String(r.zone || '').trim().toUpperCase();
         const normStoreId = String(r.id || '').trim().toUpperCase();
 
-        // Filtro por rol base (sin filtros manuales seleccionados)
-        if (isCoordinator && filterRegion === 'all' && !assignedRegions.includes(normRegion)) return false;
-        
+        if (isCoordinatorOrLiderOrGuest && filterRegion === 'all' && !assignedRegions.includes(normRegion)) return false;
         if (isSpecialist) {
           const inZone = assignedZones.includes(normZone);
           const inStore = assignedRestaurants.includes(normStoreId);
@@ -374,11 +372,11 @@ const Dashboard: React.FC = () => {
             </select>
           </div>
         </div>
-        {(user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR) && (
+        {(user.role === UserRole.ADMIN || user.role === UserRole.LIDER || user.role === UserRole.COORDINATOR || user.role === UserRole.GUEST) && (
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><MapPin className="w-3 h-3 mr-1 inline" /> Región</label>
             <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className={selectClasses}>
-              <option value="all">{user.role === UserRole.COORDINATOR ? 'Mis Regiones' : 'Todas'}</option>
+              <option value="all">{(user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) ? 'Mis Regiones' : 'Todas'}</option>
               {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>

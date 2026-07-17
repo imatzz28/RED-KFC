@@ -44,7 +44,7 @@ const computeFilteredEmployees = (employees: Employee[], restaurants: Restaurant
         return restaurantById.get(key) || restaurantByName.get(key);
     };
 
-    if (user.role === UserRole.COORDINATOR) {
+    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
         return employees.filter(e => {
             const currentStore = restaurantById.get((e.restaurant_id || '').trim().toUpperCase());
             if (currentStore && assignedRegions.has((currentStore.region || '').trim().toUpperCase())) return true;

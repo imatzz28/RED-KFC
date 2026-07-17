@@ -63,7 +63,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         role: profileData.role as UserRole,
         assignedRegions: profileData.assignedRegions || [],
         assignedZones: profileData.assignedZones || [],
-        assignedRestaurants: profileData.assignedRestaurants || []
+        assignedRestaurants: profileData.assignedRestaurants || [],
+        allowedModules: profileData.allowedModules || [],
+        guestCanEdit: profileData.guestCanEdit ?? false
       };
 
       onLogin(userData);

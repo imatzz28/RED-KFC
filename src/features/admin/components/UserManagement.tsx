@@ -101,15 +101,24 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   const visibleUsers = useMemo(() => {
     if (currentUser.role === UserRole.ADMIN) return users;
+
+    // COORDINATOR y LIDER: ven SPECIALIST en sus regiones asignadas
+    // LIDER además ve a su(s) COORDINATOR de la misma región
     return users.filter(u => {
-      if (u.role !== UserRole.SPECIALIST) return false;
+      // COORDINATOR solo ve specialists
+      if (currentUser.role === UserRole.COORDINATOR && u.role !== UserRole.SPECIALIST) return false;
+
+      // LIDER ve specialists y coordinators de su región
+      if (currentUser.role === UserRole.LIDER) {
+        if (u.role !== UserRole.SPECIALIST && u.role !== UserRole.COORDINATOR) return false;
+      }
 
       const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
       if (hasSharedRegion) return true;
 
-      const coordRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
-      const coordZones = coordRegions.flatMap(r => r.zones.map(z => z.name));
-      return (u.assignedZones || []).some(z => coordZones.includes(z)) ||
+      const myRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
+      const myZones = myRegions.flatMap(r => r.zones.map(z => z.name));
+      return (u.assignedZones || []).some(z => myZones.includes(z)) ||
         (u.assignedRestaurants || []).some(rid => {
           const rest = restaurants.find(r => r.id === rid);
           return rest && currentUser.assignedRegions?.includes(rest.region);
@@ -196,7 +205,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   const filteredStores = useMemo(() => {
     let base = restaurants;
-    if (currentUser.role === UserRole.COORDINATOR) {
+    if (currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LIDER) {
       base = base.filter(r => currentUser.assignedRegions?.includes(r.region));
     }
     if (!searchTerm) return [];
@@ -281,17 +290,23 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
         }
       }
 
-      // 3. Crear o actualizar perfil en public.users
       const userToSave: User = selectedUser
-        ? { ...selectedUser, ...userToProcess as User }
+        ? { 
+            ...selectedUser, 
+            ...userToProcess as User,
+            allowedModules: userToProcess.role === UserRole.GUEST ? (userToProcess.allowedModules || []) : undefined,
+            guestCanEdit: userToProcess.role === UserRole.GUEST ? (userToProcess.guestCanEdit ?? false) : undefined
+          }
         : {
-          id: userId!,
-          username: userToProcess.username!,
-          role: currentUser.role === UserRole.COORDINATOR ? UserRole.SPECIALIST : userToProcess.role!,
-          assignedZones: userToProcess.assignedZones || [],
-          assignedRestaurants: userToProcess.assignedRestaurants || [],
-          assignedRegions: userToProcess.assignedRegions || []
-        };
+            id: userId!,
+            username: userToProcess.username!,
+            role: (currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LIDER) ? UserRole.SPECIALIST : userToProcess.role!,
+            assignedZones: userToProcess.assignedZones || [],
+            assignedRestaurants: userToProcess.assignedRestaurants || [],
+            assignedRegions: userToProcess.assignedRegions || [],
+            allowedModules: userToProcess.role === UserRole.GUEST ? (userToProcess.allowedModules || []) : undefined,
+            guestCanEdit: userToProcess.role === UserRole.GUEST ? (userToProcess.guestCanEdit ?? false) : undefined
+          };
 
       const updatedUsersList = selectedUser
         ? users.map(u => u.id === userToSave.id ? userToSave : u)
@@ -457,6 +472,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
           >
             <option value="Todos">Cargo: Todos</option>
             <option value={UserRole.SPECIALIST}>Especialista</option>
+            <option value={UserRole.LIDER}>Líder</option>
             <option value={UserRole.COORDINATOR}>Coordinador</option>
             <option value={UserRole.GUEST}>Invitado</option>
             <option value={UserRole.ADMIN}>Administrador</option>
@@ -526,7 +542,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {paginatedUsers.map(u => {
+                {paginatedUsers.map((u, index) => {
                   const initials = getInitials(formatName(u.username));
                   
                   // Color templates based on username hash
@@ -543,19 +559,23 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                   
                   const roleBadge = u.role === UserRole.ADMIN
                     ? 'bg-slate-900/10 text-slate-800 border-slate-200'
-                    : u.role === UserRole.COORDINATOR
-                      ? 'bg-blue-50 text-blue-600 border-blue-100'
-                      : u.role === UserRole.GUEST
-                        ? 'bg-purple-50 text-purple-600 border-purple-100'
-                        : 'bg-red-50 text-red-600 border-red-100';
+                    : u.role === UserRole.LIDER
+                      ? 'bg-amber-50 text-amber-600 border-amber-100'
+                      : u.role === UserRole.COORDINATOR
+                        ? 'bg-blue-50 text-blue-600 border-blue-100'
+                        : u.role === UserRole.GUEST
+                          ? 'bg-purple-50 text-purple-600 border-purple-100'
+                          : 'bg-red-50 text-red-600 border-red-100';
                       
                   const roleLabel = u.role === UserRole.ADMIN 
                     ? 'Admin' 
-                    : u.role === UserRole.COORDINATOR 
-                      ? 'Coordinador' 
-                      : u.role === UserRole.GUEST 
-                        ? 'Invitado' 
-                        : 'Especialista';
+                    : u.role === UserRole.LIDER
+                      ? 'Líder'
+                      : u.role === UserRole.COORDINATOR 
+                        ? 'Coordinador' 
+                        : u.role === UserRole.GUEST 
+                          ? 'Invitado' 
+                          : 'Especialista';
                   const coordinator = getCoordinatorForUser(u);
 
                   return (
@@ -630,7 +650,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
                         {/* Floating Action Dropdown Menu */}
                         {activeMenuUserId === u.id && (
-                          <div className="absolute right-8 top-12 bg-white border border-slate-100 rounded-2xl shadow-2xl py-2 w-52 z-[200] animate-in fade-in zoom-in-95 duration-150 text-left">
+                          <div className={`absolute right-8 ${index < 4 ? 'top-10' : 'bottom-12'} bg-white border border-slate-100 rounded-2xl shadow-2xl py-2 w-52 z-[200] animate-in fade-in zoom-in-95 duration-150 text-left`}>
                             <button 
                               onClick={() => {
                                 setSelectedUser(u);
@@ -783,9 +803,9 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Perfil de Usuario</label>
                   {currentUser.role === UserRole.ADMIN ? (
                     <div className="grid grid-cols-2 gap-2">
-                      {[UserRole.SPECIALIST, UserRole.COORDINATOR, UserRole.GUEST, UserRole.ADMIN].map(role => (
+                      {[UserRole.SPECIALIST, UserRole.LIDER, UserRole.COORDINATOR, UserRole.GUEST, UserRole.ADMIN].map(role => (
                         <button key={role} onClick={() => setNewUser({ ...newUser, role })} className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${newUser.role === role ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                          {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.COORDINATOR ? 'Coordinador' : role === UserRole.GUEST ? 'Invitado' : 'Admin'}
+                          {role === UserRole.SPECIALIST ? 'Especialista' : role === UserRole.COORDINATOR ? 'Coordinador' : role === UserRole.LIDER ? 'Líder' : role === UserRole.GUEST ? 'Invitado' : 'Admin'}
                         </button>
                       ))}
                     </div>
@@ -798,7 +818,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
               </div>
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
-                {newUser.role === UserRole.COORDINATOR && currentUser.role === UserRole.ADMIN && (
+                {(newUser.role === UserRole.COORDINATOR || newUser.role === UserRole.LIDER || newUser.role === UserRole.GUEST) && currentUser.role === UserRole.ADMIN && (
                   <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2"><Globe className="w-3 h-3 text-red-600" /> Buscar y Asignar Regiones</p>
                     <div className="relative">
@@ -812,6 +832,72 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                           {newUser.assignedRegions?.includes(reg) && <Check className="w-3 h-3 shrink-0" />}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {newUser.role === UserRole.GUEST && currentUser.role === UserRole.ADMIN && (
+                  <div className="space-y-4 border-t border-slate-100 pt-4">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2">
+                        <SlidersHorizontal className="w-3 h-3 text-red-600" /> Habilitar Módulos
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { key: 'dashboard', label: 'Dashboard' },
+                          { key: 'my-stores', label: 'Mis Tiendas' },
+                          { key: 'entries-exits', label: 'Ingresos y Retiros' },
+                          { key: 'banca', label: 'Banca' },
+                          { key: 'safe-hands', label: 'Safe Hands' }
+                        ].map(mod => {
+                          const isAllowed = newUser.allowedModules?.includes(mod.key) ?? (mod.key === 'banca');
+                          return (
+                            <button
+                              key={mod.key}
+                              type="button"
+                              onClick={() => {
+                                const current = newUser.allowedModules || [];
+                                const next = current.includes(mod.key)
+                                  ? current.filter(x => x !== mod.key)
+                                  : [...current, mod.key];
+                                setNewUser({ ...newUser, allowedModules: next });
+                              }}
+                              className={`p-3 rounded-xl text-[9px] font-black uppercase border-2 text-left flex items-center justify-between transition-all ${
+                                isAllowed ? 'bg-red-50 border-red-600 text-red-700 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'
+                              }`}
+                            >
+                              <span className="truncate pr-1">{mod.label}</span>
+                              {isAllowed && <Check className="w-3 h-3 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2">
+                        <UserCheck className="w-3 h-3 text-red-600" /> Permiso de Edición
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewUser({ ...newUser, guestCanEdit: false })}
+                          className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${
+                            !newUser.guestCanEdit ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'
+                          }`}
+                        >
+                          Solo Lectura
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewUser({ ...newUser, guestCanEdit: true })}
+                          className={`py-3 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${
+                            newUser.guestCanEdit ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-slate-50 border-transparent text-slate-400'
+                          }`}
+                        >
+                          Permitir Edición
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

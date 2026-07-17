@@ -1,5 +1,5 @@
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -583,7 +583,9 @@ export const dataService = {
       role: u.role,
       assignedZones: u.assignedZones || [],
       assignedRestaurants: u.assignedRestaurants || [],
-      assignedRegions: u.assignedRegions || []
+      assignedRegions: u.assignedRegions || [],
+      allowedModules: u.allowedModules || [],
+      guestCanEdit: u.guestCanEdit ?? false
     }));
 
     await dataService.supabaseFetch('users', 'POST', normalized, '?on_conflict=id');
@@ -811,13 +813,19 @@ export const dataService = {
     }));
   },
 
-  getSafeHandsPersonnelPaginated: async (page: number, limit: number, search?: string): Promise<{ data: SafeHandsPerson[], total: number }> => {
+  getSafeHandsPersonnelPaginated: async (page: number, limit: number, search?: string, allowedRestaurantIds?: string[]): Promise<{ data: SafeHandsPerson[], total: number }> => {
     let queryParams = '?order=name.asc';
     if (search) {
       const cleanSearch = search.trim();
       if (cleanSearch) {
         queryParams += `&or=(name.ilike.*${encodeURIComponent(cleanSearch)}*,id.ilike.*${encodeURIComponent(cleanSearch)}*)`;
       }
+    }
+    if (allowedRestaurantIds) {
+      if (allowedRestaurantIds.length === 0) {
+        return { data: [], total: 0 };
+      }
+      queryParams += `&restaurant_id=in.(${allowedRestaurantIds.map(id => encodeURIComponent(id)).join(',')})`;
     }
     const { data, total } = await dataService.supabaseFetchPaginated('safe_hands_personnel', queryParams, page, limit);
     const parsedData = (data || []).map((p: any) => ({
@@ -846,12 +854,16 @@ export const dataService = {
     }));
   },
 
-  getSafeHandsSummaryCounts: async (): Promise<{ total: number, vigentes: number, vencidos: number, porVencer: number, totalPersonnel: number }> => {
+  getSafeHandsSummaryCounts: async (allowedRestaurantIds?: string[]): Promise<{ total: number, vigentes: number, vencidos: number, porVencer: number, totalPersonnel: number }> => {
     const todayStr = new Date().toISOString().split('T')[0];
     const soon = new Date();
     soon.setMonth(soon.getMonth() + 1);
     const soonStr = soon.toISOString().split('T')[0];
     const headers = await getAuthHeaders();
+
+    const filterSuffix = allowedRestaurantIds
+      ? `&restaurant_id=in.(${allowedRestaurantIds.map(id => encodeURIComponent(id)).join(',')})`
+      : '';
 
     const fetchCount = async (url: string) => {
       try {
@@ -870,12 +882,16 @@ export const dataService = {
       }
     };
 
+    if (allowedRestaurantIds && allowedRestaurantIds.length === 0) {
+      return { total: 0, vigentes: 0, vencidos: 0, porVencer: 0, totalPersonnel: 0 };
+    }
+
     const [total, vigentes, porVencer, vencidos, totalPersonnel] = await Promise.all([
-      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs`),
-      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${soonStr}`),
-      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${todayStr}&expiry_date=lt.${soonStr}`),
-      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=lt.${todayStr}`),
-      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_personnel`)
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?id=not.is.null${filterSuffix}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${soonStr}${filterSuffix}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=gte.${todayStr}&expiry_date=lt.${soonStr}${filterSuffix}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_certs?expiry_date=lt.${todayStr}${filterSuffix}`),
+      fetchCount(`${SUPABASE_URL}/rest/v1/safe_hands_personnel?id=not.is.null${filterSuffix}`)
     ]);
 
     return { total, vigentes, vencidos, porVencer, totalPersonnel };
@@ -1039,5 +1055,20 @@ export const dataService = {
       const query = `?id=in.(${chunk.map(id => encodeURIComponent(id)).join(',')})`;
       await dataService.supabaseFetch('safe_hands_personnel', 'DELETE', null, query);
     }
+  },
+
+  getSchedulesForDateRange: async (startDate: string, endDate: string): Promise<DailySchedule[]> => {
+    const query = `?date=gte.${startDate}&date=lte.${endDate}`;
+    const result = await dataService.supabaseFetch('schedules', 'GET', null, query);
+    return (result || []) as DailySchedule[];
+  },
+
+  saveDailySchedule: async (schedule: DailySchedule): Promise<void> => {
+    await dataService.supabaseFetch('schedules', 'POST', schedule, '?on_conflict=employee_id,date');
+  },
+
+  deleteDailySchedule: async (employeeId: string, date: string): Promise<void> => {
+    const query = `?employee_id=eq.${employeeId}&date=eq.${date}`;
+    await dataService.supabaseFetch('schedules', 'DELETE', null, query);
   }
 };

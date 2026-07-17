@@ -13,7 +13,7 @@ import localforage from 'localforage';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
 const SafeHands: React.FC = () => {
-  const { auth } = useAppStore();
+  const { auth, restaurants, employees } = useAppStore();
   const [personnel, setPersonnel] = useState<SafeHandsPerson[]>([]);
   const [certs, setCerts] = useState<SafeHandsCert[]>([]);
   const [settings, setSettings] = useState<SafeHandsSettings>({ responsibleName: '' });
@@ -44,6 +44,7 @@ const SafeHands: React.FC = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const canEdit = auth.user?.role === UserRole.ADMIN;
+  const canUpload = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER || (auth.user?.role === UserRole.GUEST && auth.user?.guestCanEdit === true);
 
   // Debounce search input
   useEffect(() => {
@@ -53,6 +54,16 @@ const SafeHands: React.FC = () => {
     }, 450);
     return () => clearTimeout(handler);
   }, [search]);
+
+  // Auto-clear toast notifications
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   // Load data when page or debouncedSearch changes
   useEffect(() => {
@@ -235,15 +246,19 @@ const SafeHands: React.FC = () => {
           
           const expiryDate = new Date(d.setFullYear(d.getFullYear() + 1)).toISOString().split('T')[0];
 
+          const matchedEmp = employees.find(e => String(e.id).trim() === cedula);
+          const ceco = matchedEmp ? matchedEmp.restaurant_id : null;
+
           newPeople.push({
             id: cedula,
             name: name,
-            lastIssueDate: issueDate
+            lastIssueDate: issueDate,
+            restaurantId: ceco
           });
 
           newCerts.push({
             employeeId: cedula,
-            restaurantId: 'SAFE_HANDS_IND',
+            restaurantId: ceco || 'SAFE_HANDS_IND',
             issueDate: issueDate,
             expiryDate: expiryDate,
             certificateCode: `SH-${cedula}-${new Date(issueDate).getTime()}`
@@ -254,11 +269,11 @@ const SafeHands: React.FC = () => {
           await dataService.saveSafeHandsPersonnel(newPeople);
           await dataService.saveSafeHandsCerts(newCerts);
           await loadData(page, debouncedSearch);
-          alert(`${newPeople.length} registros procesados correctamente.`);
+          setToastMessage(`${newPeople.length} registros procesados correctamente.`);
         }
       } catch (err) {
         console.error(err);
-        alert("Error al procesar el archivo Excel. Verifica el formato de CM.xlsx.");
+        setToastMessage("Error al procesar el archivo Excel. Verifica el formato de CM.xlsx.");
       } finally {
         setIsUploading(false);
         e.target.value = ''; // Permite volver a subir el mismo archivo
@@ -283,7 +298,7 @@ const SafeHands: React.FC = () => {
       XLSX.writeFile(wb, "Plantilla_SafeHands.xlsx");
     } catch (error) {
       console.error("Error al descargar la plantilla:", error);
-      alert("Error al generar la plantilla de descarga.");
+      setToastMessage("Error al generar la plantilla de descarga.");
     }
   };
 
@@ -301,7 +316,7 @@ const SafeHands: React.FC = () => {
       XLSX.writeFile(wb, "Plantilla_Eliminacion_SafeHands.xlsx");
     } catch (error) {
       console.error("Error al descargar la plantilla de eliminación:", error);
-      alert("Error al generar la plantilla de eliminación.");
+      setToastMessage("Error al generar la plantilla de eliminación.");
     }
   };
 
@@ -338,7 +353,7 @@ const SafeHands: React.FC = () => {
         });
 
         if (idsToDelete.length === 0) {
-          alert("No se encontraron cédulas/identificaciones en el archivo Excel.");
+          setToastMessage("No se encontraron cédulas/identificaciones en el archivo Excel.");
           return;
         }
 
@@ -346,7 +361,7 @@ const SafeHands: React.FC = () => {
         setShowBulkDeleteConfirm(true);
       } catch (err) {
         console.error(err);
-        alert("Error al procesar el archivo Excel. Verifica el formato de la plantilla.");
+        setToastMessage("Error al procesar el archivo Excel. Verifica el formato de la plantilla.");
       } finally {
         e.target.value = '';
       }
@@ -367,7 +382,7 @@ const SafeHands: React.FC = () => {
       await loadData(page, debouncedSearch);
     } catch (err) {
       console.error("Error doing bulk delete:", err);
-      alert("Error al realizar la eliminación masiva.");
+      setToastMessage("Error al realizar la eliminación masiva.");
     } finally {
       setIsBulkDeleting(false);
     }
@@ -405,7 +420,7 @@ const SafeHands: React.FC = () => {
       }, 3000);
     } catch (err) {
       console.error("Error al guardar la configuración local:", err);
-      alert("Error local al guardar la firma.");
+      setToastMessage("Error local al guardar la firma.");
     }
   };
 
@@ -416,7 +431,7 @@ const SafeHands: React.FC = () => {
       await safeHandsGenerator.downloadCertificate(cert, person as any, settings);
     } catch (error) {
       console.error("Error generating PDF:", error);
-      alert("Error al generar el certificado.");
+      setToastMessage("Error al generar el certificado.");
     }
   };
 
@@ -433,7 +448,7 @@ const SafeHands: React.FC = () => {
       await loadData(page, debouncedSearch);
     } catch (error) {
       console.error("Error deleting person:", error);
-      alert("Error al eliminar el registro.");
+      setToastMessage("Error al eliminar el registro.");
     }
   };
 
@@ -564,10 +579,12 @@ const SafeHands: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {canEdit && (
+            <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
+              <Signature className="w-5 h-5 text-slate-400" />
+            </button>
+          )}
+          {canUpload && (
             <>
-              <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
-                <Signature className="w-5 h-5 text-slate-400" />
-              </button>
               <button 
                 onClick={handleDownloadTemplate} 
                 className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
@@ -581,6 +598,10 @@ const SafeHands: React.FC = () => {
                 <span>Cargar Consolidado</span>
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
               </label>
+            </>
+          )}
+          {canEdit && (
+            <>
               <button 
                 onClick={handleDownloadDeleteTemplate} 
                 className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
@@ -949,7 +970,11 @@ const SafeHands: React.FC = () => {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[120] flex items-center gap-3 px-5 py-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-950/20 border border-slate-800 animate-in fade-in slide-in-from-bottom-5 duration-300">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div className={`w-2 h-2 rounded-full animate-pulse ${
+            toastMessage.toLowerCase().includes('error') || toastMessage.toLowerCase().includes('no se')
+              ? 'bg-red-500'
+              : 'bg-emerald-500'
+          }`} />
           <span className="text-[10px] font-black uppercase tracking-wider">{toastMessage}</span>
         </div>
       )}
