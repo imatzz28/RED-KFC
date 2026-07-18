@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GradeEntry, Employee, JobTitle, User, Restaurant, UserRole } from '@/types';
 import { dataService } from '@/services/dataService';
@@ -27,100 +27,109 @@ const ADMIN_TITLES: string[] = [
 ];
 
 const Dashboard: React.FC = () => {
-  const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth } = useAppStore();
+  const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth, showAlertDialog } = useAppStore();
   const [isExporting, setIsExporting] = useState(false);
-  const user = auth.user!;
-  const [searchPerson, setSearchPerson] = useState('');
-  const [filterRegion, setFilterRegion] = useState('all');
-  const [filterZone, setFilterZone] = useState('all');
-  const [filterStore, setFilterStore] = useState('all');
-  const [dashboardMonth, setDashboardMonth] = useState(selectedMonth);
-
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportConfig, setExportConfig] = useState({
     groups: Object.keys(EVALUATION_GROUPS),
     includeDetails: false
   });
-
-
-  const hierarchy = useMemo(() => dataService.getHierarchy(), []);
-
-  const dynamicRegions = useMemo(() => {
-    let regions = Array.from(new Set(restaurants.map(r => r.region))).filter(Boolean).sort();
-    if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) {
-      regions = regions.filter(r => user.assignedRegions.includes(r));
+  const user = auth.user!;
+  const searchPerson = '';
+  const [filterRegion, setFilterRegion] = useState('all');
+  const [filterZone, setFilterZone] = useState('all');
+  const [filterStore, setFilterStore] = useState('all');
+  const hierarchy = dataService.getHierarchy();
+  
+  const lastSettledMonth = useMemo(() => {
+    const lockedMonths = hierarchy?.lockedMonths || [];
+    if (lockedMonths.length > 0) {
+      const sortedLocked = [...lockedMonths].sort((a, b) => b.localeCompare(a));
+      return sortedLocked[0].substring(0, 7);
     }
-    return regions;
-  }, [restaurants, user]);
+    return selectedMonth;
+  }, [hierarchy, selectedMonth]);
 
-  const dynamicZones = useMemo(() => {
-    let baseStores = restaurants;
-    if (filterRegion !== 'all') baseStores = baseStores.filter(r => r.region === filterRegion);
-    else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
+  const [dashboardMonth, setDashboardMonth] = useState(lastSettledMonth);
+  const hasManuallyChangedMonth = useRef(false);
 
-    let zones = Array.from(new Set(baseStores.map(r => r.zone))).filter(Boolean).sort();
-    if (user.role === UserRole.SPECIALIST) zones = zones.filter(z => user.assignedZones.includes(z));
-    return zones;
-  }, [restaurants, filterRegion, user]);
+  useEffect(() => {
+    if (!hasManuallyChangedMonth.current) {
+      setDashboardMonth(lastSettledMonth);
+    }
+  }, [lastSettledMonth]);
 
-  const dynamicStores = useMemo(() => {
-    let baseStores = restaurants;
-    if (filterRegion !== 'all') baseStores = baseStores.filter(r => r.region === filterRegion);
-    else if (user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) baseStores = baseStores.filter(r => user.assignedRegions.includes(r.region));
-
-    if (filterZone !== 'all') baseStores = baseStores.filter(r => r.zone === filterZone);
-    if (user.role === UserRole.SPECIALIST) baseStores = baseStores.filter(r => user.assignedRestaurants.includes(r.id) || user.assignedZones.includes(r.zone));
-
-    return baseStores.sort((a, b) => a.name.localeCompare(b.name));
-  }, [restaurants, filterRegion, filterZone, user]);
-
-
-
-  const scopeStoresSet = useMemo<Set<string>>(() => {
+  const userScopeStores = useMemo(() => {
     const isCoordinatorOrLiderOrGuest = user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST;
     const isSpecialist = user.role === UserRole.SPECIALIST;
-    
-    // Normalizar a mayúsculas y sin espacios para evitar problemas de matching
+    const isAdmin = user.role === UserRole.ADMIN;
+
     const assignedRegions = (user.assignedRegions || []).map(r => String(r).trim().toUpperCase());
     const assignedZones = (user.assignedZones || []).map(z => String(z).trim().toUpperCase());
     const assignedRestaurants = (user.assignedRestaurants || []).map(s => String(s).trim().toUpperCase());
 
-    return new Set(restaurants
-      .filter(r => {
-        const normRegion = String(r.region || '').trim().toUpperCase();
-        const normZone = String(r.zone || '').trim().toUpperCase();
-        const normStoreId = String(r.id || '').trim().toUpperCase();
+    return restaurants.filter(r => {
+      if (isAdmin) return true;
+      const normRegion = String(r.region || '').trim().toUpperCase();
+      const normZone = String(r.zone || '').trim().toUpperCase();
+      const normStoreId = String(r.id || '').trim().toUpperCase();
 
-        if (isCoordinatorOrLiderOrGuest && filterRegion === 'all' && !assignedRegions.includes(normRegion)) return false;
-        if (isSpecialist) {
-          const inZone = assignedZones.includes(normZone);
-          const inStore = assignedRestaurants.includes(normStoreId);
-          if (!inZone && !inStore) return false;
-        }
+      if (isCoordinatorOrLiderOrGuest) {
+        return assignedRegions.includes(normRegion);
+      }
+      if (isSpecialist) {
+        return assignedZones.includes(normZone) || assignedRestaurants.includes(normStoreId);
+      }
+      return false;
+    });
+  }, [restaurants, user]);
 
-        // Filtros manuales del usuario
-        const matchRegion = filterRegion === 'all'
-          ? true
-          : normRegion === String(filterRegion).trim().toUpperCase();
-          
-        const matchZone = filterZone === 'all' 
-          ? true 
-          : normZone === String(filterZone).trim().toUpperCase();
-          
-        const matchStore = filterStore === 'all' 
-          ? true 
-          : normStoreId === String(filterStore).trim().toUpperCase();
-          
-        return matchRegion && matchZone && matchStore;
-      })
-      .map(r => r.id.trim().toUpperCase())
-    );
-  }, [restaurants, filterRegion, filterZone, filterStore, user]);
+  const dynamicRegions = useMemo(() => {
+    return Array.from(new Set(userScopeStores.map(r => r.region)))
+      .filter(Boolean)
+      .sort();
+  }, [userScopeStores]);
+
+  const dynamicZones = useMemo(() => {
+    let baseStores = userScopeStores;
+    if (filterRegion !== 'all') {
+      baseStores = baseStores.filter(r => r.region.trim().toUpperCase() === filterRegion.trim().toUpperCase());
+    }
+    return Array.from(new Set(baseStores.map(r => r.zone)))
+      .filter(Boolean)
+      .sort();
+  }, [userScopeStores, filterRegion]);
+
+  const dynamicStores = useMemo(() => {
+    let baseStores = userScopeStores;
+    if (filterRegion !== 'all') {
+      baseStores = baseStores.filter(r => r.region.trim().toUpperCase() === filterRegion.trim().toUpperCase());
+    }
+    if (filterZone !== 'all') {
+      baseStores = baseStores.filter(r => r.zone.trim().toUpperCase() === filterZone.trim().toUpperCase());
+    }
+    return baseStores.sort((a, b) => a.name.localeCompare(b.name));
+  }, [userScopeStores, filterRegion, filterZone]);
+
+  const scopeStoresSet = useMemo<Set<string>>(() => {
+    let baseStores = userScopeStores;
+    if (filterRegion !== 'all') {
+      baseStores = baseStores.filter(r => r.region.trim().toUpperCase() === filterRegion.trim().toUpperCase());
+    }
+    if (filterZone !== 'all') {
+      baseStores = baseStores.filter(r => r.zone.trim().toUpperCase() === filterZone.trim().toUpperCase());
+    }
+    if (filterStore !== 'all') {
+      baseStores = baseStores.filter(r => r.id.trim().toUpperCase() === filterStore.trim().toUpperCase());
+    }
+    return new Set(baseStores.map(r => r.id.trim().toUpperCase()));
+  }, [userScopeStores, filterRegion, filterZone, filterStore]);
+
+  const storeIds = useMemo(() => Array.from(scopeStoresSet) as string[], [scopeStoresSet]);
 
   const { data: statsMap, isFetching: isFetchingStats } = useQuery({
-    queryKey: ['dashboard-stats', dashboardMonth, filterRegion, filterZone, filterStore],
+    queryKey: ['dashboard-stats', dashboardMonth, filterRegion, filterZone, filterStore, storeIds.join(',')],
     queryFn: async () => {
-      const storeIds    = Array.from(scopeStoresSet);
       const isSingleStore = filterStore !== 'all';
 
       // ── CAMINO A: Zona / Región / Nacional → RPC get_dashboard_stats ──────
@@ -268,8 +277,6 @@ const Dashboard: React.FC = () => {
 
     // Si se requiere detalle, traemos solo las notas de los empleados que aplican al filtro
     if (exportConfig.includeDetails) {
-      const storeIds = Array.from(scopeStoresSet);
-      
       // Filtrar empleados que pertenecen a las tiendas seleccionadas
       const validEmployees = initialEmployees.filter(emp => {
         const normalizedStore = String(emp.restaurant_id || '').trim().toUpperCase();
@@ -341,7 +348,7 @@ const Dashboard: React.FC = () => {
         setShowExportModal(false);
       } else {
         console.error("Error en Web Worker de Exportación:", e.data.error);
-        alert("Ocurrió un error al exportar el archivo. Revisa la consola.");
+        showAlertDialog("Ocurrió un error al exportar el archivo. Revisa la consola.");
       }
       worker.terminate();
     };
@@ -349,7 +356,7 @@ const Dashboard: React.FC = () => {
     worker.onerror = (err) => {
       setIsExporting(false);
       console.error("Worker fatal error:", err);
-      alert("Error crítico en el proceso de exportación.");
+      showAlertDialog("Error crítico en el proceso de exportación.");
       worker.terminate();
     };
   };
@@ -358,14 +365,20 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 bg-slate-50/50 -m-8 p-8 min-h-screen">
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 items-end">
+      <div className={`bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-${(user.role === UserRole.ADMIN || user.role === UserRole.LIDER || user.role === UserRole.COORDINATOR || user.role === UserRole.GUEST) ? '5' : '4'} gap-6 items-end`}>
         <div className="space-y-2 col-span-1 md:col-span-2 lg:col-span-1">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Calendar className="w-3 h-3 mr-1 inline" /> Periodo</label>
           <div className="flex gap-2">
-            <select value={dashboardMonth.split('-')[0]} onChange={(e) => setDashboardMonth(`${e.target.value}-${dashboardMonth.split('-')[1]}`)} className={selectClasses}>
+            <select value={dashboardMonth.split('-')[0]} onChange={(e) => {
+              hasManuallyChangedMonth.current = true;
+              setDashboardMonth(`${e.target.value}-${dashboardMonth.split('-')[1]}`);
+            }} className={selectClasses}>
               {['2023', '2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <select value={dashboardMonth.split('-')[1]} onChange={(e) => setDashboardMonth(`${dashboardMonth.split('-')[0]}-${e.target.value}`)} className={selectClasses}>
+            <select value={dashboardMonth.split('-')[1]} onChange={(e) => {
+              hasManuallyChangedMonth.current = true;
+              setDashboardMonth(`${dashboardMonth.split('-')[0]}-${e.target.value}`);
+            }} className={selectClasses}>
               {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((m, idx) => (
                 <option key={m} value={m}>{['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][idx]}</option>
               ))}
@@ -394,10 +407,6 @@ const Dashboard: React.FC = () => {
             <option value="all">Todas</option>
             {dynamicStores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Search className="w-3 h-3 mr-1 inline" /> Persona</label>
-          <input type="text" placeholder="ID o Nombre..." value={searchPerson} onChange={(e) => setSearchPerson(e.target.value)} className="w-full p-3 bg-white border-2 border-slate-100 rounded-xl text-xs font-black uppercase text-slate-800" />
         </div>
         <button onClick={() => setShowExportModal(true)} className="w-full flex items-center justify-center space-x-2 px-4 py-3.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">
           <Download className="w-4 h-4" /> <span>Generar Reporte</span>
@@ -451,6 +460,7 @@ const Dashboard: React.FC = () => {
         filterZone={filterZone} 
         filterStore={filterStore}
         user={user}
+        storeIds={storeIds}
       />
 
 
@@ -569,12 +579,19 @@ const StatCard: React.FC<{ icon: React.ReactNode, label: string, sublabel?: stri
   );
 };
 
-const TrendChart: React.FC<{ dashboardMonth: string, filterRegion: string, filterZone: string, filterStore: string, user: User }> = ({ dashboardMonth, filterRegion, filterZone, filterStore, user }) => {
-  const hierarchy = useMemo(() => dataService.getHierarchy(), []);
+const TrendChart: React.FC<{ 
+  dashboardMonth: string, 
+  filterRegion: string, 
+  filterZone: string, 
+  filterStore: string, 
+  user: User,
+  storeIds: string[]
+}> = ({ dashboardMonth, filterRegion, filterZone, filterStore, user, storeIds }) => {
+  const hierarchy = dataService.getHierarchy();
   const lockedMonths = hierarchy?.lockedMonths || [];
 
   const { data: trendData, isLoading } = useQuery({
-    queryKey: ['dashboard-trend-detailed', dashboardMonth, filterRegion, filterZone, filterStore, lockedMonths.length, user.id],
+    queryKey: ['dashboard-trend-detailed', dashboardMonth, filterRegion, filterZone, filterStore, lockedMonths.length, user.id, storeIds.join(',')],
     queryFn: async () => {
       const [year, currentMonthNum] = dashboardMonth.split('-').map(Number);
       const months: string[] = [];

@@ -414,8 +414,7 @@ const EntriesExitsReport: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Tarjetas de métricas ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <MetricCard icon={<ArrowUpCircle className="w-5 h-5" />} label="Ingresos" value={monthStats.entries} color="emerald" onClick={() => { setViewDetail('entries'); setSelectedTitleFilter('all'); }} />
           <MetricCard icon={<ArrowDownCircle className="w-5 h-5" />} label="Retiros" value={monthStats.exits} color="red" onClick={() => { setViewDetail('exits'); setSelectedTitleFilter('all'); }} />
           <MetricCard icon={<HardHat className="w-5 h-5" />} label="Rot. Operativa" sublabel="M.Equipo · Domiciliarios · Entrenadores" value={`${monthStats.rotationOperative}%`} color="amber" />
@@ -588,24 +587,91 @@ const EntriesExitsReport: React.FC = () => {
 
 // ── MetricCard ──────────────────────────────────────────────────────────────
 const MetricCard: React.FC<{
-  icon: React.ReactNode; label: string; sublabel?: string;
-  value: string | number; color: 'emerald' | 'red' | 'amber' | 'blue' | 'violet';
+  icon: React.ReactNode; 
+  label: string; 
+  sublabel?: string;
+  value: string | number; 
+  color: 'emerald' | 'red' | 'amber' | 'blue' | 'violet';
   onClick?: () => void;
 }> = ({ icon, label, sublabel, value, color, onClick }) => {
-  const cm = {
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:border-emerald-500',
-    red: 'bg-red-50 text-red-600 border-red-100 hover:border-red-500',
-    amber: 'bg-amber-50 text-amber-600 border-amber-100 hover:border-amber-500',
-    blue: 'bg-blue-50 text-blue-600 border-blue-100 hover:border-blue-500',
-    violet: 'bg-violet-50 text-violet-600 border-violet-100 hover:border-violet-500',
+  const colorMap = {
+    emerald: {
+      text: 'text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+      glow: 'bg-emerald-500/5',
+      activeBorder: 'hover:border-emerald-500/50'
+    },
+    red: {
+      text: 'text-red-400',
+      bg: 'bg-red-500/10 border-red-500/20 text-red-400',
+      glow: 'bg-red-500/5',
+      activeBorder: 'hover:border-red-500/50'
+    },
+    amber: {
+      text: 'text-amber-400',
+      bg: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+      glow: 'bg-amber-500/5',
+      activeBorder: 'hover:border-amber-500/50'
+    },
+    blue: {
+      text: 'text-blue-400',
+      bg: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+      glow: 'bg-blue-500/5',
+      activeBorder: 'hover:border-blue-500/50'
+    },
+    violet: {
+      text: 'text-violet-400',
+      bg: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+      glow: 'bg-violet-500/5',
+      activeBorder: 'hover:border-violet-500/50'
+    }
   };
+
+  const currentColors = colorMap[color];
+
   return (
-    <button onClick={onClick} disabled={!onClick} className={`p-6 rounded-[28px] border-2 transition-all flex items-center gap-4 text-left w-full ${cm[color]} ${onClick ? 'cursor-pointer hover:shadow-lg active:scale-95' : 'cursor-default'}`}>
-      <div className="p-3 rounded-2xl bg-white shadow-sm shrink-0">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-widest opacity-60 leading-none">{label}</p>
-        {sublabel && <p className="text-[8px] font-bold opacity-40 uppercase tracking-wide mt-0.5 leading-tight truncate">{sublabel}</p>}
-        <p className="text-xl font-black tracking-tighter leading-none mt-1">{value}</p>
+    <button 
+      onClick={onClick} 
+      disabled={!onClick} 
+      className={`bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 border-2 border-slate-800/80 flex flex-col justify-between min-h-[135px] text-left w-full shadow-[0_15px_35px_rgba(15,23,42,0.4)] hover:shadow-[0_22px_45px_rgba(15,23,42,0.55)] ${
+        onClick ? 'cursor-pointer hover:-translate-y-0.5 active:scale-95 ' + currentColors.activeBorder : 'cursor-default'
+      }`}
+    >
+      {/* Diagonal stripe pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} 
+      />
+      
+      {/* Glow top-right based on color */}
+      <div className={`absolute -top-6 -right-6 w-28 h-28 rounded-full ${currentColors.glow} blur-2xl pointer-events-none`} />
+
+      {/* Top: icon + title */}
+      <div className="flex items-start gap-3 relative z-10 w-full">
+        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border ${currentColors.bg}`}>
+          {icon}
+        </div>
+        <div className="flex flex-col min-w-0 flex-1">
+          <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none truncate">{label}</p>
+          {sublabel && (
+            <p className="text-[8px] font-bold text-white/30 uppercase tracking-wide mt-1 leading-tight truncate">
+              {sublabel}
+            </p>
+          )}
+          <span className={`text-3xl font-black ${currentColors.text} tracking-tighter leading-none mt-2`}>
+            {value}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom: label + ghost value */}
+      <div className="relative z-10 mt-2 flex items-end justify-between w-full">
+        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">
+          {onClick ? 'Ver Detalles' : 'Porcentaje'}
+        </p>
+        <span className="text-4xl font-black text-white/5 tracking-tighter leading-none select-none">
+          {value}
+        </span>
       </div>
     </button>
   );

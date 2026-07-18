@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import { SafeHandsCert, SafeHandsPerson, SafeHandsSettings } from '@/types';
 import { 
@@ -11,6 +12,7 @@ import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
 const PublicValidation: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const showAlertDialog = useAppStore(state => state.showAlertDialog);
   const [searchId, setSearchId] = useState(id || '');
   const [data, setData] = useState<{ cert: SafeHandsCert, employee: SafeHandsPerson } | null>(null);
   const [settings, setSettings] = useState<SafeHandsSettings | null>(null);
@@ -71,7 +73,7 @@ const PublicValidation: React.FC = () => {
       await safeHandsGenerator.downloadCertificate(data.cert, data.employee as any, activeSettings);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Error al generar el PDF.");
+      showAlertDialog("Error al generar el PDF.");
     }
   };
 

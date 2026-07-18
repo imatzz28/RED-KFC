@@ -806,7 +806,7 @@ const Banca: React.FC = () => {
                         <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                         <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                       </div>
-                      <MapPin className="w-6 h-6 text-white relative z-10" />
+                      <Store className="w-6 h-6 text-white relative z-10" />
                       <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
                     </div>
                     <div className="flex-1 flex flex-col justify-center px-4 min-w-0">
@@ -863,7 +863,7 @@ const Banca: React.FC = () => {
                         <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                         <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                       </div>
-                      <MapPin className="w-6 h-6 text-white relative z-10" />
+                      <Store className="w-6 h-6 text-white relative z-10" />
                       <span className="text-white font-black text-[8px] tracking-tighter mt-0.5 relative z-10">KFC</span>
                     </div>
                     <div className="flex-1 flex flex-col justify-center px-4 min-w-0">

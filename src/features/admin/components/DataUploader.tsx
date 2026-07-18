@@ -4,6 +4,8 @@ import { UploadCloud, FileSpreadsheet, Network, FileDown } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import { HierarchyData, Restaurant } from '@/types';
 
+import { useAppStore } from '@/store/useAppStore';
+
 interface Props {
   setImportStatus: (status: { message: string, isError: boolean } | null) => void;
   onEmployeesImported: () => void;
@@ -12,47 +14,53 @@ interface Props {
 }
 
 export const DataUploader: React.FC<Props> = ({ setImportStatus, onEmployeesImported, setHierarchy, setRestaurants }) => {
+  const showConfirmDialog = useAppStore(state => state.showConfirmDialog);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'employees' | 'hierarchy') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const label = type === 'employees' ? 'la nómina de personal' : 'la estructura de tiendas';
-    const confirmed = window.confirm(
-      `¿Estás seguro de que deseas importar "${file.name}" como ${label}?\n\nEsta acción actualizará los datos en producción.`
-    );
-    if (!confirmed) { e.target.value = ''; return; }
+    
+    showConfirmDialog(
+      `¿Estás seguro de que deseas importar "${file.name}" como ${label}?\n\nEsta acción actualizará los datos en producción.`,
+      () => {
+        setImportStatus({ message: 'Procesando archivo...', isError: false });
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const bstr = evt.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(ws);
 
-    setImportStatus({ message: 'Procesando archivo...', isError: false });
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
+            if (!data || data.length === 0) {
+              setImportStatus({ message: 'Error: El archivo está vacío o no tiene el formato correcto.', isError: true });
+              return;
+            }
 
-        if (!data || data.length === 0) {
-          setImportStatus({ message: 'Error: El archivo está vacío o no tiene el formato correcto.', isError: true });
-          return;
-        }
-
-        if (type === 'employees') {
-          const res = await dataService.importMonthlyExcel(data as Record<string, unknown>[]);
-          setImportStatus({ message: `Carga exitosa: ${res.count} trabajadores sincronizados.`, isError: false });
-        } else {
-          const count = await dataService.importHierarchyExcel(data as Record<string, unknown>[]);
-          setImportStatus({ message: `Éxito: ${count} tiendas sincronizadas correctamente.`, isError: false });
-          setHierarchy(dataService.getHierarchy());
-          setRestaurants(dataService.getRestaurants());
-        }
-        onEmployeesImported();
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-        setImportStatus({ message: `Error: ${errorMessage}`, isError: true });
+            if (type === 'employees') {
+              const res = await dataService.importMonthlyExcel(data as Record<string, unknown>[]);
+              setImportStatus({ message: `Carga exitosa: ${res.count} trabajadores sincronizados.`, isError: false });
+            } else {
+              const count = await dataService.importHierarchyExcel(data as Record<string, unknown>[]);
+              setImportStatus({ message: `Éxito: ${count} tiendas sincronizadas correctamente.`, isError: false });
+              setHierarchy(dataService.getHierarchy());
+              setRestaurants(dataService.getRestaurants());
+            }
+            onEmployeesImported();
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setImportStatus({ message: `Error: ${errorMessage}`, isError: true });
+          }
+        };
+        reader.readAsBinaryString(file);
+        e.target.value = '';
+      },
+      () => {
+        e.target.value = '';
       }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
+    );
   };
 
   return (

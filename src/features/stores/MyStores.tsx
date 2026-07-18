@@ -24,7 +24,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
 
 
 const MyStores: React.FC = () => {
-  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate } = useAppStore();
+  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog } = useAppStore();
   const user = auth.user!;
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -339,7 +339,7 @@ const MyStores: React.FC = () => {
       setShowPdfModal(false);
     } catch (err) {
       console.error(err);
-      alert("Error al generar el reporte PDF.");
+      showAlertDialog("Error al generar el reporte PDF.");
     } finally {
       setIsGeneratingPdf(false);
     }

@@ -35,7 +35,8 @@ const formatDateString = (date: Date): string => {
 };
 
 const Schedules: React.FC = () => {
-  const { auth, restaurants, hierarchy } = useAppStore();
+  const { auth, restaurants } = useAppStore();
+  const hierarchy = dataService.getHierarchy();
   const [currentWeekMonday, setCurrentWeekMonday] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<DailySchedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);

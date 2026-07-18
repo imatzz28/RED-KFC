@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, UserRole, HierarchyData, Restaurant } from '@/types';
 import { dataService, supabase } from '@/services/dataService';
+import { useAppStore } from '@/store/useAppStore';
 import { 
   UserPlus, Trash2, Key, X, Globe, Search, Layers, Store, Check, 
   RefreshCw, CheckCircle2, Users, User as UserIcon, MapPin, 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, hierarchy, restaurants, setImportStatus }) => {
+  const showAlertDialog = useAppStore(state => state.showAlertDialog);
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -236,7 +238,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       setImportStatus({ message: "Usuario eliminado correctamente.", isError: false });
       setUserToDelete(null);
     } catch {
-      alert("No se pudo eliminar el usuario.");
+      showAlertDialog("No se pudo eliminar el usuario.");
     } finally {
       setIsSaving(false);
     }
@@ -244,7 +246,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   const handleSaveUser = async () => {
     if (!newUser.username || !newUser.role) {
-      alert("El usuario y el rol son obligatorios.");
+      showAlertDialog("El usuario y el rol son obligatorios.");
       return;
     }
     
@@ -257,7 +259,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
     
     // Validate password for new user
     if (!selectedUser && !password) {
-      alert("La contraseña es obligatoria para nuevos usuarios.");
+      showAlertDialog("La contraseña es obligatoria para nuevos usuarios.");
       return;
     }
 
@@ -323,7 +325,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       setImportStatus({ message: `Usuario @${userToSave.username} guardado exitosamente.`, isError: false });
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Ocurrió un error desconocido.';
-      alert(`Error al guardar: ${errorMessage}`);
+      showAlertDialog(`Error al guardar: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }

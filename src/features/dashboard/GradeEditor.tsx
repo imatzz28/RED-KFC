@@ -4,6 +4,7 @@ import { Employee, GradeEntry } from '@/types';
 import { EVALUATION_GROUPS } from '@/utils/constants';
 import { dataService } from '@/services/dataService';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAppStore } from '@/store/useAppStore';
 // Added MapPin to the imports from lucide-react
 import { X, Save, User, Calendar, GraduationCap, Star, Trophy, ClipboardCheck, Vault, Lock, RefreshCw, BookOpen, ArrowUp, ArrowDown, Repeat, History, Clock, MapPin, Activity } from 'lucide-react';
 
@@ -25,6 +26,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
 
 const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) => {
   const queryClient = useQueryClient();
+  const showAlertDialog = useAppStore(state => state.showAlertDialog);
   const [activeGroup, setActiveGroup] = useState<string>('AK');
   const [formGrades, setFormGrades] = useState<GradeEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -76,7 +78,7 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
       setTimeout(() => setSaveSuccess(false), 3000);
       // Removed onClose() to keep editor open as requested
     } catch (err: unknown) {
-      alert(`Error al guardar notas: ${err instanceof Error ? err.message : 'Ocurrió un error desconocido.'}`);
+      showAlertDialog(`Error al guardar notas: ${err instanceof Error ? err.message : 'Ocurrió un error desconocido.'}`);
     } finally {
       setIsSaving(false);
     }

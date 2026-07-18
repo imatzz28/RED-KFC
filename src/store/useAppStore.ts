@@ -25,6 +25,19 @@ interface AppState {
     refreshData: () => void;
     initData: (force?: boolean) => Promise<void>;
     loadMonthly: () => Promise<void>;
+
+    // Global Modal Dialog
+    dialog: {
+        isOpen: boolean;
+        type: 'alert' | 'confirm';
+        title?: string;
+        message: string;
+        onConfirm?: () => void;
+        onCancel?: () => void;
+    };
+    showAlertDialog: (message: string, title?: string, onConfirm?: () => void) => void;
+    showConfirmDialog: (message: string, onConfirm: () => void, onCancel?: () => void, title?: string) => void;
+    closeDialog: () => void;
 }
 
 const computeFilteredEmployees = (employees: Employee[], restaurants: Restaurant[], user: User | null): Employee[] => {
@@ -85,6 +98,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     selectedMonth: getInitialFallbackMonth(),
     isSidebarOpen: false,
     syncStatus: 'syncing',
+
+    dialog: { isOpen: false, type: 'alert', message: '' },
+    showAlertDialog: (message, title = 'Notificación', onConfirm) => set({
+        dialog: { isOpen: true, type: 'alert', title, message, onConfirm }
+    }),
+    showConfirmDialog: (message, onConfirm, onCancel, title = 'Confirmación') => set({
+        dialog: { isOpen: true, type: 'confirm', title, message, onConfirm, onCancel }
+    }),
+    closeDialog: () => set(state => ({
+        dialog: { ...state.dialog, isOpen: false }
+    })),
 
     handleLogin: async (user) => {
         set({ auth: { user, isAuthenticated: true } });

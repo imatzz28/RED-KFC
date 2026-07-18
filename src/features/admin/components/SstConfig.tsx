@@ -3,6 +3,8 @@ import { Activity, RefreshCw, Save } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import { HierarchyData } from '@/types';
 
+import { useAppStore } from '@/store/useAppStore';
+
 interface Props {
   hierarchy: HierarchyData;
   setHierarchy: (h: HierarchyData) => void;
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export const SstConfig: React.FC<Props> = ({ hierarchy, setHierarchy, setImportStatus }) => {
+  const showAlertDialog = useAppStore(state => state.showAlertDialog);
   const [sstMonth, setSstMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [sstCat1, setSstCat1] = useState(hierarchy.groupDConfig?.[new Date().toISOString().slice(0, 7)]?.cat1 || '');
   const [sstCat2, setSstCat2] = useState(hierarchy.groupDConfig?.[new Date().toISOString().slice(0, 7)]?.cat2 || '');
@@ -33,7 +36,7 @@ export const SstConfig: React.FC<Props> = ({ hierarchy, setHierarchy, setImportS
       setHierarchy(newHierarchy);
       setImportStatus({ message: `Temas de Guías para ${sstMonth} actualizados correctamente.`, isError: false });
     } catch {
-      alert("Error al guardar la configuración.");
+      showAlertDialog("Error al guardar la configuración.");
     } finally {
       setIsSaving(false);
     }

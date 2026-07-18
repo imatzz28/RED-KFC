@@ -13,7 +13,7 @@ import localforage from 'localforage';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
 
 const SafeHands: React.FC = () => {
-  const { auth, restaurants, employees } = useAppStore();
+  const { auth, restaurants, employees, showConfirmDialog } = useAppStore();
   const [personnel, setPersonnel] = useState<SafeHandsPerson[]>([]);
   const [certs, setCerts] = useState<SafeHandsCert[]>([]);
   const [settings, setSettings] = useState<SafeHandsSettings>({ responsibleName: '' });
@@ -435,21 +435,23 @@ const SafeHands: React.FC = () => {
     }
   };
 
-  const handleDeletePerson = async (id: string, name: string) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${name} (${id}) y su carnet de manipulación?`)) {
-      return;
-    }
-    try {
-      await dataService.deleteSafeHandsPerson(id);
-      setToastMessage("¡Registro eliminado con éxito!");
-      setTimeout(() => {
-        setToastMessage(null);
-      }, 3000);
-      await loadData(page, debouncedSearch);
-    } catch (error) {
-      console.error("Error deleting person:", error);
-      setToastMessage("Error al eliminar el registro.");
-    }
+  const handleDeletePerson = (id: string, name: string) => {
+    showConfirmDialog(
+      `¿Estás seguro de que deseas eliminar a ${name} (${id}) y su carnet de manipulación?`,
+      async () => {
+        try {
+          await dataService.deleteSafeHandsPerson(id);
+          setToastMessage("¡Registro eliminado con éxito!");
+          setTimeout(() => {
+            setToastMessage(null);
+          }, 3000);
+          await loadData(page, debouncedSearch);
+        } catch (error) {
+          console.error("Error deleting person:", error);
+          setToastMessage("Error al eliminar el registro.");
+        }
+      }
+    );
   };
 
   const handleDeleteAllData = async () => {

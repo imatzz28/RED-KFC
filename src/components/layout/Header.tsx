@@ -8,7 +8,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { supabase } from '@/services/dataService';
 
 const Header: React.FC = () => {
-  const { auth, selectedMonth, setSelectedMonth: onMonthChange, setIsSidebarOpen, handleLogout: onLogout } = useAppStore();
+  const { auth, selectedMonth, setIsSidebarOpen, handleLogout: onLogout, showAlertDialog } = useAppStore();
   const location = useLocation();
   const user = auth.user;
   const onMenuClick = () => setIsSidebarOpen(true);
@@ -16,7 +16,6 @@ const Header: React.FC = () => {
   const [showPassModal, setShowPassModal] = useState(false);
   const [passData, setPassData] = useState({ old: '', new: '' });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Cerrar el dropdown al hacer click fuera de él
@@ -33,15 +32,15 @@ const Header: React.FC = () => {
 
   const handleUpdatePassword = async () => {
     if (!passData.old) {
-      alert('Debes ingresar tu contraseña actual.');
+      showAlertDialog('Debes ingresar tu contraseña actual.');
       return;
     }
     if (!passData.new || passData.new.length < 6) {
-      alert('La nueva contraseña debe tener al menos 6 caracteres.');
+      showAlertDialog('La nueva contraseña debe tener al menos 6 caracteres.');
       return;
     }
     if (passData.old === passData.new) {
-      alert('La nueva contraseña debe ser diferente a la actual.');
+      showAlertDialog('La nueva contraseña debe ser diferente a la actual.');
       return;
     }
 
@@ -54,35 +53,26 @@ const Header: React.FC = () => {
         password: passData.old
       });
       if (reAuthError) {
-        alert('La contraseña actual es incorrecta.');
+        showAlertDialog('La contraseña actual es incorrecta.');
         return;
       }
 
       const { error } = await supabase.auth.updateUser({ password: passData.new });
       if (error) throw error;
 
-      alert('Contraseña actualizada con éxito.');
+      showAlertDialog('Contraseña actualizada con éxito.');
       setShowPassModal(false);
       setPassData({ old: '', new: '' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       console.error(err);
-      alert(`Error al actualizar la contraseña: ${msg}`);
+      showAlertDialog(`Error al actualizar la contraseña: ${msg}`);
     } finally {
       setIsUpdatingPassword(false);
     }
   };
 
-  const handleIconClick = () => {
-    if (dateInputRef.current) {
-      try {
-        dateInputRef.current.showPicker();
-      } catch {
-        // Fallback for browsers that don't support showPicker
-        dateInputRef.current.click();
-      }
-    }
-  };
+  // Removed unused handleIconClick
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
@@ -104,22 +94,26 @@ const Header: React.FC = () => {
           <Menu className="w-6 h-6" />
         </button>
 
-        {!['/dashboard', '/entries-exits', '/banca', '/admin', '/safe-hands'].includes(location.pathname) && (
-          <div className="flex flex-col">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 italic">Periodo Evaluación</label>
-            <div className="relative group flex items-center">
-              <div className="absolute left-3.5 z-10 pointer-events-none p-1.5 bg-red-50 rounded-lg">
+        {location.pathname === '/my-stores' && (
+          <div className="flex flex-col animate-in fade-in duration-300">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 italic">Periodo Evaluación</label>
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-2 border-slate-100 rounded-xl text-xs font-black text-slate-700 uppercase tracking-wider shadow-sm select-none">
+              <div className="p-1.5 bg-red-50 rounded-lg shrink-0">
                 <Calendar className="w-4 h-4 text-red-600" />
               </div>
-              <input
-                ref={dateInputRef}
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => onMonthChange(e.target.value)}
-                onClick={handleIconClick}
-                className="pl-14 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-100 outline-none transition-all cursor-pointer shadow-sm w-44 md:w-52 relative"
-                style={{ colorScheme: 'light' }}
-              />
+              <span>{(() => {
+                if (!selectedMonth) return '';
+                try {
+                  const [year, month] = selectedMonth.split('-');
+                  const monthNames = [
+                    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+                  ];
+                  return `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+                } catch {
+                  return selectedMonth;
+                }
+              })()}</span>
             </div>
           </div>
         )}

@@ -71,7 +71,7 @@ const Sidebar: React.FC = () => {
       to: '/schedules',
       label: 'Horarios',
       icon: Calendar,
-      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER],
+      roles: [UserRole.ADMIN],
       key: 'schedules'
     },
     {
