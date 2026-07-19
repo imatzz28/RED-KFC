@@ -48,7 +48,8 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
     role: UserRole.SPECIALIST,
     assignedZones: [],
     assignedRestaurants: [],
-    assignedRegions: []
+    assignedRegions: [],
+    cedula: ''
   });
 
   // Close menus when clicking outside
@@ -296,12 +297,14 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
         ? { 
             ...selectedUser, 
             ...userToProcess as User,
+            cedula: userToProcess.cedula || undefined,
             allowedModules: userToProcess.role === UserRole.GUEST ? (userToProcess.allowedModules || []) : undefined,
             guestCanEdit: userToProcess.role === UserRole.GUEST ? (userToProcess.guestCanEdit ?? false) : undefined
           }
         : {
             id: userId!,
             username: userToProcess.username!,
+            cedula: userToProcess.cedula || undefined,
             role: (currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LIDER) ? UserRole.SPECIALIST : userToProcess.role!,
             assignedZones: userToProcess.assignedZones || [],
             assignedRestaurants: userToProcess.assignedRestaurants || [],
@@ -318,7 +321,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       setUsers(updatedUsersList);
       setShowUserModal(false);
       setSelectedUser(null);
-      setNewUser({ username: '', role: UserRole.SPECIALIST, assignedZones: [], assignedRestaurants: [], assignedRegions: [] });
+      setNewUser({ username: '', role: UserRole.SPECIALIST, assignedZones: [], assignedRestaurants: [], assignedRegions: [], cedula: '' });
       setPassword('');
       setRegionSearchTerm('');
       setSearchTerm('');
@@ -595,7 +598,12 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                                 {u.role}
                               </span>
                             </div>
-                            <span className="text-[9px] font-semibold text-slate-400 font-mono tracking-tight">@{u.username}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[9px] font-semibold text-slate-400 font-mono tracking-tight">@{u.username}</span>
+                              <span className={`text-[9px] font-bold ${u.cedula ? 'text-slate-400' : 'text-amber-500'}`}>
+                                | CC: {u.cedula || 'Sin Cédula ⚠️'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -795,6 +803,20 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                       onChange={e => setPassword(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
                       placeholder={selectedUser ? "••••••••" : "Ingresar contraseña"}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Cédula / Documento de Identidad</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={newUser.cedula || ''}
+                      onChange={e => setNewUser({ ...newUser, cedula: e.target.value.replace(/\D/g, '') })}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all outline-none"
+                      placeholder="Ej: 21615614"
                     />
                   </div>
                 </div>

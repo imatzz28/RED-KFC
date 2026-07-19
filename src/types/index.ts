@@ -35,6 +35,7 @@ export interface User {
   assignedZones: string[];
   assignedRestaurants: string[];
   assignedRegions: string[]; // Campo para filtrar por regiones
+  cedula?: string;           // Cédula / Documento del especialista
   // GUEST granular permissions
   allowedModules?: string[];  // e.g. ['dashboard','banca','safe-hands']
   guestCanEdit?: boolean;     // false = solo lectura (default)

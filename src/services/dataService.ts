@@ -585,7 +585,8 @@ export const dataService = {
       assignedRestaurants: u.assignedRestaurants || [],
       assignedRegions: u.assignedRegions || [],
       allowedModules: u.allowedModules || [],
-      guestCanEdit: u.guestCanEdit ?? false
+      guestCanEdit: u.guestCanEdit ?? false,
+      cedula: u.cedula || null
     }));
 
     await dataService.supabaseFetch('users', 'POST', normalized, '?on_conflict=id');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { UserRole, DailySchedule, User, Restaurant } from '@/types';
 import { dataService } from '@/services/dataService';
@@ -14,9 +14,10 @@ import {
   X, 
   Check,
   Award,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
-import localforage from 'localforage';
+import * as XLSX from 'xlsx';
 
 const getMonday = (d: Date) => {
   const date = new Date(d);
@@ -34,14 +35,292 @@ const formatDateString = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
+const SHIFT_CATALOG: Record<string, number> = {
+  '06:00-12:00': 1,
+  '06:00-15:00': 2,
+  '07:00-11:00': 3,
+  '07:00-12:00': 4,
+  '07:00-13:00': 5,
+  '07:00-15:00': 6,
+  '07:00-16:00': 7,
+  '07:00-17:00': 8,
+  '08:00-12:00': 9,
+  '08:00-13:00': 10,
+  '08:00-14:00': 11,
+  '08:00-16:00': 12,
+  '08:00-17:00': 13,
+  '08:00-18:00': 14,
+  '09:00-13:00': 15,
+  '09:00-14:00': 16,
+  '09:00-15:00': 17,
+  '09:00-17:00': 18,
+  '09:00-18:00': 19,
+  '09:00-19:00': 20,
+  '10:00-14:00': 21,
+  '10:00-15:00': 22,
+  '10:00-16:00': 23,
+  '10:00-18:00': 24,
+  '10:00-19:00': 25,
+  '10:00-20:00': 26,
+  '11:00-15:00': 27,
+  '11:00-16:00': 28,
+  '11:00-17:00': 29,
+  '11:00-19:00': 30,
+  '12:00-16:00': 33,
+  '12:00-17:00': 34,
+  '12:00-18:00': 35,
+  '12:00-20:00': 36,
+  '12:00-21:00': 37,
+  '12:00-22:00': 38,
+  '13:00-17:00': 39,
+  '13:00-18:00': 40,
+  '13:00-19:00': 41,
+  '13:00-21:00': 42,
+  '13:00-22:00': 43,
+  '13:00-23:00': 44,
+  '14:00-18:00': 45,
+  '14:00-19:00': 46,
+  '14:00-20:00': 47,
+  '14:00-22:00': 48,
+  '14:00-23:00': 49,
+  '14:00-00:00': 50,
+  '14:00-24:00': 50,
+  '15:00-19:00': 51,
+  '15:00-20:00': 52,
+  '15:00-21:00': 53,
+  '15:00-23:00': 54,
+  '15:00-00:00': 55,
+  '15:00-24:00': 55,
+  '15:00-01:00': 56,
+  '16:00-20:00': 57,
+  '16:00-21:05': 58,
+  '16:00-21:00': 58,
+  '16:00-22:00': 59,
+  '16:00-00:00': 60,
+  '16:00-24:00': 60,
+  '16:00-01:00': 61,
+  '16:00-02:00': 62,
+  '17:00-21:00': 63,
+  '17:00-22:00': 64,
+  '17:00-23:00': 65,
+  '17:00-01:00': 66,
+  '17:00-02:00': 67,
+  '17:00-03:00': 68,
+  '18:00-22:00': 69,
+  '18:00-23:00': 70,
+  '18:00-00:00': 71,
+  '18:00-24:00': 71,
+  '18:00-02:00': 72,
+  '18:00-03:00': 73,
+  '18:00-04:00': 74,
+  '19:00-23:00': 75,
+  '19:00-00:00': 76,
+  '19:00-24:00': 76,
+  '19:00-01:00': 77,
+  '19:00-03:00': 78,
+  '19:00-04:00': 79,
+  '19:00-05:00': 80,
+  '20:00-00:00': 81,
+  '20:00-24:00': 81,
+  '20:00-01:00': 82,
+  '20:00-02:00': 83,
+  '20:00-04:00': 84,
+  '20:00-05:00': 85,
+  '20:00-06:00': 86,
+  '21:00-01:00': 87,
+  '21:00-02:00': 88,
+  '21:00-03:00': 89,
+  '21:00-05:00': 90,
+  '21:00-06:00': 91,
+  '22:00-02:00': 92,
+  '22:00-03:00': 93,
+  '22:00-04:00': 94,
+  '22:00-06:00': 95,
+  '23:00-05:00': 96,
+  '00:00-06:00': 97,
+  '24:00-06:00': 97
+};
+
+const normalizeTime = (time?: string): string => {
+  if (!time) return '';
+  const parts = time.split(':');
+  if (parts.length < 2) return '';
+  const h = parts[0].trim().padStart(2, '0');
+  const m = parts[1].trim().padStart(2, '0');
+  return `${h}:${m}`;
+};
+
+interface CatalogShift {
+  id: number;
+  checkIn: string;
+  checkOut: string;
+  hours: number;
+  break: number;
+}
+
+const SHIFT_CATALOG_LIST: CatalogShift[] = [];
+const seenIds = new Set<number>();
+
+Object.entries(SHIFT_CATALOG).forEach(([key, id]) => {
+  if (seenIds.has(id)) return;
+  seenIds.add(id);
+
+  const [checkIn, checkOut] = key.split('-');
+  let hours = 0;
+  let breakHours = 0;
+  try {
+    const [inH, inM] = checkIn.split(':').map(Number);
+    const [outH, outM] = checkOut.split(':').map(Number);
+    let diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+    if (diffMinutes < 0) {
+      diffMinutes += 24 * 60;
+    }
+    const elapsed = diffMinutes / 60;
+    breakHours = elapsed > 6 ? 1 : 0;
+    hours = elapsed - breakHours;
+  } catch {
+    hours = 0;
+  }
+
+  // Ajuste de excepciones del catálogo oficial (ej. Turno 80)
+  if (id === 80) {
+    hours = 8;
+  }
+
+  SHIFT_CATALOG_LIST.push({
+    id,
+    checkIn,
+    checkOut,
+    hours,
+    break: breakHours
+  });
+});
+
+SHIFT_CATALOG_LIST.sort((a, b) => a.id - b.id);
+
+/**
+ * Calcula la fecha de Pascua (algoritmo de Gauss)
+ */
+const getEasterSunday = (year: number): Date => {
+  const a = year % 19;
+  const b = year % 4;
+  const c = year % 7;
+  const k = Math.floor(year / 100);
+  const p = Math.floor((13 + 8 * k) / 25);
+  const q = Math.floor(k / 4);
+  const M = (15 - p + k - q) % 30;
+  const N = (4 + k - q) % 7;
+  const d = (19 * a + M) % 30;
+  const e = (2 * b + 4 * c + 6 * d + N) % 7;
+  const day = 22 + d + e;
+  
+  const easter = new Date(year, 2, 1);
+  easter.setDate(day);
+  return easter;
+};
+
+/**
+ * Obtiene el siguiente lunes para las festividades que se trasladan (Ley Emiliani)
+ */
+const getNextMondayEmiliani = (date: Date): Date => {
+  const result = new Date(date);
+  const day = result.getDay();
+  if (day !== 1) {
+    const diff = day === 0 ? 1 : 8 - day;
+    result.setDate(result.getDate() + diff);
+  }
+  return result;
+};
+
+/**
+ * Devuelve el nombre del festivo colombiano para una fecha dada, o null si no es festivo
+ */
+const getColombianHoliday = (date: Date): string | null => {
+  const y = date.getFullYear();
+  const m = date.getMonth();
+  const d = date.getDate();
+  
+  const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  
+  const fixedHolidays: Record<string, string> = {
+    [`${y}-01-01`]: 'Año Nuevo',
+    [`${y}-05-01`]: 'Día del Trabajo',
+    [`${y}-07-20`]: 'Día de la Independencia',
+    [`${y}-08-07`]: 'Batalla de Boyacá',
+    [`${y}-12-08`]: 'Inmaculada Concepción',
+    [`${y}-12-25`]: 'Navidad',
+  };
+  
+  if (fixedHolidays[dateKey]) {
+    return fixedHolidays[dateKey];
+  }
+  
+  const emilianiHolidays: { m: number; d: number; name: string }[] = [
+    { m: 0, d: 6, name: 'Día de los Reyes Magos' },
+    { m: 2, d: 19, name: 'Día de San José' },
+    { m: 5, d: 29, name: 'San Pedro y San Pablo' },
+    { m: 7, d: 15, name: 'Asunción de la Virgen' },
+    { m: 9, d: 12, name: 'Día de la Raza' },
+    { m: 10, d: 1, name: 'Todos los Santos' },
+    { m: 10, d: 11, name: 'Independencia de Cartagena' },
+  ];
+  
+  for (const h of emilianiHolidays) {
+    const hDate = new Date(y, h.m, h.d);
+    const actualMonday = getNextMondayEmiliani(hDate);
+    if (actualMonday.getMonth() === m && actualMonday.getDate() === d) {
+      return h.name;
+    }
+  }
+  
+  const easter = getEasterSunday(y);
+  
+  const juevesSanto = new Date(easter);
+  juevesSanto.setDate(easter.getDate() - 3);
+  if (juevesSanto.getMonth() === m && juevesSanto.getDate() === d) {
+    return 'Jueves Santo';
+  }
+  
+  const viernesSanto = new Date(easter);
+  viernesSanto.setDate(easter.getDate() - 2);
+  if (viernesSanto.getMonth() === m && viernesSanto.getDate() === d) {
+    return 'Viernes Santo';
+  }
+  
+  const ascension = new Date(easter);
+  ascension.setDate(easter.getDate() + 43);
+  if (ascension.getMonth() === m && ascension.getDate() === d) {
+    return 'Ascensión del Señor';
+  }
+  
+  const corpusChristi = new Date(easter);
+  corpusChristi.setDate(easter.getDate() + 64);
+  if (corpusChristi.getMonth() === m && corpusChristi.getDate() === d) {
+    return 'Corpus Christi';
+  }
+  
+  const sagradoCorazon = new Date(easter);
+  sagradoCorazon.setDate(easter.getDate() + 71);
+  if (sagradoCorazon.getMonth() === m && sagradoCorazon.getDate() === d) {
+    return 'Sagrado Corazón de Jesús';
+  }
+  
+  return null;
+};
+
 const Schedules: React.FC = () => {
   const { auth, restaurants } = useAppStore();
   const hierarchy = dataService.getHierarchy();
   const [currentWeekMonday, setCurrentWeekMonday] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<DailySchedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm] = useState('');
   const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
+
+  // Advanced Filtering State
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [selectedZone, setSelectedZone] = useState('');
+  const [selectedRestaurant, setSelectedRestaurant] = useState('');
 
   // Modal editing state
   const [selectedCell, setSelectedCell] = useState<{
@@ -54,6 +333,7 @@ const Schedules: React.FC = () => {
   const [modalShiftType, setModalShiftType] = useState<'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad'>('Laboral');
   const [modalCheckIn, setModalCheckIn] = useState('08:00');
   const [modalCheckOut, setModalCheckOut] = useState('17:00');
+  const [selectedShiftId, setSelectedShiftId] = useState<number | ''>('');
   const [modalRestaurantId, setModalRestaurantId] = useState('');
   const [isSavingShift, setIsSavingShift] = useState(false);
 
@@ -74,7 +354,7 @@ const Schedules: React.FC = () => {
   }, [currentWeekMonday]);
 
   // Load schedules for the current week range
-  const loadWeekSchedules = async () => {
+  const loadWeekSchedules = useCallback(async () => {
     setIsLoading(true);
     try {
       const startStr = weekDays[0].dateStr;
@@ -87,11 +367,11 @@ const Schedules: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [weekDays]);
 
   useEffect(() => {
     loadWeekSchedules();
-  }, [currentWeekMonday, weekDays]);
+  }, [currentWeekMonday, loadWeekSchedules]);
 
   // Toast auto-clear
   useEffect(() => {
@@ -105,39 +385,136 @@ const Schedules: React.FC = () => {
     setToast({ message, isError });
   };
 
-  // Get visible specialists using same visibility rules
+  // Allowed regions for the current user
+  const allowedRegions = useMemo(() => {
+    if (!auth.user) return [];
+    if (auth.user.role === UserRole.ADMIN) {
+      return hierarchy.regions.map(r => r.name);
+    }
+    return auth.user.assignedRegions || [];
+  }, [auth.user, hierarchy]);
+
+  // Allowed zones based on selectedRegion or all allowed regions
+  const allowedZones = useMemo(() => {
+    if (!auth.user) return [];
+    const regionsToUse = selectedRegion 
+      ? hierarchy.regions.filter(r => r.name === selectedRegion)
+      : hierarchy.regions.filter(r => allowedRegions.includes(r.name));
+      
+    const zonesSet = new Set<string>();
+    regionsToUse.forEach(r => {
+      r.zones.forEach(z => {
+        zonesSet.add(z.name);
+      });
+    });
+    return Array.from(zonesSet);
+  }, [auth.user, hierarchy, allowedRegions, selectedRegion]);
+
+  // Allowed restaurants based on selectedRegion / selectedZone or user scope
+  const allowedRestaurantsForFilter = useMemo(() => {
+    if (!auth.user) return [];
+    
+    let list = restaurants;
+    
+    if (selectedRegion) {
+      list = list.filter(r => r.region === selectedRegion);
+    } else {
+      list = list.filter(r => allowedRegions.includes(r.region));
+    }
+    
+    if (selectedZone) {
+      list = list.filter(r => r.zone === selectedZone);
+    } else if (allowedZones.length > 0) {
+      list = list.filter(r => allowedZones.includes(r.zone));
+    }
+    
+    // Filter based on user scope if not ADMIN
+    if (auth.user.role !== UserRole.ADMIN) {
+      const currentUser = auth.user;
+      list = list.filter(r => {
+        if (currentUser.assignedRegions?.includes(r.region)) return true;
+        if (currentUser.assignedZones?.includes(r.zone)) return true;
+        if (currentUser.assignedRestaurants?.includes(r.id)) return true;
+        return false;
+      });
+    }
+    
+    return list;
+  }, [auth.user, restaurants, allowedRegions, allowedZones, selectedRegion, selectedZone]);
+
+  // Get visible specialists using same visibility rules & dropdown filters
   const visibleSpecialists = useMemo(() => {
     const allUsers = dataService.getUsers();
     const specialists = allUsers.filter(u => u.role === UserRole.SPECIALIST);
     
-    // Filter by search term
+    // 1. Filter by search term
     const term = searchTerm.trim().toLowerCase();
-    const searched = term 
+    let filtered = term 
       ? specialists.filter(u => u.username.toLowerCase().includes(term))
       : specialists;
 
-    if (auth.user?.role === UserRole.ADMIN) return searched;
+    // 2. Filter by role visibility
+    if (auth.user?.role !== UserRole.ADMIN) {
+      const currentUser = auth.user!;
+      filtered = filtered.filter(u => {
+        // Check shared region
+        const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
+        if (hasSharedRegion) return true;
 
-    const currentUser = auth.user!;
-    return searched.filter(u => {
-      // Check shared region
-      const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
-      if (hasSharedRegion) return true;
+        // Check zone or restaurant match
+        const myRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
+        const myZones = myRegions.flatMap(r => r.zones.map(z => z.name));
+        
+        const zoneMatch = (u.assignedZones || []).some(z => myZones.includes(z));
+        if (zoneMatch) return true;
 
-      // Check zone or restaurant match
-      const myRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
-      const myZones = myRegions.flatMap(r => r.zones.map(z => z.name));
-      
-      const zoneMatch = (u.assignedZones || []).some(z => myZones.includes(z));
-      if (zoneMatch) return true;
-
-      const restMatch = (u.assignedRestaurants || []).some(rid => {
-        const rest = restaurants.find(r => r.id === rid);
-        return rest && currentUser.assignedRegions?.includes(rest.region);
+        const restMatch = (u.assignedRestaurants || []).some(rid => {
+          const rest = restaurants.find(r => r.id === rid);
+          return rest && currentUser.assignedRegions?.includes(rest.region);
+        });
+        return restMatch;
       });
-      return restMatch;
-    });
-  }, [auth.user, restaurants, hierarchy, searchTerm]);
+    }
+
+    // 3. Filter by selected Region drop-down
+    if (selectedRegion) {
+      filtered = filtered.filter(u => {
+        const isAssigned = u.assignedRegions?.includes(selectedRegion);
+        const hasZone = u.assignedZones?.some(z => {
+          const reg = hierarchy.regions.find(r => r.zones.some(zone => zone.name === z));
+          return reg?.name === selectedRegion;
+        });
+        const hasRest = u.assignedRestaurants?.some(rid => {
+          const rest = restaurants.find(r => r.id === rid);
+          return rest?.region === selectedRegion;
+        });
+        return isAssigned || hasZone || hasRest;
+      });
+    }
+
+    // 4. Filter by selected Zone drop-down
+    if (selectedZone) {
+      filtered = filtered.filter(u => {
+        const isAssigned = u.assignedZones?.includes(selectedZone);
+        const hasRest = u.assignedRestaurants?.some(rid => {
+          const rest = restaurants.find(r => r.id === rid);
+          return rest?.zone === selectedZone;
+        });
+        return isAssigned || hasRest;
+      });
+    }
+
+    // 5. Filter by selected Restaurant drop-down
+    if (selectedRestaurant) {
+      filtered = filtered.filter(u => {
+        return u.assignedRestaurants?.includes(selectedRestaurant);
+      });
+    }
+
+    return filtered;
+  }, [auth.user, restaurants, hierarchy, searchTerm, selectedRegion, selectedZone, selectedRestaurant]);
+
+
 
   // Navigate weeks
   const handlePrevWeek = () => {
@@ -174,7 +551,7 @@ const Schedules: React.FC = () => {
         if (diffMinutes > 0) {
           return parseFloat((diffMinutes / 60).toFixed(1));
         }
-      } catch (e) {
+      } catch {
         return 0;
       }
     }
@@ -206,10 +583,18 @@ const Schedules: React.FC = () => {
       setModalCheckIn(sched.check_in || '08:00');
       setModalCheckOut(sched.check_out || '17:00');
       setModalRestaurantId(sched.restaurant_id || '');
+      
+      if (sched.shift_type === 'Laboral' && sched.check_in && sched.check_out) {
+        const key = `${normalizeTime(sched.check_in)}-${normalizeTime(sched.check_out)}`;
+        setSelectedShiftId(SHIFT_CATALOG[key] || '');
+      } else {
+        setSelectedShiftId('');
+      }
     } else {
       setModalShiftType('Laboral');
       setModalCheckIn('08:00');
       setModalCheckOut('17:00');
+      setSelectedShiftId(13); // Turno 13: 08:00 - 17:00
       
       // Default to the specialist's first assigned restaurant if any
       const defaultRestId = specialist.assignedRestaurants?.[0] || '';
@@ -241,6 +626,15 @@ const Schedules: React.FC = () => {
 
   const handleSaveShift = async () => {
     if (!selectedCell) return;
+
+    if (modalShiftType === 'Laboral') {
+      const key = `${normalizeTime(modalCheckIn)}-${normalizeTime(modalCheckOut)}`;
+      if (SHIFT_CATALOG[key] === undefined) {
+        showToast('El horario seleccionado no pertenece al catálogo oficial de KFC y no puede asignarse.', true);
+        return;
+      }
+    }
+
     setIsSavingShift(true);
 
     try {
@@ -254,7 +648,7 @@ const Schedules: React.FC = () => {
       };
 
       await dataService.saveDailySchedule(scheduleToSave);
-      showToast(`Turno guardado con éxito para ${formatName(selectedCell.specialist.username)}.`);
+      showToast('Horario Asignado');
       
       // Reload and close modal
       await loadWeekSchedules();
@@ -293,81 +687,229 @@ const Schedules: React.FC = () => {
       .join(' ');
   };
 
-  const getWeekRangeLabel = () => {
-    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-    const startStr = weekDays[0].dateObj.toLocaleDateString('es-ES', options);
-    const endStr = weekDays[6].dateObj.toLocaleDateString('es-ES', { ...options, year: 'numeric' });
-    return `Semana del ${startStr} al ${endStr}`;
+  const getAvatarColors = (username: string) => {
+    const colors = [
+      { bg: 'bg-blue-50 border-blue-100 text-blue-700' },
+      { bg: 'bg-purple-50 border-purple-100 text-purple-700' },
+      { bg: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+      { bg: 'bg-amber-50 border-amber-100 text-amber-700' },
+      { bg: 'bg-pink-50 border-pink-100 text-pink-700' },
+      { bg: 'bg-indigo-50 border-indigo-100 text-indigo-700' },
+      { bg: 'bg-rose-50 border-rose-100 text-rose-700' },
+    ];
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+      hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
   };
 
+  const getWeekRangeLabel = () => {
+    if (weekDays.length === 0) return '';
+    const start = weekDays[0].dateObj;
+    const end = weekDays[6].dateObj;
+    const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    const startStr = `${start.getDate()} ${months[start.getMonth()]}`;
+    const endStr = `${end.getDate()} ${months[end.getMonth()]}`;
+    return `${startStr} - ${endStr}, ${end.getFullYear()}`;
+  };
+
+  const exportExcelTemplate = () => {
+    try {
+      const rows: {
+        CC: string;
+        'ID Turno': string | number;
+        Dia: number;
+        Mes: number;
+        Año: number;
+        'ID Centro de Costo': string;
+      }[] = [];
+      
+      visibleSpecialists.forEach(spec => {
+        weekDays.forEach(day => {
+          const s = getCellSchedule(spec.id, day.dateStr);
+          if (!s) return; // Omitir si no hay turno asignado este día
+          
+          let turnId: string | number = '';
+          if (s.shift_type === 'Laboral' && s.check_in && s.check_out) {
+            const key = `${normalizeTime(s.check_in)}-${normalizeTime(s.check_out)}`;
+            turnId = SHIFT_CATALOG[key] || `${s.check_in}-${s.check_out}`;
+          } else if (s.shift_type === 'Capacitación') {
+            turnId = 'CAPACITACION';
+          } else if (s.shift_type === 'Descanso') {
+            turnId = 'DESCANSO';
+          } else if (s.shift_type === 'Incapacidad') {
+            turnId = 'INCAPACIDAD';
+          }
+          
+          const [y, m, d] = s.date.split('-').map(Number);
+          
+          rows.push({
+            'CC': spec.cedula || spec.id,
+            'ID Turno': turnId,
+            'Dia': d,
+            'Mes': m,
+            'Año': y,
+            'ID Centro de Costo': s.restaurant_id || spec.assignedRestaurants?.[0] || ''
+          });
+        });
+      });
+      
+      if (rows.length === 0) {
+        showToast('No hay turnos programados en esta semana para exportar.', true);
+        return;
+      }
+      
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Plantilla Horarios");
+      
+      const fileDate = weekDays[0].dateStr;
+      XLSX.writeFile(wb, `Plantilla_Horarios_${fileDate}.xlsx`);
+      showToast('Plantilla de Excel exportada con éxito.');
+    } catch (err) {
+      console.error('[ExportExcel] Error:', err);
+      showToast('Error al exportar la plantilla de Excel.', true);
+    }
+  };
+
+  const todayStr = useMemo(() => formatDateString(new Date()), []);
+
+  const visualizedRegion = useMemo(() => {
+    if (selectedRegion) return selectedRegion;
+    if (auth.user?.role === UserRole.ADMIN) return 'Nacional';
+    const userRegions = auth.user?.assignedRegions || [];
+    if (userRegions.length === 1) return userRegions[0];
+    if (userRegions.length > 1) return 'Regional';
+    return 'KFC';
+  }, [selectedRegion, auth.user]);
+
   return (
-    <div className="space-y-6">
+    <>
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-5 py-4 rounded-2xl shadow-xl border animate-fade-in transition-all bg-white border-slate-100 max-w-sm">
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2 px-5 py-4 rounded-2xl shadow-xl border animate-fade-in transition-all bg-white border-slate-100 max-w-sm">
           <div className={`w-3 h-3 rounded-full shrink-0 ${toast.isError ? 'bg-red-500' : 'bg-green-500'}`} />
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">{toast.message}</span>
         </div>
       )}
 
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100/80">
-        <div>
-          <span className="text-[9px] font-black tracking-widest text-red-600 uppercase">Gestión de Turnos</span>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-red-600 shrink-0" />
-            Programación de Horarios
-          </h1>
-          <p className="text-[10px] text-slate-400 mt-1">Crea y modifica el calendario de actividades de tus Especialistas.</p>
-        </div>
-
-        {/* Date navigators */}
-        <div className="flex items-center gap-2 self-start md:self-center">
-          <button 
-            onClick={handlePrevWeek} 
-            className="p-3 bg-slate-50 border border-slate-100 hover:border-red-600 rounded-xl hover:text-red-600 transition-all text-slate-400"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          
-          <button 
-            onClick={handleCurrentWeek}
-            className="px-4 py-3 bg-slate-50 border border-slate-100 hover:border-red-600 text-slate-600 hover:text-red-600 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-          >
-            Hoy
-          </button>
-          
-          <button 
-            onClick={handleNextWeek} 
-            className="p-3 bg-slate-50 border border-slate-100 hover:border-red-600 rounded-xl hover:text-red-600 transition-all text-slate-400"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          <span className="text-[10px] font-bold text-slate-700 uppercase px-3 py-2 bg-slate-50 rounded-xl border border-slate-100/60 ml-2">
-            {weekDays.length > 0 ? getWeekRangeLabel() : 'Cargando...'}
-          </span>
-        </div>
-      </div>
-
-      {/* Main body */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="space-y-6">
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Toolbar */}
-        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-          <div className="relative max-w-md w-full">
-            <input 
-              type="text" 
-              placeholder="Buscar especialista por nombre..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white pl-4 pr-10 py-3 border-2 border-slate-100 rounded-2xl focus:border-red-600 text-[11px] font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400"
-            />
-          </div>
-          <div className="flex items-center gap-4 text-[9px] font-black tracking-widest text-slate-400 uppercase">
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> <span>Laboral</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-indigo-500" /> <span>Capacitación (7h)</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-slate-400" /> <span>Descanso</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500" /> <span>Incapacidad</span></div>
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+            {/* Left side: filters */}
+            <div className="flex flex-wrap items-end gap-3 flex-1">
+              {/* 1. Filtrar por Región */}
+              <div className="w-full sm:w-auto min-w-[180px]">
+                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Región</label>
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => {
+                    setSelectedRegion(e.target.value);
+                    setSelectedZone('');
+                    setSelectedRestaurant('');
+                  }}
+                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all h-[42px]"
+                >
+                  <option value="">Todas las Regiones</option>
+                  {allowedRegions.map(reg => (
+                    <option key={reg} value={reg}>{reg}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* 2. Filtrar por Zona */}
+              <div className="w-full sm:w-auto min-w-[180px]">
+                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Zona</label>
+                <select
+                  value={selectedZone}
+                  onChange={(e) => {
+                    setSelectedZone(e.target.value);
+                    setSelectedRestaurant('');
+                  }}
+                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all h-[42px]"
+                >
+                  <option value="">Todas las Zonas</option>
+                  {allowedZones.map(zone => (
+                    <option key={zone} value={zone}>{zone}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* 3. Filtrar por Restaurante */}
+              <div className="w-full sm:w-auto min-w-[240px]">
+                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Restaurante</label>
+                <select
+                  value={selectedRestaurant}
+                  onChange={(e) => setSelectedRestaurant(e.target.value)}
+                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all uppercase h-[42px]"
+                >
+                  <option value="">Todos los Restaurantes</option>
+                  {allowedRestaurantsForFilter.map(r => (
+                    <option key={r.id} value={r.id}>{r.id} - {r.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* 4. Limpiar Filtros */}
+              {(selectedRegion || selectedZone || selectedRestaurant) && (
+                <button
+                  onClick={() => {
+                    setSelectedRegion('');
+                    setSelectedZone('');
+                    setSelectedRestaurant('');
+                  }}
+                  className="px-4 py-2 border border-dashed border-red-200 hover:border-red-600 text-red-500 hover:text-red-655 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer h-[42px] flex items-center justify-center shrink-0"
+                >
+                  Limpiar Filtros
+                </button>
+              )}
+            </div>
+
+            {/* Right side: week navigation and export */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0 mt-4 xl:mt-0">
+              {/* Date navigators */}
+              <div className="flex items-center border border-slate-200 bg-white p-1 rounded-xl shadow-sm h-[42px] shrink-0">
+                <button 
+                  onClick={handlePrevWeek} 
+                  className="p-2 hover:bg-slate-50 rounded-lg hover:text-red-600 transition-all text-slate-400"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                
+                <button 
+                  onClick={handleCurrentWeek}
+                  className="px-4 py-1.5 hover:bg-slate-50 text-slate-600 hover:text-red-655 text-xs font-black uppercase tracking-widest rounded-lg transition-all"
+                >
+                  Hoy
+                </button>
+                
+                <button 
+                  onClick={handleNextWeek} 
+                  className="p-2 hover:bg-slate-50 rounded-lg hover:text-red-600 transition-all text-slate-400"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Week range label */}
+              <div className="flex items-center gap-3 px-5 py-3 bg-white border-2 border-slate-150 rounded-xl text-xs font-black text-slate-800 cursor-default shadow-sm h-[42px] shrink-0">
+                <Calendar className="w-4.5 h-4.5 text-red-650 shrink-0" />
+                <span className="tracking-wide">{weekDays.length > 0 ? getWeekRangeLabel() : 'Cargando...'}</span>
+              </div>
+
+              {/* Export button */}
+              <button 
+                onClick={exportExcelTemplate}
+                className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer h-[42px] shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                <span>Exportar Plantilla</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -376,19 +918,114 @@ const Schedules: React.FC = () => {
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="py-4 px-6 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[240px] sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                  Especialista
-                </th>
-                {weekDays.map(day => (
-                  <th key={day.dateStr} className="py-4 px-3 text-center border-l border-slate-100/80">
-                    <div className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{day.name}</div>
-                    <div className="text-[8px] font-bold text-slate-400 tracking-wider mt-0.5">
-                      {day.dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                <th className="p-1.5 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-[240px] text-center">
+                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+                    {/* Header Div */}
+                    <div className="bg-[#0f1c2d] py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none">
+                      <MapPin className="w-3.5 h-3.5 text-white/90 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">Región</span>
+                      
+                      {/* Downward triangle indicator */}
+                      <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 w-4 h-2 overflow-hidden z-10">
+                        <svg viewBox="0 0 10 5" className="w-4 h-2 fill-current text-[#0f1c2d]">
+                          <polygon points="0,0 10,0 5,5" />
+                        </svg>
+                      </div>
                     </div>
-                  </th>
-                ))}
-                <th className="py-4 px-5 text-center text-[9px] font-black text-slate-400 uppercase tracking-wider w-[100px] border-l border-slate-100/80 bg-slate-50/50">
-                  Total Semanal
+                    
+                    {/* Date Div */}
+                    <div className="py-4 px-2 flex flex-col items-center justify-center bg-white">
+                      <div className="flex items-center justify-center max-w-full overflow-hidden">
+                        <span className={`font-black text-[#0f1c2d] truncate uppercase ${visualizedRegion.length > 10 ? 'text-sm' : 'text-lg'}`} title={visualizedRegion}>
+                          {visualizedRegion}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Colored Bottom Line */}
+                    <div className="h-1.5 w-full bg-[#0f1c2d]" />
+                  </div>
+                </th>
+                {weekDays.map((day, idx) => {
+                  const isToday = day.dateStr === todayStr;
+                  const holidayName = getColombianHoliday(day.dateObj);
+                  const isRed = idx % 2 === 1;
+                  const headerBg = isRed ? 'bg-[#c41230]' : 'bg-[#0f1c2d]';
+                  const textColor = holidayName ? 'text-amber-950' : (isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]');
+                  const monthColor = holidayName ? 'text-amber-800' : (isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]');
+                  const borderColor = holidayName ? 'bg-amber-500' : (isRed ? 'bg-[#c41230]' : 'bg-[#0f1c2d]');
+
+                  return (
+                    <th 
+                      key={day.dateStr} 
+                      className={`p-1.5 text-center border-l border-slate-100/80 w-[140px] transition-colors relative 
+                        ${isToday ? 'bg-red-50/15' : ''}`}
+                    >
+                      <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+                        {/* Header Div */}
+                        <div className={`${headerBg} py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none`}>
+                          <Calendar className="w-3.5 h-3.5 text-white/90 shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">{day.name}</span>
+                          {isToday && (
+                            <span className={`bg-white font-black text-[8px] px-1.5 py-0.5 rounded-full shadow-sm ml-1.5 ${isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]'}`}>
+                              HOY
+                            </span>
+                          )}
+                          
+                          {/* Downward triangle indicator */}
+                          <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 w-4 h-2 overflow-hidden z-10">
+                            <svg viewBox="0 0 10 5" className={`w-4 h-2 fill-current ${isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]'}`}>
+                              <polygon points="0,0 10,0 5,5" />
+                            </svg>
+                          </div>
+                        </div>
+                        
+                        {/* Date Div */}
+                        <div 
+                          className={`py-4 flex flex-col items-center justify-center relative transition-colors duration-150 
+                            ${holidayName ? 'bg-amber-100/80 border-b border-amber-200/20' : (isToday ? 'bg-red-50/20' : 'bg-white')}`}
+                          title={holidayName || undefined}
+                        >
+                          <div className="flex items-baseline justify-center gap-0.5">
+                            <span className={`text-2xl font-black ${textColor}`}>{day.dateObj.getDate()}</span>
+                            <span className={`text-[10px] font-black uppercase ${monthColor} opacity-90`}>
+                              {['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][day.dateObj.getMonth()]}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Colored Bottom Line */}
+                        <div className={`h-1.5 w-full ${borderColor}`} />
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="p-1.5 text-center border-l border-slate-100/80 w-[110px] bg-slate-50/20">
+                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+                    {/* Header Div */}
+                    <div className="bg-[#0f1c2d] py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none">
+                      <Clock className="w-3.5 h-3.5 text-white/90 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">Total</span>
+                      
+                      {/* Downward triangle indicator */}
+                      <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 w-4 h-2 overflow-hidden z-10">
+                        <svg viewBox="0 0 10 5" className="w-4 h-2 fill-current text-[#0f1c2d]">
+                          <polygon points="0,0 10,0 5,5" />
+                        </svg>
+                      </div>
+                    </div>
+                    
+                    {/* Date Div */}
+                    <div className="py-4 flex flex-col items-center justify-center bg-white">
+                      <div className="flex items-baseline justify-center gap-0.5">
+                        <span className="text-xl font-black text-[#0f1c2d]">HORAS</span>
+                        <span className="text-[9px] font-black uppercase text-slate-400">SEM.</span>
+                      </div>
+                    </div>
+                    
+                    {/* Colored Bottom Line */}
+                    <div className="h-1.5 w-full bg-[#0f1c2d]" />
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -418,15 +1055,16 @@ const Schedules: React.FC = () => {
                     {/* Specialist profile cell */}
                     <td className="py-4 px-6 sticky left-0 bg-white group-hover:bg-slate-50/80 transition-colors z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 border-2 border-slate-200/50 flex items-center justify-center font-black text-slate-700 text-xs shrink-0 uppercase">
+                        <div className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center font-black text-xs shrink-0 uppercase transition-colors ${getAvatarColors(spec.username).bg}`}>
                           {spec.username.slice(0, 2)}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-[10px] font-black text-slate-800 uppercase truncate">
+                          <div className="text-xs font-black text-slate-800 uppercase truncate">
                             {formatName(spec.username)}
                           </div>
-                          <div className="text-[8px] font-black text-slate-400 mt-0.5 tracking-wider uppercase">
-                            CC: {spec.id}
+                          <div className={`text-[9.5px] font-black mt-1 tracking-wider uppercase flex flex-wrap items-center gap-1.5 ${spec.cedula ? 'text-slate-400' : 'text-red-500'}`}>
+                            <span>CC: {spec.cedula || 'SIN CÉDULA'}</span>
+                            {!spec.cedula && <span className="text-[8px] bg-red-50 text-red-600 border border-red-200/50 px-1.5 py-0.5 rounded font-bold">⚠️ Actualizar</span>}
                           </div>
                         </div>
                       </div>
@@ -443,20 +1081,30 @@ const Schedules: React.FC = () => {
                           : '';
 
                         if (s.shift_type === 'Laboral') {
+                          const key = `${normalizeTime(s.check_in)}-${normalizeTime(s.check_out)}`;
+                          const isCatalogShift = SHIFT_CATALOG[key] !== undefined;
+
                           content = (
-                            <div className="bg-emerald-50 border border-emerald-200/60 rounded-xl p-2.5 text-left transition-all hover:shadow-sm">
-                              <div className="text-[8px] font-black text-emerald-800 uppercase tracking-wide">LABORAL</div>
-                              <div className="text-[9px] font-black text-emerald-600 mt-1 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-emerald-500" />
+                            <div className={`border rounded-xl p-2.5 text-left transition-all hover:shadow-sm ${isCatalogShift ? 'bg-emerald-50 border-emerald-200/60' : 'bg-amber-50 border-amber-200/60'}`}>
+                              <div className="flex items-center justify-between gap-1">
+                                <div className={`text-[9.5px] font-black uppercase tracking-wide ${isCatalogShift ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                  {isCatalogShift ? 'LABORAL' : 'LABORAL (Personalizado)'}
+                                </div>
+                                {!isCatalogShift && (
+                                  <span className="text-[9.5px] text-amber-600 font-extrabold cursor-help" title="No está en el catálogo oficial de turnos">⚠️</span>
+                                )}
+                              </div>
+                              <div className={`text-[10.5px] font-black mt-1 flex items-center gap-1 ${isCatalogShift ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                <Clock className={`w-3 h-3 ${isCatalogShift ? 'text-emerald-500' : 'text-amber-500'}`} />
                                 <span>{s.check_in} - {s.check_out}</span>
                               </div>
                               {storeName && (
-                                <div className="text-[8px] font-bold text-emerald-500 mt-0.5 truncate flex items-center gap-0.5">
-                                  <MapPin className="w-2.5 h-2.5 shrink-0 text-emerald-400" />
+                                <div className={`text-[9px] font-bold mt-0.5 truncate flex items-center gap-0.5 ${isCatalogShift ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                  <MapPin className={`w-2.5 h-2.5 shrink-0 ${isCatalogShift ? 'text-emerald-400' : 'text-amber-400'}`} />
                                   <span className="truncate">{storeName}</span>
                                 </div>
                               )}
-                              <div className="text-[8px] font-black text-emerald-700/80 mt-1.5 pt-1 border-t border-emerald-200/30 text-right">
+                              <div className={`text-[9px] font-black mt-1.5 pt-1 border-t text-right ${isCatalogShift ? 'text-emerald-700/80 border-emerald-200/30' : 'text-amber-700/80 border-amber-200/30'}`}>
                                 {calculateHours(s)} Horas
                               </div>
                             </div>
@@ -464,18 +1112,18 @@ const Schedules: React.FC = () => {
                         } else if (s.shift_type === 'Capacitación') {
                           content = (
                             <div className="bg-indigo-50 border border-indigo-200/60 rounded-xl p-2.5 text-left transition-all hover:shadow-sm">
-                              <div className="text-[8px] font-black text-indigo-800 uppercase tracking-wide">CAPACITACIÓN</div>
-                              <div className="text-[9px] font-black text-indigo-600 mt-1 flex items-center gap-1">
+                              <div className="text-[9.5px] font-black text-indigo-800 uppercase tracking-wide">CAPACITACIÓN</div>
+                              <div className="text-[10.5px] font-black text-indigo-600 mt-1 flex items-center gap-1">
                                 <Award className="w-3 h-3 text-indigo-500" />
                                 <span>Turno Especial</span>
                               </div>
                               {storeName && (
-                                <div className="text-[8px] font-bold text-indigo-500 mt-0.5 truncate flex items-center gap-0.5">
+                                <div className="text-[9px] font-bold text-indigo-500 mt-0.5 truncate flex items-center gap-0.5">
                                   <MapPin className="w-2.5 h-2.5 shrink-0 text-indigo-400" />
                                   <span className="truncate">{storeName}</span>
                                 </div>
                               )}
-                              <div className="text-[8px] font-black text-indigo-700/80 mt-1.5 pt-1 border-t border-indigo-200/30 text-right">
+                              <div className="text-[9px] font-black text-indigo-700/80 mt-1.5 pt-1 border-t border-indigo-200/30 text-right">
                                 {calculateHours(s)} Horas
                               </div>
                             </div>
@@ -483,9 +1131,9 @@ const Schedules: React.FC = () => {
                         } else if (s.shift_type === 'Descanso') {
                           content = (
                             <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 text-center transition-all">
-                              <div className="text-[8px] font-black text-slate-500 uppercase tracking-wider">DESCANSO</div>
-                              <div className="text-[8px] font-bold text-slate-400 mt-1">Día Libre</div>
-                              <div className="text-[8px] font-black text-slate-400/80 mt-1.5 pt-1 border-t border-slate-200/20">
+                              <div className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider">DESCANSO</div>
+                              <div className="text-[9.5px] font-bold text-slate-400 mt-1">Día Libre</div>
+                              <div className="text-[9px] font-black text-slate-400/80 mt-1.5 pt-1 border-t border-slate-200/20">
                                 0.0 Horas
                               </div>
                             </div>
@@ -493,9 +1141,9 @@ const Schedules: React.FC = () => {
                         } else if (s.shift_type === 'Incapacidad') {
                           content = (
                             <div className="bg-rose-50 border border-rose-200/60 rounded-xl p-2.5 text-center transition-all">
-                              <div className="text-[8px] font-black text-rose-800 uppercase tracking-wider">INCAPACIDAD</div>
-                              <div className="text-[8px] font-bold text-rose-500 mt-1">Ausencia Médica</div>
-                              <div className="text-[8px] font-black text-rose-500/80 mt-1.5 pt-1 border-t border-rose-200/20">
+                              <div className="text-[9.5px] font-black text-rose-800 uppercase tracking-wider">INCAPACIDAD</div>
+                              <div className="text-[9.5px] font-bold text-rose-500 mt-1">Ausencia Médica</div>
+                              <div className="text-[9px] font-black text-rose-500/80 mt-1.5 pt-1 border-t border-rose-200/20">
                                 0.0 Horas
                               </div>
                             </div>
@@ -503,18 +1151,24 @@ const Schedules: React.FC = () => {
                         }
                       } else {
                         content = (
-                          <div className="border border-dashed border-slate-200 rounded-xl p-3 text-slate-300 group-hover/row:text-red-500 group-hover/row:border-red-200/80 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[70px] bg-slate-50/20">
-                            <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
-                            <span className="text-[8px] font-bold uppercase tracking-wider">Asignar</span>
+                          <div className="border border-dashed border-slate-200 bg-white rounded-2xl p-3 text-slate-400/80 hover:text-red-600 hover:border-red-300 hover:bg-red-50/20 transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer min-h-[84px] shadow-sm/5">
+                            <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/cell:bg-red-50 group-hover/cell:border-red-200 group-hover/cell:text-red-600 transition-all">
+                              <Plus className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-[8px] font-extrabold uppercase tracking-widest text-slate-400 group-hover/cell:text-red-600 transition-all">Asignar</span>
                           </div>
                         );
                       }
 
+                      const isToday = day.dateStr === todayStr;
+                      const holidayName = getColombianHoliday(day.dateObj);
                       return (
                         <td 
                           key={day.dateStr} 
                           onClick={() => handleCellClick(spec, day)}
-                          className="p-1.5 border-l border-slate-100 hover:bg-slate-50 cursor-pointer w-[140px] vertical-align-top transition-colors select-none"
+                          className={`p-1.5 border-l border-slate-100 hover:bg-slate-50 cursor-pointer w-[140px] vertical-align-top transition-all select-none group/cell 
+                            ${isToday ? 'bg-red-50/10 border-x border-red-100/20' : ''} 
+                            ${(!isToday && holidayName) ? 'bg-amber-50/10 border-x border-amber-100/20' : ''}`}
                         >
                           {content}
                         </td>
@@ -523,8 +1177,8 @@ const Schedules: React.FC = () => {
 
                     {/* Total weekly hours cell */}
                     <td className="py-4 px-5 text-center font-black border-l border-slate-100 text-slate-900 bg-slate-50/20">
-                      <div className="text-xs font-black">{getWeeklyHours(spec.id)}h</div>
-                      <div className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Semana</div>
+                      <div className="text-sm font-black">{getWeeklyHours(spec.id)}h</div>
+                      <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Semana</div>
                     </td>
                   </tr>
                 ))
@@ -533,6 +1187,9 @@ const Schedules: React.FC = () => {
           </table>
         </div>
       </div>
+    </div>
+
+
 
       {/* Turn modal editor */}
       {selectedCell && (
@@ -570,7 +1227,7 @@ const Schedules: React.FC = () => {
                   ].map(item => (
                     <button
                       key={item.key}
-                      onClick={() => setModalShiftType(item.key as any)}
+                      onClick={() => setModalShiftType(item.key as 'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad')}
                       className={`px-4 py-3 rounded-xl border text-[10px] font-black uppercase text-center transition-all ${modalShiftType === item.key ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'}`}
                     >
                       {item.label}
@@ -580,31 +1237,35 @@ const Schedules: React.FC = () => {
               </div>
 
               {/* Conditional elements based on type */}
+              {/* Conditional elements based on type */}
               {modalShiftType === 'Laboral' && (
-                <div className="grid grid-cols-2 gap-4 animate-slide-down">
-                  <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Entrada</label>
-                    <div className="relative">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input 
-                        type="time" 
-                        value={modalCheckIn}
-                        onChange={(e) => setModalCheckIn(e.target.value)}
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3.5 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Salida</label>
-                    <div className="relative">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input 
-                        type="time" 
-                        value={modalCheckOut}
-                        onChange={(e) => setModalCheckOut(e.target.value)}
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3.5 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all"
-                      />
-                    </div>
+                <div className="animate-slide-down">
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Seleccionar Turno del Catálogo</label>
+                  <div className="relative">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
+                    <select
+                      value={selectedShiftId}
+                      onChange={(e) => {
+                        const shiftId = e.target.value ? Number(e.target.value) : '';
+                        setSelectedShiftId(shiftId);
+                        const shift = SHIFT_CATALOG_LIST.find(s => s.id === shiftId);
+                        if (shift) {
+                          setModalCheckIn(shift.checkIn);
+                          setModalCheckOut(shift.checkOut);
+                        } else {
+                          setModalCheckIn('');
+                          setModalCheckOut('');
+                        }
+                      }}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3.5 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all uppercase"
+                    >
+                      <option value="">Selecciona un turno oficial...</option>
+                      {SHIFT_CATALOG_LIST.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.checkIn} a {s.checkOut} ({s.hours}h {s.break > 0 ? `+ ${s.break}h descanso` : 'sin descanso'})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
@@ -678,8 +1339,11 @@ const Schedules: React.FC = () => {
                 </button>
                 <button
                   onClick={handleSaveShift}
-                  disabled={isSavingShift}
-                  className="flex items-center gap-1.5 px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50"
+                  disabled={
+                    isSavingShift || 
+                    (modalShiftType === 'Laboral' && !selectedShiftId)
+                  }
+                  className="flex items-center gap-1.5 px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:hover:bg-red-300 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>{isSavingShift ? 'Guardando...' : 'Guardar'}</span>
@@ -690,7 +1354,7 @@ const Schedules: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
