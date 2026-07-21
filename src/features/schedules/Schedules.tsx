@@ -311,6 +311,7 @@ const getColombianHoliday = (date: Date): string | null => {
 const Schedules: React.FC = () => {
   const { auth, restaurants } = useAppStore();
   const hierarchy = dataService.getHierarchy();
+  const isReadOnly = auth.user?.role === UserRole.SPECIALIST || auth.user?.role === UserRole.GUEST;
   const [currentWeekMonday, setCurrentWeekMonday] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<DailySchedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -803,7 +804,7 @@ const Schedules: React.FC = () => {
             {/* Left side: filters */}
             <div className="flex flex-wrap items-end gap-3 flex-1">
               {/* 1. Filtrar por Región */}
-              <div className="w-full sm:w-auto min-w-[180px]">
+              <div className="w-full sm:w-auto min-w-[200px]">
                 <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Región</label>
                 <select
                   value={selectedRegion}
@@ -821,50 +822,17 @@ const Schedules: React.FC = () => {
                 </select>
               </div>
               
-              {/* 2. Filtrar por Zona */}
-              <div className="w-full sm:w-auto min-w-[180px]">
-                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Zona</label>
-                <select
-                  value={selectedZone}
-                  onChange={(e) => {
-                    setSelectedZone(e.target.value);
-                    setSelectedRestaurant('');
-                  }}
-                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all h-[42px]"
-                >
-                  <option value="">Todas las Zonas</option>
-                  {allowedZones.map(zone => (
-                    <option key={zone} value={zone}>{zone}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* 3. Filtrar por Restaurante */}
-              <div className="w-full sm:w-auto min-w-[240px]">
-                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Restaurante</label>
-                <select
-                  value={selectedRestaurant}
-                  onChange={(e) => setSelectedRestaurant(e.target.value)}
-                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all uppercase h-[42px]"
-                >
-                  <option value="">Todos los Restaurantes</option>
-                  {allowedRestaurantsForFilter.map(r => (
-                    <option key={r.id} value={r.id}>{r.id} - {r.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* 4. Limpiar Filtros */}
-              {(selectedRegion || selectedZone || selectedRestaurant) && (
+              {/* Limpiar Filtros */}
+              {selectedRegion && (
                 <button
                   onClick={() => {
                     setSelectedRegion('');
                     setSelectedZone('');
                     setSelectedRestaurant('');
                   }}
-                  className="px-4 py-2 border border-dashed border-red-200 hover:border-red-600 text-red-500 hover:text-red-655 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer h-[42px] flex items-center justify-center shrink-0"
+                  className="px-4 py-2 border border-dashed border-red-200 hover:border-red-600 text-red-500 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer h-[42px] flex items-center justify-center shrink-0"
                 >
-                  Limpiar Filtros
+                  Limpiar Filtro
                 </button>
               )}
             </div>
@@ -915,11 +883,11 @@ const Schedules: React.FC = () => {
 
         {/* Table Grid container */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1345px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="p-1.5 sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-[240px] text-center">
-                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+              <tr className="bg-slate-50">
+                <th className="p-1.5 sticky left-0 [transform:translateZ(0)] will-change-transform bg-slate-50 z-30 border-r-2 border-slate-200/90 border-b border-slate-200/60 shadow-[6px_0_15px_-3px_rgba(0,0,0,0.08)] w-[220px] min-w-[220px] text-center">
+                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg h-full">
                     {/* Header Div */}
                     <div className="bg-[#0f1c2d] py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none">
                       <MapPin className="w-3.5 h-3.5 text-white/90 shrink-0" />
@@ -934,7 +902,7 @@ const Schedules: React.FC = () => {
                     </div>
                     
                     {/* Date Div */}
-                    <div className="py-4 px-2 flex flex-col items-center justify-center bg-white">
+                    <div className="py-4 px-2 flex flex-col items-center justify-center bg-white flex-1">
                       <div className="flex items-center justify-center max-w-full overflow-hidden">
                         <span className={`font-black text-[#0f1c2d] truncate uppercase ${visualizedRegion.length > 10 ? 'text-sm' : 'text-lg'}`} title={visualizedRegion}>
                           {visualizedRegion}
@@ -958,16 +926,16 @@ const Schedules: React.FC = () => {
                   return (
                     <th 
                       key={day.dateStr} 
-                      className={`p-1.5 text-center border-l border-slate-100/80 w-[140px] transition-colors relative 
-                        ${isToday ? 'bg-red-50/15' : ''}`}
+                      className={`p-1.5 text-center border-b border-slate-200/60 border-r border-slate-100 w-[145px] min-w-[145px] transition-colors relative 
+                        ${isToday ? 'bg-red-50/15' : 'bg-slate-50'}`}
                     >
-                      <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+                      <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg h-full">
                         {/* Header Div */}
-                        <div className={`${headerBg} py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none`}>
+                        <div className={`${headerBg} py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none shrink-0`}>
                           <Calendar className="w-3.5 h-3.5 text-white/90 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-wider">{day.name}</span>
+                          <span className="text-[10px] font-black uppercase tracking-wider truncate">{day.name}</span>
                           {isToday && (
-                            <span className={`bg-white font-black text-[8px] px-1.5 py-0.5 rounded-full shadow-sm ml-1.5 ${isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]'}`}>
+                            <span className={`bg-white font-black text-[8px] px-1.5 py-0.5 rounded-full shadow-sm ml-1 shrink-0 ${isRed ? 'text-[#c41230]' : 'text-[#0f1c2d]'}`}>
                               HOY
                             </span>
                           )}
@@ -982,7 +950,7 @@ const Schedules: React.FC = () => {
                         
                         {/* Date Div */}
                         <div 
-                          className={`py-4 flex flex-col items-center justify-center relative transition-colors duration-150 
+                          className={`py-4 flex flex-col items-center justify-center relative transition-colors duration-150 flex-1
                             ${holidayName ? 'bg-amber-100/80 border-b border-amber-200/20' : (isToday ? 'bg-red-50/20' : 'bg-white')}`}
                           title={holidayName || undefined}
                         >
@@ -995,13 +963,13 @@ const Schedules: React.FC = () => {
                         </div>
                         
                         {/* Colored Bottom Line */}
-                        <div className={`h-1.5 w-full ${borderColor}`} />
+                        <div className={`h-1.5 w-full shrink-0 ${borderColor}`} />
                       </div>
                     </th>
                   );
                 })}
-                <th className="p-1.5 text-center border-l border-slate-100/80 w-[110px] bg-slate-50/20">
-                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg">
+                <th className="p-1.5 text-center border-b border-slate-200/60 border-r border-slate-100 w-[110px] min-w-[110px] bg-slate-50">
+                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg h-full">
                     {/* Header Div */}
                     <div className="bg-[#0f1c2d] py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none">
                       <Clock className="w-3.5 h-3.5 text-white/90 shrink-0" />
@@ -1016,7 +984,7 @@ const Schedules: React.FC = () => {
                     </div>
                     
                     {/* Date Div */}
-                    <div className="py-4 flex flex-col items-center justify-center bg-white">
+                    <div className="py-4 flex flex-col items-center justify-center bg-white flex-1">
                       <div className="flex items-baseline justify-center gap-0.5">
                         <span className="text-xl font-black text-[#0f1c2d]">HORAS</span>
                         <span className="text-[9px] font-black uppercase text-slate-400">SEM.</span>
@@ -1053,7 +1021,7 @@ const Schedules: React.FC = () => {
                 visibleSpecialists.map(spec => (
                   <tr key={spec.id} className="hover:bg-slate-50/40 transition-colors group">
                     {/* Specialist profile cell */}
-                    <td className="py-4 px-6 sticky left-0 bg-white group-hover:bg-slate-50/80 transition-colors z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    <td className="py-4 px-6 sticky left-0 [transform:translateZ(0)] will-change-transform bg-white group-hover:bg-slate-50 transition-colors z-20 border-r-2 border-slate-200/90 border-b border-slate-100 shadow-[6px_0_15px_-3px_rgba(0,0,0,0.08)] w-[220px] min-w-[220px]">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center font-black text-xs shrink-0 uppercase transition-colors ${getAvatarColors(spec.username).bg}`}>
                           {spec.username.slice(0, 2)}
@@ -1166,9 +1134,9 @@ const Schedules: React.FC = () => {
                         <td 
                           key={day.dateStr} 
                           onClick={() => handleCellClick(spec, day)}
-                          className={`p-1.5 border-l border-slate-100 hover:bg-slate-50 cursor-pointer w-[140px] vertical-align-top transition-all select-none group/cell 
-                            ${isToday ? 'bg-red-50/10 border-x border-red-100/20' : ''} 
-                            ${(!isToday && holidayName) ? 'bg-amber-50/10 border-x border-amber-100/20' : ''}`}
+                          className={`p-1.5 border-r border-b border-slate-100 hover:bg-slate-50 cursor-pointer w-[145px] min-w-[145px] vertical-align-top transition-all select-none group/cell 
+                            ${isToday ? 'bg-red-50/10' : ''} 
+                            ${(!isToday && holidayName) ? 'bg-amber-50/10' : ''}`}
                         >
                           {content}
                         </td>
@@ -1176,7 +1144,7 @@ const Schedules: React.FC = () => {
                     })}
 
                     {/* Total weekly hours cell */}
-                    <td className="py-4 px-5 text-center font-black border-l border-slate-100 text-slate-900 bg-slate-50/20">
+                    <td className="py-4 px-5 text-center font-black border-r border-b border-slate-100 text-slate-900 bg-slate-50/20 w-[110px] min-w-[110px]">
                       <div className="text-sm font-black">{getWeeklyHours(spec.id)}h</div>
                       <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Semana</div>
                     </td>
@@ -1191,164 +1159,296 @@ const Schedules: React.FC = () => {
 
 
 
-      {/* Turn modal editor */}
+      {/* Turn modal editor / viewer */}
       {selectedCell && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up">
             
             {/* Modal header */}
-            <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
-                <span className="text-[8px] font-black text-red-600 uppercase tracking-widest">Planificar Actividad</span>
-                <h3 className="text-sm font-black text-slate-900 uppercase mt-0.5 tracking-tight">
+                <span className="text-[9px] font-black text-red-600 uppercase tracking-widest">
+                  {isReadOnly ? 'Detalle del Horario' : 'Planificar Actividad'}
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 uppercase mt-0.5 tracking-tight">
                   {selectedCell.dayName} {selectedCell.date.split('-').reverse().slice(0, 2).join('/')}
                 </h3>
-                <p className="text-[9px] text-slate-400 mt-0.5">Especialista: {formatName(selectedCell.specialist.username)}</p>
+                <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                  Especialista: <span className="font-bold text-slate-800">{formatName(selectedCell.specialist.username)}</span>
+                </p>
               </div>
               <button 
                 onClick={() => setSelectedCell(null)}
-                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-150 rounded-xl transition-all"
+                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-200/60 rounded-xl transition-all"
+                title="Cerrar modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal body */}
-            <div className="p-6 space-y-5">
-              {/* Type of Turn Selector */}
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Actividad</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'Laboral', label: 'Turno Laboral' },
-                    { key: 'Capacitación', label: 'Capacitación' },
-                    { key: 'Descanso', label: 'Descanso' },
-                    { key: 'Incapacidad', label: 'Incapacidad' }
-                  ].map(item => (
-                    <button
-                      key={item.key}
-                      onClick={() => setModalShiftType(item.key as 'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad')}
-                      className={`px-4 py-3 rounded-xl border text-[10px] font-black uppercase text-center transition-all ${modalShiftType === item.key ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-5">
+              {isReadOnly ? (
+                /* VISTA DE CONSULTA (SOLO LECTURA PARA ESPECIALISTAS) */
+                <div className="space-y-4">
+                  {selectedCell.schedule ? (
+                    <>
+                      {/* Tipo de Actividad Badge & Details */}
+                      <div className="p-4 rounded-2xl border bg-slate-50/80 border-slate-150 flex items-center gap-3.5">
+                        {selectedCell.schedule.shift_type === 'Laboral' && (
+                          <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-xl shrink-0">
+                            <Clock className="w-6 h-6" />
+                          </div>
+                        )}
+                        {selectedCell.schedule.shift_type === 'Capacitación' && (
+                          <div className="p-3 bg-indigo-500/10 text-indigo-600 rounded-xl shrink-0">
+                            <Award className="w-6 h-6" />
+                          </div>
+                        )}
+                        {selectedCell.schedule.shift_type === 'Descanso' && (
+                          <div className="p-3 bg-slate-500/10 text-slate-600 rounded-xl shrink-0">
+                            <Check className="w-6 h-6" />
+                          </div>
+                        )}
+                        {selectedCell.schedule.shift_type === 'Incapacidad' && (
+                          <div className="p-3 bg-rose-500/10 text-rose-600 rounded-xl shrink-0">
+                            <AlertCircle className="w-6 h-6" />
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Tipo de Jornada</span>
+                          <span className="text-sm font-black uppercase tracking-tight text-slate-900">
+                            {selectedCell.schedule.shift_type === 'Laboral' ? 'Turno Laboral' : selectedCell.schedule.shift_type}
+                          </span>
+                        </div>
+                      </div>
 
-              {/* Conditional elements based on type */}
-              {/* Conditional elements based on type */}
-              {modalShiftType === 'Laboral' && (
-                <div className="animate-slide-down">
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Seleccionar Turno del Catálogo</label>
-                  <div className="relative">
-                    <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
-                    <select
-                      value={selectedShiftId}
-                      onChange={(e) => {
-                        const shiftId = e.target.value ? Number(e.target.value) : '';
-                        setSelectedShiftId(shiftId);
-                        const shift = SHIFT_CATALOG_LIST.find(s => s.id === shiftId);
-                        if (shift) {
-                          setModalCheckIn(shift.checkIn);
-                          setModalCheckOut(shift.checkOut);
-                        } else {
-                          setModalCheckIn('');
-                          setModalCheckOut('');
-                        }
-                      }}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3.5 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all uppercase"
-                    >
-                      <option value="">Selecciona un turno oficial...</option>
-                      {SHIFT_CATALOG_LIST.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.checkIn} a {s.checkOut} ({s.hours}h {s.break > 0 ? `+ ${s.break}h descanso` : 'sin descanso'})
-                        </option>
+                      {/* Horario de Entrada y Salida (si es Laboral) */}
+                      {selectedCell.schedule.shift_type === 'Laboral' && selectedCell.schedule.check_in && selectedCell.schedule.check_out && (
+                        <div className="p-4 rounded-2xl border border-slate-150 bg-white shadow-xs space-y-3">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Horario de Asistencia</span>
+                          <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                            <div className="text-center">
+                              <span className="text-[8px] font-extrabold uppercase text-slate-400 block">Entrada</span>
+                              <span className="text-base font-black text-slate-900">{selectedCell.schedule.check_in}</span>
+                            </div>
+                            <div className="h-0.5 flex-1 mx-4 bg-slate-200 relative">
+                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-100 px-2 text-[9px] font-black text-slate-400 rounded-full border border-slate-200">
+                                {calculateHours(selectedCell.schedule)}h
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-[8px] font-extrabold uppercase text-slate-400 block">Salida</span>
+                              <span className="text-base font-black text-slate-900">{selectedCell.schedule.check_out}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Restaurante / CECO Asignado */}
+                      {(selectedCell.schedule.shift_type === 'Laboral' || selectedCell.schedule.shift_type === 'Capacitación') && (
+                        <div className="p-4 rounded-2xl border border-slate-150 bg-white shadow-xs space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Restaurante / CECO Asignado</span>
+                          {(() => {
+                            const rest = restaurants.find(r => r.id === selectedCell.schedule?.restaurant_id);
+                            return rest ? (
+                              <div className="flex items-start gap-3">
+                                <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-xs font-black text-slate-900 uppercase">{rest.id} - {rest.name}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">Zona: {rest.zone} | Región: {rest.region}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs font-medium text-slate-500 italic">No especificado</p>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Info adicional para otros tipos */}
+                      {selectedCell.schedule.shift_type === 'Capacitación' && (
+                        <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-indigo-900 text-xs font-medium">
+                          Duración contable asignada: <strong className="font-extrabold text-indigo-700">7.0 horas</strong>
+                        </div>
+                      )}
+
+                      {selectedCell.schedule.shift_type === 'Descanso' && (
+                        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs font-medium">
+                          Día de descanso libre (<strong className="font-extrabold text-slate-800">0.0 horas</strong>).
+                        </div>
+                      )}
+
+                      {selectedCell.schedule.shift_type === 'Incapacidad' && (
+                        <div className="p-3.5 bg-rose-50/70 border border-rose-100 rounded-xl text-rose-900 text-xs font-medium">
+                          Ausencia justificada por incapacidad (<strong className="font-extrabold text-rose-700">0.0 horas</strong>).
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Sin turno asignado */
+                    <div className="py-8 px-4 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      <div className="w-12 h-12 rounded-full bg-slate-200/60 text-slate-400 flex items-center justify-center mx-auto">
+                        <Calendar className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-slate-700">Sin Turno Programado</h4>
+                        <p className="text-[10px] font-medium text-slate-400 mt-1">No hay actividad registrada para este día.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* VISTA DE EDICIÓN (ADMIN / LÍDER / COORDINADOR) */
+                <>
+                  {/* Type of Turn Selector */}
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Actividad</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'Laboral', label: 'Turno Laboral' },
+                        { key: 'Capacitación', label: 'Capacitación' },
+                        { key: 'Descanso', label: 'Descanso' },
+                        { key: 'Incapacidad', label: 'Incapacidad' }
+                      ].map(item => (
+                        <button
+                          key={item.key}
+                          onClick={() => setModalShiftType(item.key as 'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad')}
+                          className={`px-3 py-3 rounded-xl border text-[10px] font-black uppercase text-center transition-all ${modalShiftType === item.key ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'}`}
+                        >
+                          {item.label}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {(modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && (
-                <div className="animate-slide-down">
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Restaurante / CECO Asignado</label>
-                  <select 
-                    value={modalRestaurantId}
-                    onChange={(e) => setModalRestaurantId(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3.5 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all"
-                  >
-                    <option value="">Selecciona una tienda del especialista...</option>
-                    {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
-                      <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
-                    ))}
-                  </select>
-                  <p className="text-[8px] text-slate-400 mt-1.5">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
-                </div>
-              )}
+                  {/* Conditional elements based on type */}
+                  {modalShiftType === 'Laboral' && (
+                    <div className="animate-slide-down">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Seleccionar Turno del Catálogo</label>
+                      <div className="relative">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
+                        <select
+                          value={selectedShiftId}
+                          onChange={(e) => {
+                            const shiftId = e.target.value ? Number(e.target.value) : '';
+                            setSelectedShiftId(shiftId);
+                            const shift = SHIFT_CATALOG_LIST.find(s => s.id === shiftId);
+                            if (shift) {
+                              setModalCheckIn(shift.checkIn);
+                              setModalCheckOut(shift.checkOut);
+                            } else {
+                              setModalCheckIn('');
+                              setModalCheckOut('');
+                            }
+                          }}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all uppercase truncate"
+                        >
+                          <option value="">Selecciona un turno oficial...</option>
+                          {SHIFT_CATALOG_LIST.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.checkIn} a {s.checkOut} ({s.hours}h {s.break > 0 ? `+ ${s.break}h descanso` : 'sin descanso'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
-              {modalShiftType === 'Capacitación' && (
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-indigo-900 animate-slide-down">
-                  <Award className="w-5 h-5 shrink-0 text-indigo-600" />
-                  <p className="text-[9px] font-bold leading-normal">
-                    Nota: Los turnos de Capacitación registran una jornada de asistencia fija equivalente a <strong className="font-extrabold text-indigo-700">7.0 horas</strong> en el total semanal.
-                  </p>
-                </div>
-              )}
+                  {(modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && (
+                    <div className="animate-slide-down">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Restaurante / CECO Asignado</label>
+                      <select 
+                        value={modalRestaurantId}
+                        onChange={(e) => setModalRestaurantId(e.target.value)}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
+                      >
+                        <option value="">Selecciona una tienda del especialista...</option>
+                        {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
+                          <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
+                        ))}
+                      </select>
+                      <p className="text-[8px] text-slate-400 mt-1.5">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
+                    </div>
+                  )}
 
-              {modalShiftType === 'Descanso' && (
-                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex gap-3 text-slate-600 animate-slide-down">
-                  <Check className="w-5 h-5 shrink-0 text-slate-500" />
-                  <p className="text-[9px] font-bold leading-normal">
-                    Día libre o descanso laboral. Este día sumará <strong className="font-extrabold text-slate-700">0.0 horas</strong> en el total semanal.
-                  </p>
-                </div>
-              )}
+                  {modalShiftType === 'Capacitación' && (
+                    <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-indigo-900 animate-slide-down">
+                      <Award className="w-5 h-5 shrink-0 text-indigo-600" />
+                      <p className="text-[9px] font-bold leading-normal">
+                        Nota: Los turnos de Capacitación registran una jornada de asistencia fija equivalente a <strong className="font-extrabold text-indigo-700">7.0 horas</strong> en el total semanal.
+                      </p>
+                    </div>
+                  )}
 
-              {modalShiftType === 'Incapacidad' && (
-                <div className="bg-rose-50/60 border border-rose-100 rounded-2xl p-4 flex gap-3 text-rose-900 animate-slide-down">
-                  <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
-                  <p className="text-[9px] font-bold leading-normal">
-                    Ausencia justificada por enfermedad o incapacidad médica. Este día sumará <strong className="font-extrabold text-rose-700">0.0 horas</strong> en el total semanal.
-                  </p>
-                </div>
+                  {modalShiftType === 'Descanso' && (
+                    <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex gap-3 text-slate-600 animate-slide-down">
+                      <Check className="w-5 h-5 shrink-0 text-slate-500" />
+                      <p className="text-[9px] font-bold leading-normal">
+                        Día libre o descanso laboral. Este día sumará <strong className="font-extrabold text-slate-700">0.0 horas</strong> en el total semanal.
+                      </p>
+                    </div>
+                  )}
+
+                  {modalShiftType === 'Incapacidad' && (
+                    <div className="bg-rose-50/60 border border-rose-100 rounded-2xl p-4 flex gap-3 text-rose-900 animate-slide-down">
+                      <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
+                      <p className="text-[9px] font-bold leading-normal">
+                        Ausencia justificada por enfermedad o incapacidad médica. Este día sumará <strong className="font-extrabold text-rose-700">0.0 horas</strong> en el total semanal.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Modal actions */}
-            <div className="bg-slate-50 p-6 border-t border-slate-100 flex items-center justify-between">
-              <div>
-                {selectedCell.schedule && (
+            <div className="bg-slate-50 p-4 sm:p-6 border-t border-slate-100 flex items-center justify-between shrink-0">
+              {isReadOnly ? (
+                <div className="w-full flex justify-end">
                   <button
-                    onClick={handleDeleteShift}
-                    disabled={isSavingShift}
-                    className="flex items-center gap-1.5 px-4 py-3 border border-red-200 hover:border-red-600 hover:bg-red-50 text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
+                    onClick={() => setSelectedCell(null)}
+                    className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-95"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Eliminar</span>
+                    Cerrar
                   </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedCell(null)}
-                  disabled={isSavingShift}
-                  className="px-5 py-3 border-2 border-slate-150 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveShift}
-                  disabled={
-                    isSavingShift || 
-                    (modalShiftType === 'Laboral' && !selectedShiftId)
-                  }
-                  className="flex items-center gap-1.5 px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:hover:bg-red-300 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSavingShift ? 'Guardando...' : 'Guardar'}</span>
-                </button>
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    {selectedCell.schedule && (
+                      <button
+                        onClick={handleDeleteShift}
+                        disabled={isSavingShift}
+                        className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 sm:py-3 border border-red-200 hover:border-red-600 hover:bg-red-50 text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedCell(null)}
+                      disabled={isSavingShift}
+                      className="px-4 sm:px-5 py-2.5 sm:py-3 border-2 border-slate-150 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveShift}
+                      disabled={
+                        isSavingShift || 
+                        (modalShiftType === 'Laboral' && !selectedShiftId)
+                      }
+                      className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:hover:bg-red-300 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isSavingShift ? 'Guardando...' : 'Guardar'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
