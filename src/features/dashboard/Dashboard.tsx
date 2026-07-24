@@ -26,6 +26,44 @@ const ADMIN_TITLES: string[] = [
   JobTitle.GERENTE,
 ];
 
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-5 shadow-2xl max-w-[260px] text-white animate-in zoom-in-95 duration-100 relative">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-red-600 rounded-t-3xl" />
+        <h4 className="text-[10px] font-black uppercase italic tracking-[0.15em] text-red-500 mb-3 mt-1">
+          {data.name}
+        </h4>
+        <div className="space-y-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Promedio:</span>
+            <span className="text-white text-xs">{data.avg}%</span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Aprobación:</span>
+            <span className="text-white text-xs">{data.rate}%</span>
+          </div>
+          <div className="border-t border-slate-800/80 my-2"></div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Certificados:</span>
+            <span className="text-emerald-400 text-xs">{data.approvedCount}</span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Pendientes:</span>
+            <span className="text-red-400 text-xs">{data.pendingCount}</span>
+          </div>
+          <div className="flex justify-between gap-6 border-t border-slate-800/80 pt-2">
+            <span className="text-slate-500">Censo Total:</span>
+            <span className="text-slate-400 text-xs">{data.employeeCount}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const Dashboard: React.FC = () => {
   const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth, showAlertDialog } = useAppStore();
   const [isExporting, setIsExporting] = useState(false);
@@ -146,11 +184,17 @@ const Dashboard: React.FC = () => {
 
         const groupAvgs = Object.keys(EVALUATION_GROUPS).map(gid => {
           const row = rpcData.find((r: any) => r.group_id === gid);
+          const employeeCount = row ? Number(row.employee_count) : 0;
+          const approvedCount = row ? Number(row.approved_count) : 0;
+          const pendingCount = employeeCount - approvedCount;
           return {
             id:   gid,
             name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name,
             avg:  row ? Math.round(Number(row.avg_score))     : 0,
-            rate: row ? Math.round(Number(row.approval_rate)) : 0
+            rate: row ? Math.round(Number(row.approval_rate)) : 0,
+            employeeCount,
+            approvedCount,
+            pendingCount
           };
         });
 
@@ -245,11 +289,16 @@ const Dashboard: React.FC = () => {
         const scores = groupData[gid].scores;
         const avg    = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
         const denom  = gid === 'C' ? eligibleAllStar : totalEmployees;
+        const approvedCount = groupData[gid].passed;
+        const pendingCount = denom - approvedCount;
         return {
           id:   gid,
           name: EVALUATION_GROUPS[gid as keyof typeof EVALUATION_GROUPS].name,
           avg:  Math.round(avg),
-          rate: denom > 0 ? Math.round((groupData[gid].passed / denom) * 100) : 0
+          rate: denom > 0 ? Math.round((approvedCount / denom) * 100) : 0,
+          employeeCount: denom,
+          approvedCount,
+          pendingCount
         };
       });
 
@@ -442,7 +491,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
                 <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} />
-                <Tooltip cursor={{ fill: '#f8fafc' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
                 <Bar dataKey="avg" radius={[10, 10, 0, 0]} barSize={45}>
                   <LabelList dataKey="avg" position="top" formatter={(v: number) => `${v}%`} style={{ fontSize: '10px', fontWeight: '900', fill: '#64748b' }} />
                   {stats.groupAvgs.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.avg >= APPROVAL_THRESHOLD ? '#10b981' : '#ef4444'} />)}

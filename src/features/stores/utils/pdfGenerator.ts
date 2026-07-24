@@ -83,12 +83,12 @@ export const generateStorePdf = async (
                         d.setFontSize(10);
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id}  •  REGIÓN: ${selectedStore.region}  •  PERIODO: ${getMonthText(pdfMonth)}`, 20, 36);
-                        d.addImage(APP_LOGO_B64, 'PNG', 190, 2, 42, 42);
+                        d.addImage(APP_LOGO_B64, 'PNG', 190, 2, 42, 42, 'logo', 'FAST');
                     } else {
                         d.setFontSize(7.5);
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id} | ${selectedStore.region} | ${getMonthText(pdfMonth)}`, 130, 13);
-                        d.addImage(APP_LOGO_B64, 'PNG', 225, 1, 15, 15);
+                        d.addImage(APP_LOGO_B64, 'PNG', 225, 1, 15, 15, 'logo', 'FAST');
                     }
                 };
 
