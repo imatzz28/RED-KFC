@@ -774,10 +774,10 @@ const Schedules: React.FC = () => {
       
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Plantilla Horarios");
+      XLSX.utils.book_append_sheet(wb, ws, "Plantilla Planificación");
       
       const fileDate = weekDays[0].dateStr;
-      XLSX.writeFile(wb, `Plantilla_Horarios_${fileDate}.xlsx`);
+      XLSX.writeFile(wb, `Plantilla_Planificacion_${fileDate}.xlsx`);
       showToast('Plantilla de Excel exportada con éxito.');
     } catch (err) {
       console.error('[ExportExcel] Error:', err);
