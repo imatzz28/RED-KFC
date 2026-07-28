@@ -336,6 +336,8 @@ const Schedules: React.FC = () => {
   const [modalCheckOut, setModalCheckOut] = useState('17:00');
   const [selectedShiftId, setSelectedShiftId] = useState<number | ''>('');
   const [modalRestaurantId, setModalRestaurantId] = useState('');
+  const [modalActivity, setModalActivity] = useState('');
+  const [usersVersion, setUsersVersion] = useState(0);
   const [isSavingShift, setIsSavingShift] = useState(false);
 
   // Compute the 7 dates of the week
@@ -457,24 +459,28 @@ const Schedules: React.FC = () => {
     // 2. Filter by role visibility
     if (auth.user?.role !== UserRole.ADMIN) {
       const currentUser = auth.user!;
-      filtered = filtered.filter(u => {
-        // Check shared region
-        const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
-        if (hasSharedRegion) return true;
+      if (currentUser.role === UserRole.SPECIALIST) {
+        filtered = filtered.filter(u => u.id === currentUser.id);
+      } else {
+        filtered = filtered.filter(u => {
+          // Check shared region
+          const hasSharedRegion = (u.assignedRegions || []).some(reg => currentUser.assignedRegions?.includes(reg));
+          if (hasSharedRegion) return true;
 
-        // Check zone or restaurant match
-        const myRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
-        const myZones = myRegions.flatMap(r => r.zones.map(z => z.name));
-        
-        const zoneMatch = (u.assignedZones || []).some(z => myZones.includes(z));
-        if (zoneMatch) return true;
+          // Check zone or restaurant match
+          const myRegions = hierarchy.regions.filter(r => currentUser.assignedRegions?.includes(r.name));
+          const myZones = myRegions.flatMap(r => r.zones.map(z => z.name));
+          
+          const zoneMatch = (u.assignedZones || []).some(z => myZones.includes(z));
+          if (zoneMatch) return true;
 
-        const restMatch = (u.assignedRestaurants || []).some(rid => {
-          const rest = restaurants.find(r => r.id === rid);
-          return rest && currentUser.assignedRegions?.includes(rest.region);
+          const restMatch = (u.assignedRestaurants || []).some(rid => {
+            const rest = restaurants.find(r => r.id === rid);
+            return rest && currentUser.assignedRegions?.includes(rest.region);
+          });
+          return restMatch;
         });
-        return restMatch;
-      });
+      }
     }
 
     // 3. Filter by selected Region drop-down
@@ -513,7 +519,7 @@ const Schedules: React.FC = () => {
     }
 
     return filtered;
-  }, [auth.user, restaurants, hierarchy, searchTerm, selectedRegion, selectedZone, selectedRestaurant]);
+  }, [auth.user, restaurants, hierarchy, searchTerm, selectedRegion, selectedZone, selectedRestaurant, usersVersion]);
 
 
 
@@ -584,6 +590,7 @@ const Schedules: React.FC = () => {
       setModalCheckIn(sched.check_in || '08:00');
       setModalCheckOut(sched.check_out || '17:00');
       setModalRestaurantId(sched.restaurant_id || '');
+      setModalActivity(sched.activity || '');
       
       if (sched.shift_type === 'Laboral' && sched.check_in && sched.check_out) {
         const key = `${normalizeTime(sched.check_in)}-${normalizeTime(sched.check_out)}`;
@@ -595,6 +602,7 @@ const Schedules: React.FC = () => {
       setModalShiftType('Laboral');
       setModalCheckIn('08:00');
       setModalCheckOut('17:00');
+      setModalActivity('');
       setSelectedShiftId(13); // Turno 13: 08:00 - 17:00
       
       // Default to the specialist's first assigned restaurant if any
@@ -645,7 +653,8 @@ const Schedules: React.FC = () => {
         shift_type: modalShiftType,
         check_in: modalShiftType === 'Laboral' ? modalCheckIn : undefined,
         check_out: modalShiftType === 'Laboral' ? modalCheckOut : undefined,
-        restaurant_id: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && modalRestaurantId ? modalRestaurantId : undefined
+        restaurant_id: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && modalRestaurantId ? modalRestaurantId : undefined,
+        activity: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') ? modalActivity : undefined
       };
 
       await dataService.saveDailySchedule(scheduleToSave);
@@ -739,7 +748,7 @@ const Schedules: React.FC = () => {
           } else if (s.shift_type === 'Capacitación') {
             turnId = 'CAPACITACION';
           } else if (s.shift_type === 'Descanso') {
-            turnId = 'DESCANSO';
+            turnId = -1;
           } else if (s.shift_type === 'Incapacidad') {
             turnId = 'INCAPACIDAD';
           }
@@ -752,7 +761,8 @@ const Schedules: React.FC = () => {
             'Dia': d,
             'Mes': m,
             'Año': y,
-            'ID Centro de Costo': s.restaurant_id || spec.assignedRestaurants?.[0] || ''
+            'ID Centro de Costo': s.restaurant_id || spec.assignedRestaurants?.[0] || '',
+            'Actividad': s.activity || ''
           });
         });
       });
@@ -804,23 +814,25 @@ const Schedules: React.FC = () => {
             {/* Left side: filters */}
             <div className="flex flex-wrap items-end gap-3 flex-1">
               {/* 1. Filtrar por Región */}
-              <div className="w-full sm:w-auto min-w-[200px]">
-                <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Región</label>
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => {
-                    setSelectedRegion(e.target.value);
-                    setSelectedZone('');
-                    setSelectedRestaurant('');
-                  }}
-                  className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all h-[42px]"
-                >
-                  <option value="">Todas las Regiones</option>
-                  {allowedRegions.map(reg => (
-                    <option key={reg} value={reg}>{reg}</option>
-                  ))}
-                </select>
-              </div>
+              {auth.user?.role !== UserRole.SPECIALIST && auth.user?.role !== UserRole.GUEST && (
+                <div className="w-full sm:w-auto min-w-[200px]">
+                  <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-0.5">Filtrar por Región</label>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => {
+                      setSelectedRegion(e.target.value);
+                      setSelectedZone('');
+                      setSelectedRestaurant('');
+                    }}
+                    className="w-full bg-white border-2 border-slate-100 hover:border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-700 outline-none transition-all h-[42px]"
+                  >
+                    <option value="">Todas las Regiones</option>
+                    {allowedRegions.map(reg => (
+                      <option key={reg} value={reg}>{reg}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {/* Limpiar Filtros */}
               {selectedRegion && (
@@ -870,20 +882,22 @@ const Schedules: React.FC = () => {
               </div>
 
               {/* Export button */}
-              <button 
-                onClick={exportExcelTemplate}
-                className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer h-[42px] shrink-0"
-              >
-                <Download className="w-4 h-4" />
-                <span>Exportar Plantilla</span>
-              </button>
+              {auth.user?.role !== UserRole.SPECIALIST && auth.user?.role !== UserRole.GUEST && (
+                <button 
+                  onClick={exportExcelTemplate}
+                  className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer h-[42px] shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Exportar Plantilla</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Table Grid container */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1345px]">
+          <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1455px]">
             <thead>
               <tr className="bg-slate-50">
                 <th className="p-1.5 sticky left-0 [transform:translateZ(0)] will-change-transform bg-slate-50 z-30 border-r-2 border-slate-200/90 border-b border-slate-200/60 shadow-[6px_0_15px_-3px_rgba(0,0,0,0.08)] w-[220px] min-w-[220px] text-center">
@@ -995,12 +1009,39 @@ const Schedules: React.FC = () => {
                     <div className="h-1.5 w-full bg-[#0f1c2d]" />
                   </div>
                 </th>
+                <th className="p-1.5 text-center border-b border-slate-200/60 border-r border-slate-100 w-[110px] min-w-[110px] bg-slate-50">
+                  <div className="flex flex-col rounded-2xl overflow-hidden shadow-md border border-slate-100 bg-white transition-all hover:shadow-lg h-full">
+                    {/* Header Div */}
+                    <div className="bg-[#0f1c2d] py-2.5 px-2 flex items-center justify-center gap-1.5 relative text-white select-none">
+                      <Calendar className="w-3.5 h-3.5 text-white/90 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">Días</span>
+                      
+                      {/* Downward triangle indicator */}
+                      <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 w-4 h-2 overflow-hidden z-10">
+                        <svg viewBox="0 0 10 5" className="w-4 h-2 fill-current text-[#0f1c2d]">
+                          <polygon points="0,0 10,0 5,5" />
+                        </svg>
+                      </div>
+                    </div>
+                    
+                    {/* Date Div */}
+                    <div className="py-4 flex flex-col items-center justify-center bg-white flex-1">
+                      <div className="flex items-baseline justify-center gap-0.5">
+                        <span className="text-xl font-black text-[#0f1c2d]">DÍAS</span>
+                        <span className="text-[9px] font-black uppercase text-slate-400">PEND.</span>
+                      </div>
+                    </div>
+                    
+                    {/* Colored Bottom Line */}
+                    <div className="h-1.5 w-full bg-[#0f1c2d]" />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-20 text-center">
+                  <td colSpan={10} className="py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-8 h-8 border-4 border-slate-100 border-t-red-600 rounded-full animate-spin" />
                       <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cargando grilla de turnos...</span>
@@ -1009,7 +1050,7 @@ const Schedules: React.FC = () => {
                 </tr>
               ) : visibleSpecialists.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-20 text-center">
+                  <td colSpan={10} className="py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
                       <AlertCircle className="w-8 h-8 text-slate-300" />
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">No se encontraron especialistas</span>
@@ -1072,6 +1113,11 @@ const Schedules: React.FC = () => {
                                   <span className="truncate">{storeName}</span>
                                 </div>
                               )}
+                              {s.activity && (
+                                <div className={`text-[8.5px] font-black mt-1 uppercase tracking-wide truncate ${isCatalogShift ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                  🎯 {s.activity}
+                                </div>
+                              )}
                               <div className={`text-[9px] font-black mt-1.5 pt-1 border-t text-right ${isCatalogShift ? 'text-emerald-700/80 border-emerald-200/30' : 'text-amber-700/80 border-amber-200/30'}`}>
                                 {calculateHours(s)} Horas
                               </div>
@@ -1089,6 +1135,11 @@ const Schedules: React.FC = () => {
                                 <div className="text-[9px] font-bold text-indigo-500 mt-0.5 truncate flex items-center gap-0.5">
                                   <MapPin className="w-2.5 h-2.5 shrink-0 text-indigo-400" />
                                   <span className="truncate">{storeName}</span>
+                                </div>
+                              )}
+                              {s.activity && (
+                                <div className="text-[8.5px] font-black mt-1 uppercase tracking-wide truncate text-indigo-700">
+                                  🎯 {s.activity}
                                 </div>
                               )}
                               <div className="text-[9px] font-black text-indigo-700/80 mt-1.5 pt-1 border-t border-indigo-200/30 text-right">
@@ -1147,6 +1198,36 @@ const Schedules: React.FC = () => {
                     <td className="py-4 px-5 text-center font-black border-r border-b border-slate-100 text-slate-900 bg-slate-50/20 w-[110px] min-w-[110px]">
                       <div className="text-sm font-black">{getWeeklyHours(spec.id)}h</div>
                       <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Semana</div>
+                    </td>
+
+                    {/* Días pendientes cell */}
+                    <td className="py-4 px-5 text-center font-black border-r border-b border-slate-100 text-slate-900 bg-slate-50/20 w-[110px] min-w-[110px]">
+                      {isReadOnly ? (
+                        <div className="text-sm font-black">{spec.pendingDays || 0}</div>
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          value={spec.pendingDays || 0}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            const updatedUsers = dataService.getUsers().map(u => u.id === spec.id ? { ...u, pendingDays: val } : u);
+                            dataService._cache.users = updatedUsers;
+                            setUsersVersion(v => v + 1);
+                          }}
+                          onBlur={async (e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            try {
+                              await dataService.updateUserPendingDays(spec.id, val);
+                              showToast('Días pendientes actualizados');
+                            } catch (err) {
+                              console.error(err);
+                              showToast('Error al actualizar días pendientes', true);
+                            }
+                          }}
+                          className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-center font-black text-xs outline-none focus:border-red-500 bg-white"
+                        />
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1266,6 +1347,14 @@ const Schedules: React.FC = () => {
                         </div>
                       )}
 
+                      {/* Actividad Programada */}
+                      {(selectedCell.schedule.shift_type === 'Laboral' || selectedCell.schedule.shift_type === 'Capacitación') && selectedCell.schedule.activity && (
+                        <div className="p-4 rounded-2xl border border-slate-150 bg-white shadow-xs space-y-1">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Actividad Programada</span>
+                          <p className="text-xs font-black text-[#0f1c2d]">🎯 {selectedCell.schedule.activity}</p>
+                        </div>
+                      )}
+
                       {/* Info adicional para otros tipos */}
                       {selectedCell.schedule.shift_type === 'Capacitación' && (
                         <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-indigo-900 text-xs font-medium">
@@ -1356,20 +1445,45 @@ const Schedules: React.FC = () => {
                   )}
 
                   {(modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && (
-                    <div className="animate-slide-down">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Restaurante / CECO Asignado</label>
-                      <select 
-                        value={modalRestaurantId}
-                        onChange={(e) => setModalRestaurantId(e.target.value)}
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
-                      >
-                        <option value="">Selecciona una tienda del especialista...</option>
-                        {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
-                          <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
-                        ))}
-                      </select>
-                      <p className="text-[8px] text-slate-400 mt-1.5">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
-                    </div>
+                    <>
+                      <div className="animate-slide-down">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Actividad a Realizar</label>
+                        <select 
+                          value={modalActivity}
+                          onChange={(e) => setModalActivity(e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
+                        >
+                          <option value="">Selecciona una actividad...</option>
+                          {[
+                            'Induccion Coroporativo',
+                            'Introduccion a las plataformas',
+                            'Taller Manipulacion Mensual',
+                            'The Vault',
+                            'Apoyo Comercial',
+                            'Apoyo planta',
+                            'Entrenamiento CAR',
+                            'Trabajo en Restaurante'
+                          ].map(act => (
+                            <option key={act} value={act}>{act}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="animate-slide-down">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Restaurante / CECO Asignado</label>
+                        <select 
+                          value={modalRestaurantId}
+                          onChange={(e) => setModalRestaurantId(e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
+                        >
+                          <option value="">Selecciona una tienda del especialista...</option>
+                          {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
+                            <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
+                          ))}
+                        </select>
+                        <p className="text-[8px] text-slate-400 mt-1.5">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
+                      </div>
+                    </>
                   )}
 
                   {modalShiftType === 'Capacitación' && (

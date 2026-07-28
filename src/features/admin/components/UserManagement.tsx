@@ -160,7 +160,27 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
     // 2. Filter Region
     if (filterRegion !== 'Todos') {
-      result = result.filter(u => (u.assignedRegions || []).includes(filterRegion));
+      result = result.filter(u => {
+        // Direct region assignment
+        if ((u.assignedRegions || []).includes(filterRegion)) return true;
+
+        // Zone-based region matching (for Specialists)
+        const regionObj = hierarchy.regions.find(r => r.name === filterRegion);
+        if (regionObj) {
+          const regionZones = regionObj.zones.map(z => z.name);
+          const hasZoneInRegion = (u.assignedZones || []).some(z => regionZones.includes(z));
+          if (hasZoneInRegion) return true;
+        }
+
+        // Restaurant-based region matching (for Specialists)
+        const hasRestaurantInRegion = (u.assignedRestaurants || []).some(rid => {
+          const rest = restaurants.find(r => r.id === rid);
+          return rest && rest.region === filterRegion;
+        });
+        if (hasRestaurantInRegion) return true;
+
+        return false;
+      });
     }
 
     // 3. Filter Role
@@ -928,31 +948,102 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
                 {(newUser.role === UserRole.SPECIALIST) && (
                   <>
+                    {/* Zonas de Gestión (Lista desplegable con badges) */}
                     <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2"><Layers className="w-3 h-3 text-red-600" /> Zonas de Gestión</p>
-                      <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-1">
+                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2">
+                        <Layers className="w-3 h-3 text-red-600" /> Zonas de Gestión
+                      </p>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            toggleItem(val, 'assignedZones');
+                          }
+                        }}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all cursor-pointer"
+                      >
+                        <option value="">Selecciona una zona para asignar...</option>
                         {availableZones.map(zone => (
-                          <button key={zone} onClick={() => toggleItem(zone, 'assignedZones')} className={`p-3 rounded-xl text-[9px] font-black uppercase border-2 text-left flex items-center justify-between ${newUser.assignedZones?.includes(zone) ? 'bg-red-50 border-red-600 text-red-700 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                            <span className="truncate pr-1">{zone}</span> {newUser.assignedZones?.includes(zone) && <Check className="w-3 h-3 shrink-0" />}
-                          </button>
+                          <option key={zone} value={zone} disabled={newUser.assignedZones?.includes(zone)}>
+                            {zone} {newUser.assignedZones?.includes(zone) ? '✓ (Asignada)' : ''}
+                          </option>
                         ))}
-                      </div>
+                      </select>
+                      
+                      {newUser.assignedZones && newUser.assignedZones.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                          {newUser.assignedZones.map(zone => (
+                            <span
+                              key={zone}
+                              onClick={() => toggleItem(zone, 'assignedZones')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer border border-red-200/50 transition-all select-none hover:scale-95"
+                              title="Haga clic para remover"
+                            >
+                              {zone} <X className="w-3 h-3 text-red-500 shrink-0" />
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
+                    {/* Tiendas Específicas (Etiquetas + Buscador con autocompletado reactivo) */}
                     <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2"><Store className="w-3 h-3 text-red-600" /> Tiendas Específicas</p>
+                      <p className="text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-2">
+                        <Store className="w-3 h-3 text-red-600" /> Tiendas Específicas
+                      </p>
+                      
+                      {newUser.assignedRestaurants && newUser.assignedRestaurants.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50 max-h-[120px] overflow-y-auto no-scrollbar">
+                          {newUser.assignedRestaurants.map(rid => {
+                            const store = restaurants.find(r => r.id === rid);
+                            return (
+                              <span
+                                key={rid}
+                                onClick={() => toggleItem(rid, 'assignedRestaurants')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[8.5px] font-black uppercase tracking-wide cursor-pointer border border-blue-200/50 transition-all select-none hover:scale-95"
+                                title="Haga clic para remover"
+                              >
+                                <span>{rid} - {store ? store.name : 'Cargando...'}</span>
+                                <X className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       <div className="relative">
                         <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                        <input type="text" placeholder="Buscar por CECO o Nombre..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-xs font-black" />
+                        <input
+                          type="text"
+                          placeholder="Buscar por CECO o Nombre..."
+                          value={searchTerm}
+                          onChange={e => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-xs font-black"
+                        />
                       </div>
-                      {filteredStores.length > 0 && (
-                        <div className="bg-slate-50 rounded-2xl p-2 border border-slate-100 space-y-1">
-                           {filteredStores.map(st => (
-                             <button key={st.id} onClick={() => toggleItem(st.id, 'assignedRestaurants')} className={`w-full p-2.5 rounded-xl text-left text-[9px] font-black uppercase flex items-center justify-between transition-colors ${newUser.assignedRestaurants?.includes(st.id) ? 'bg-white text-red-600 shadow-sm' : 'hover:bg-slate-100 text-slate-400'}`}>
-                               <span>{st.id} - {st.name}</span>
-                               {newUser.assignedRestaurants?.includes(st.id) && <Check className="w-3 h-3" />}
-                             </button>
-                           ))}
+                      
+                      {searchTerm.trim() !== '' && filteredStores.length > 0 && (
+                        <div className="bg-slate-50 rounded-2xl p-2 border border-slate-100 max-h-[150px] overflow-y-auto space-y-1 shadow-inner no-scrollbar">
+                           {filteredStores.map(st => {
+                             const isSelected = newUser.assignedRestaurants?.includes(st.id);
+                             return (
+                               <button
+                                 key={st.id}
+                                 type="button"
+                                 onClick={() => {
+                                   toggleItem(st.id, 'assignedRestaurants');
+                                   setSearchTerm('');
+                                 }}
+                                 className={`w-full p-2.5 rounded-xl text-left text-[9px] font-black uppercase flex items-center justify-between transition-all ${
+                                   isSelected ? 'bg-white text-red-600 shadow-sm border border-red-200' : 'hover:bg-slate-100 text-slate-400 border border-transparent'
+                                 }`}
+                               >
+                                 <span>{st.id} - {st.name}</span>
+                                 {isSelected && <Check className="w-3 h-3 text-red-600" />}
+                               </button>
+                             );
+                           })}
                         </div>
                       )}
                     </div>

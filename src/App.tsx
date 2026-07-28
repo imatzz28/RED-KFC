@@ -97,7 +97,7 @@ const App: React.FC = () => {
                   {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (
                     <Route path="/safe-hands" element={<SafeHands />} />
                   )}
-                  {nonGuest([UserRole.ADMIN]) && (
+                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('schedules')) && (
                     <Route path="/schedules" element={<Schedules />} />
                   )}
                   {nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) && (

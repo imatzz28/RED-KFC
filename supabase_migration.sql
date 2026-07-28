@@ -675,3 +675,10 @@ DROP POLICY IF EXISTS "Permitir gestión de turnos a gestores" ON public.schedul
 CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
   FOR ALL TO authenticated USING (true);
 
+-- ============================================================
+-- 6. ACTUALIZACIONES DE ESQUEMA (AJUSTES DE HORARIOS)
+-- ============================================================
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS activity TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "pendingDays" INTEGER DEFAULT 0;
+
+

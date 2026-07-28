@@ -536,7 +536,16 @@ export const dataService = {
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
   getBancaData: (): BancaData => dataService._cache.banca || { assignments: [] },
   getUsers: (): User[] => {
-    return dataService._cache.users || [];
+    const rawUsers = dataService._cache.users || [];
+    return rawUsers.map((u: any) => ({
+      ...u,
+      pendingDays: u.pendingDays ?? u.pending_days ?? 0,
+      assignedZones: u.assignedZones ?? u.assigned_zones ?? [],
+      assignedRestaurants: u.assignedRestaurants ?? u.assigned_restaurants ?? [],
+      assignedRegions: u.assignedRegions ?? u.assigned_regions ?? [],
+      allowedModules: u.allowedModules ?? u.allowed_modules ?? [],
+      guestCanEdit: u.guestCanEdit ?? u.guest_can_edit ?? false
+    }));
   },
 
   saveBancaData: async (banca: BancaData) => {
@@ -586,10 +595,21 @@ export const dataService = {
       assignedRegions: u.assignedRegions || [],
       allowedModules: u.allowedModules || [],
       guestCanEdit: u.guestCanEdit ?? false,
-      cedula: u.cedula || null
+      cedula: u.cedula || null,
+      pendingDays: u.pendingDays ?? 0
     }));
 
     await dataService.supabaseFetch('users', 'POST', normalized, '?on_conflict=id');
+  },
+
+  updateUserPendingDays: async (userId: string, pendingDays: number): Promise<void> => {
+    const users = dataService.getUsers();
+    const updatedUsers = users.map(u => u.id === userId ? { ...u, pendingDays } : u);
+    dataService._cache.users = updatedUsers;
+    await localforage.setItem('la_akademia_users', updatedUsers);
+
+    const payload = { pendingDays };
+    await dataService.supabaseFetch('users', 'PATCH', payload, `?id=eq.${userId}`);
   },
 
   clearAllDataInCloud: async () => {

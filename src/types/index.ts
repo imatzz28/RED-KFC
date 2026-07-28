@@ -39,6 +39,7 @@ export interface User {
   // GUEST granular permissions
   allowedModules?: string[];  // e.g. ['dashboard','banca','safe-hands']
   guestCanEdit?: boolean;     // false = solo lectura (default)
+  pendingDays?: number;       // Días pendientes
 }
 
 export interface StoreHistory {
@@ -153,5 +154,6 @@ export interface DailySchedule {
   check_in?: string;   // HH:MM
   check_out?: string;  // HH:MM
   restaurant_id?: string; // CECO
+  activity?: string;      // Actividad a realizar
   created_at?: string;
 }
