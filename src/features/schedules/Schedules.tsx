@@ -15,7 +15,8 @@ import {
   Check,
   Award,
   AlertCircle,
-  Download
+  Download,
+  MessageSquare
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -337,6 +338,9 @@ const Schedules: React.FC = () => {
   const [selectedShiftId, setSelectedShiftId] = useState<number | ''>('');
   const [modalRestaurantId, setModalRestaurantId] = useState('');
   const [modalActivity, setModalActivity] = useState('');
+  const [modalNoRestaurant, setModalNoRestaurant] = useState(false);
+  const [modalEnableMessage, setModalEnableMessage] = useState(false);
+  const [modalCustomMessage, setModalCustomMessage] = useState('');
   const [usersVersion, setUsersVersion] = useState(0);
   const [isSavingShift, setIsSavingShift] = useState(false);
 
@@ -591,6 +595,9 @@ const Schedules: React.FC = () => {
       setModalCheckOut(sched.check_out || '17:00');
       setModalRestaurantId(sched.restaurant_id || '');
       setModalActivity(sched.activity || '');
+      setModalNoRestaurant(Boolean(sched.no_restaurant || (!sched.restaurant_id && (sched.shift_type === 'Laboral' || sched.shift_type === 'Capacitación'))));
+      setModalEnableMessage(Boolean(sched.custom_message));
+      setModalCustomMessage(sched.custom_message || '');
       
       if (sched.shift_type === 'Laboral' && sched.check_in && sched.check_out) {
         const key = `${normalizeTime(sched.check_in)}-${normalizeTime(sched.check_out)}`;
@@ -603,6 +610,9 @@ const Schedules: React.FC = () => {
       setModalCheckIn('08:00');
       setModalCheckOut('17:00');
       setModalActivity('');
+      setModalNoRestaurant(false);
+      setModalEnableMessage(false);
+      setModalCustomMessage('');
       setSelectedShiftId(13); // Turno 13: 08:00 - 17:00
       
       // Default to the specialist's first assigned restaurant if any
@@ -647,14 +657,19 @@ const Schedules: React.FC = () => {
     setIsSavingShift(true);
 
     try {
+      const finalRestaurantId = modalNoRestaurant ? undefined : ((modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && modalRestaurantId ? modalRestaurantId : undefined);
+      const finalCustomMessage = modalEnableMessage && modalCustomMessage.trim() ? modalCustomMessage.trim().slice(0, 200) : undefined;
+
       const scheduleToSave: DailySchedule = {
         employee_id: selectedCell.specialist.id,
         date: selectedCell.date,
         shift_type: modalShiftType,
         check_in: modalShiftType === 'Laboral' ? modalCheckIn : undefined,
         check_out: modalShiftType === 'Laboral' ? modalCheckOut : undefined,
-        restaurant_id: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') && modalRestaurantId ? modalRestaurantId : undefined,
-        activity: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') ? modalActivity : undefined
+        restaurant_id: finalRestaurantId,
+        no_restaurant: modalNoRestaurant,
+        activity: (modalShiftType === 'Laboral' || modalShiftType === 'Capacitación') ? modalActivity : undefined,
+        custom_message: finalCustomMessage
       };
 
       await dataService.saveDailySchedule(scheduleToSave);
@@ -1118,6 +1133,12 @@ const Schedules: React.FC = () => {
                                   🎯 {s.activity}
                                 </div>
                               )}
+                              {s.custom_message && (
+                                <div className={`text-[8.5px] font-bold mt-1 tracking-tight truncate flex items-center gap-0.5 ${isCatalogShift ? 'text-emerald-700' : 'text-amber-700'}`} title={s.custom_message}>
+                                  <MessageSquare className="w-2.5 h-2.5 shrink-0 opacity-80" />
+                                  <span className="truncate">"{s.custom_message}"</span>
+                                </div>
+                              )}
                               <div className={`text-[9px] font-black mt-1.5 pt-1 border-t text-right ${isCatalogShift ? 'text-emerald-700/80 border-emerald-200/30' : 'text-amber-700/80 border-amber-200/30'}`}>
                                 {calculateHours(s)} Horas
                               </div>
@@ -1142,6 +1163,12 @@ const Schedules: React.FC = () => {
                                   🎯 {s.activity}
                                 </div>
                               )}
+                              {s.custom_message && (
+                                <div className="text-[8.5px] font-bold mt-1 tracking-tight truncate flex items-center gap-0.5 text-indigo-700" title={s.custom_message}>
+                                  <MessageSquare className="w-2.5 h-2.5 shrink-0 text-indigo-500" />
+                                  <span className="truncate">"{s.custom_message}"</span>
+                                </div>
+                              )}
                               <div className="text-[9px] font-black text-indigo-700/80 mt-1.5 pt-1 border-t border-indigo-200/30 text-right">
                                 {calculateHours(s)} Horas
                               </div>
@@ -1152,6 +1179,12 @@ const Schedules: React.FC = () => {
                             <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 text-center transition-all">
                               <div className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider">DESCANSO</div>
                               <div className="text-[9.5px] font-bold text-slate-400 mt-1">Día Libre</div>
+                              {s.custom_message && (
+                                <div className="text-[8.5px] font-bold mt-1 tracking-tight truncate flex items-center justify-center gap-0.5 text-slate-600" title={s.custom_message}>
+                                  <MessageSquare className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                                  <span className="truncate">"{s.custom_message}"</span>
+                                </div>
+                              )}
                               <div className="text-[9px] font-black text-slate-400/80 mt-1.5 pt-1 border-t border-slate-200/20">
                                 0.0 Horas
                               </div>
@@ -1331,6 +1364,14 @@ const Schedules: React.FC = () => {
                         <div className="p-4 rounded-2xl border border-slate-150 bg-white shadow-xs space-y-2">
                           <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Restaurante / CECO Asignado</span>
                           {(() => {
+                            if (selectedCell.schedule?.no_restaurant || !selectedCell.schedule?.restaurant_id) {
+                              return (
+                                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                  <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                                  <span>Sin restaurante específico</span>
+                                </div>
+                              );
+                            }
                             const rest = restaurants.find(r => r.id === selectedCell.schedule?.restaurant_id);
                             return rest ? (
                               <div className="flex items-start gap-3">
@@ -1352,6 +1393,18 @@ const Schedules: React.FC = () => {
                         <div className="p-4 rounded-2xl border border-slate-150 bg-white shadow-xs space-y-1">
                           <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Actividad Programada</span>
                           <p className="text-xs font-black text-[#0f1c2d]">🎯 {selectedCell.schedule.activity}</p>
+                        </div>
+                      )}
+
+                      {/* Mensaje Personalizado */}
+                      {selectedCell.schedule.custom_message && (
+                        <div className="p-4 rounded-2xl border border-blue-150 bg-blue-50/50 shadow-xs space-y-1">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-blue-600" /> Mensaje Personalizado
+                          </span>
+                          <p className="text-xs font-bold text-slate-800 leading-relaxed italic">
+                            "{selectedCell.schedule.custom_message}"
+                          </p>
                         </div>
                       )}
 
@@ -1469,22 +1522,80 @@ const Schedules: React.FC = () => {
                         </select>
                       </div>
 
-                      <div className="animate-slide-down">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Restaurante / CECO Asignado</label>
-                        <select 
-                          value={modalRestaurantId}
-                          onChange={(e) => setModalRestaurantId(e.target.value)}
-                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
-                        >
-                          <option value="">Selecciona una tienda del especialista...</option>
-                          {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
-                            <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
-                          ))}
-                        </select>
-                        <p className="text-[8px] text-slate-400 mt-1.5">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
+                      <div className="animate-slide-down space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Restaurante / CECO Asignado</label>
+                          <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={modalNoRestaurant}
+                              onChange={(e) => setModalNoRestaurant(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                            />
+                            <span>Sin restaurante específico</span>
+                          </label>
+                        </div>
+
+                        {!modalNoRestaurant ? (
+                          <>
+                            <select 
+                              value={modalRestaurantId}
+                              onChange={(e) => setModalRestaurantId(e.target.value)}
+                              className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate"
+                            >
+                              <option value="">Selecciona una tienda del especialista...</option>
+                              {getSpecialistAllowedRestaurants(selectedCell.specialist).map(r => (
+                                <option key={r.id} value={r.id}>{r.id} - {r.name} ({r.region})</option>
+                              ))}
+                            </select>
+                            <p className="text-[8px] text-slate-400">Restringido a las tiendas configuradas en la jurisdicción del especialista.</p>
+                          </>
+                        ) : (
+                          <div className="p-3 bg-slate-100/70 border border-slate-200/80 rounded-xl text-[9.5px] font-bold text-slate-500 flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>Horario programado sin un restaurante específico asignado.</span>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
+
+                  {/* Mensaje Personalizado Section (para cualquier tipo de turno) */}
+                  <div className="pt-3 border-t border-slate-100 space-y-2 animate-slide-down">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-[9.5px] font-black uppercase tracking-wider text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={modalEnableMessage}
+                          onChange={(e) => {
+                            setModalEnableMessage(e.target.checked);
+                            if (!e.target.checked) setModalCustomMessage('');
+                          }}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                        <MessageSquare className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        <span>Mensaje Personalizado</span>
+                      </label>
+                      {modalEnableMessage && (
+                        <span className={`text-[8.5px] font-bold ${modalCustomMessage.length >= 200 ? 'text-red-600' : 'text-slate-400'}`}>
+                          {modalCustomMessage.length}/200
+                        </span>
+                      )}
+                    </div>
+
+                    {modalEnableMessage && (
+                      <div className="animate-slide-down space-y-1">
+                        <textarea
+                          maxLength={200}
+                          rows={3}
+                          value={modalCustomMessage}
+                          onChange={(e) => setModalCustomMessage(e.target.value.slice(0, 200))}
+                          placeholder="Escribe un mensaje personalizado (máximo 200 caracteres)..."
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-xs font-medium text-slate-800 outline-none focus:border-red-600 transition-all resize-none"
+                        />
+                      </div>
+                    )}
+                  </div>
 
                   {modalShiftType === 'Capacitación' && (
                     <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-indigo-900 animate-slide-down">

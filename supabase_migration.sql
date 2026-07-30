@@ -680,5 +680,7 @@ CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
 -- ============================================================
 ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS activity TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "pendingDays" INTEGER DEFAULT 0;
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS custom_message TEXT;
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS no_restaurant BOOLEAN DEFAULT FALSE;
 
 

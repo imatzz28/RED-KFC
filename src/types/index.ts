@@ -155,5 +155,7 @@ export interface DailySchedule {
   check_out?: string;  // HH:MM
   restaurant_id?: string; // CECO
   activity?: string;      // Actividad a realizar
+  custom_message?: string; // Mensaje personalizado de máximo 200 caracteres
+  no_restaurant?: boolean; // Opción para no programar un restaurante específico
   created_at?: string;
 }
