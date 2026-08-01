@@ -549,19 +549,30 @@ const Schedules: React.FC = () => {
     return schedules.find(s => s.employee_id === specialistId && s.date === dateStr);
   };
 
-  // Calculate daily shift hours
+  // Calculate daily shift hours (subtracting break time if applicable)
   const calculateHours = (s?: DailySchedule): number => {
     if (!s) return 0;
     if (s.shift_type === 'Capacitación') return 7;
     if (s.shift_type === 'Descanso' || s.shift_type === 'Incapacidad') return 0;
     if (s.shift_type === 'Laboral' && s.check_in && s.check_out) {
+      const key = `${normalizeTime(s.check_in)}-${normalizeTime(s.check_out)}`;
+      const shiftId = SHIFT_CATALOG[key];
+      if (shiftId !== undefined) {
+        const catalogShift = SHIFT_CATALOG_LIST.find(cs => cs.id === shiftId);
+        if (catalogShift) {
+          return catalogShift.hours;
+        }
+      }
       try {
         const [inH, inM] = s.check_in.split(':').map(Number);
         const [outH, outM] = s.check_out.split(':').map(Number);
-        const diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-        if (diffMinutes > 0) {
-          return parseFloat((diffMinutes / 60).toFixed(1));
+        let diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+        if (diffMinutes < 0) {
+          diffMinutes += 24 * 60;
         }
+        const elapsed = diffMinutes / 60;
+        const breakHours = elapsed > 6 ? 1 : 0;
+        return parseFloat((elapsed - breakHours).toFixed(1));
       } catch {
         return 0;
       }
@@ -776,8 +787,7 @@ const Schedules: React.FC = () => {
             'Dia': d,
             'Mes': m,
             'Año': y,
-            'ID Centro de Costo': s.restaurant_id || spec.assignedRestaurants?.[0] || '',
-            'Actividad': s.activity || ''
+            'ID Centro de Costo': 'ENTRENAMIENTO'
           });
         });
       });
@@ -1236,12 +1246,13 @@ const Schedules: React.FC = () => {
                     {/* Días pendientes cell */}
                     <td className="py-4 px-5 text-center font-black border-r border-b border-slate-100 text-slate-900 bg-slate-50/20 w-[110px] min-w-[110px]">
                       {isReadOnly ? (
-                        <div className="text-sm font-black">{spec.pendingDays || 0}</div>
+                        <div className="text-sm font-black">{spec.pendingDays || '—'}</div>
                       ) : (
                         <input
                           type="number"
                           min="0"
-                          value={spec.pendingDays || 0}
+                          value={spec.pendingDays || ''}
+                          placeholder="—"
                           onChange={(e) => {
                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                             const updatedUsers = dataService.getUsers().map(u => u.id === spec.id ? { ...u, pendingDays: val } : u);
@@ -1252,7 +1263,7 @@ const Schedules: React.FC = () => {
                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                             try {
                               await dataService.updateUserPendingDays(spec.id, val);
-                              showToast('Días pendientes actualizados');
+                              if (val > 0) showToast('Días pendientes actualizados');
                             } catch (err) {
                               console.error(err);
                               showToast('Error al actualizar días pendientes', true);

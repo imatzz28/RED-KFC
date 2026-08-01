@@ -43,7 +43,7 @@ const SafeHands: React.FC = () => {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  const canEdit = auth.user?.role === UserRole.ADMIN;
+  const canEdit = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR;
   const canUpload = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER || (auth.user?.role === UserRole.GUEST && auth.user?.guestCanEdit === true);
 
   // Debounce search input
