@@ -684,3 +684,65 @@ ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS custom_message TEXT;
 ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS no_restaurant BOOLEAN DEFAULT FALSE;
 
 
+-- ============================================================
+-- 7. TABLA DE SOLICITUDES DE DÍAS Y PERMISOS (SCHEDULE REQUESTS)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.schedule_requests (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id          TEXT NOT NULL,           -- Cédula del especialista
+  date                 DATE NOT NULL,           -- Fecha solicitada (YYYY-MM-DD)
+  request_type         TEXT NOT NULL,           -- 'Descanso', 'Horario Específico', 'Permiso Especial'
+  requested_shift_id   INTEGER,                 -- ID del turno del catálogo (si aplica)
+  comments             TEXT,                    -- Justificación / nota del especialista
+  status               TEXT NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'PROCESADO'
+  created_at           TIMESTAMPTZ DEFAULT NOW(), -- Timestamp exacto de la solicitud
+  UNIQUE (employee_id, date)
+);
+
+-- Índices para mejorar búsquedas
+CREATE INDEX IF NOT EXISTS idx_sr_date       ON public.schedule_requests(date);
+CREATE INDEX IF NOT EXISTS idx_sr_employee   ON public.schedule_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_sr_status     ON public.schedule_requests(status);
+
+-- Habilitar RLS
+ALTER TABLE public.schedule_requests ENABLE ROW LEVEL SECURITY;
+
+-- Lectura para todos los roles autenticados (admins/coordinadores/líderes ven todo)
+DROP POLICY IF EXISTS "Lectura de solicitudes para autenticados" ON public.schedule_requests;
+CREATE POLICY "Lectura de solicitudes para autenticados" ON public.schedule_requests
+  FOR SELECT TO authenticated USING (true);
+
+-- Escritura: especialistas solo pueden gestionar sus propias solicitudes
+DROP POLICY IF EXISTS "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests;
+CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests
+  FOR ALL TO authenticated
+  USING (
+    -- Admin, Coordinator y Lider pueden ver y modificar todo
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+    )
+    OR
+    -- Specialist solo puede gestionar sus propias solicitudes (donde employee_id = su cédula)
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) = 'SPECIALIST'
+        AND u.cedula = employee_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+    )
+    OR
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) = 'SPECIALIST'
+        AND u.cedula = employee_id
+    )
+  );

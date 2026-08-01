@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { UserRole, DailySchedule, User, Restaurant } from '@/types';
+import { UserRole, DailySchedule, User, Restaurant, ScheduleRequest, ScheduleRequestType } from '@/types';
 import { dataService } from '@/services/dataService';
 import { 
   Calendar, 
@@ -16,7 +16,8 @@ import {
   Award,
   AlertCircle,
   Download,
-  MessageSquare
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -315,6 +316,7 @@ const Schedules: React.FC = () => {
   const isReadOnly = auth.user?.role === UserRole.SPECIALIST || auth.user?.role === UserRole.GUEST;
   const [currentWeekMonday, setCurrentWeekMonday] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<DailySchedule[]>([]);
+  const [scheduleRequests, setScheduleRequests] = useState<ScheduleRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm] = useState('');
   const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
@@ -344,6 +346,18 @@ const Schedules: React.FC = () => {
   const [usersVersion, setUsersVersion] = useState(0);
   const [isSavingShift, setIsSavingShift] = useState(false);
 
+  // ── Schedule Request Modal (Specialist) ───────────────────────────────────
+  const [requestModal, setRequestModal] = useState<{
+    specialist: User;
+    date: string;
+    dayName: string;
+    existingRequest?: ScheduleRequest;
+  } | null>(null);
+  const [reqType, setReqType] = useState<ScheduleRequestType>('Descanso');
+  const [reqShiftId, setReqShiftId] = useState<number | ''>('');
+  const [reqComments, setReqComments] = useState('');
+  const [isSavingRequest, setIsSavingRequest] = useState(false);
+
   // Compute the 7 dates of the week
   const weekDays = useMemo(() => {
     const days = [];
@@ -366,8 +380,12 @@ const Schedules: React.FC = () => {
     try {
       const startStr = weekDays[0].dateStr;
       const endStr = weekDays[6].dateStr;
-      const data = await dataService.getSchedulesForDateRange(startStr, endStr);
+      const [data, requests] = await Promise.all([
+        dataService.getSchedulesForDateRange(startStr, endStr),
+        dataService.getScheduleRequestsForDateRange(startStr, endStr)
+      ]);
       setSchedules(data);
+      setScheduleRequests(requests);
     } catch (err) {
       console.error('[Schedules] Error al cargar horarios:', err);
       showToast('Error al cargar horarios de la base de datos.', true);
@@ -379,6 +397,17 @@ const Schedules: React.FC = () => {
   useEffect(() => {
     loadWeekSchedules();
   }, [currentWeekMonday, loadWeekSchedules]);
+
+  // ── Request helpers ───────────────────────────────────────────────────────
+  // Returns true if the given date belongs to a future week (not the current one)
+  const isFutureWeek = useMemo(() => {
+    const thisMonday = getMonday(new Date());
+    return currentWeekMonday.getTime() > thisMonday.getTime();
+  }, [currentWeekMonday]);
+
+  const getCellRequest = (specialistId: string, dateStr: string): ScheduleRequest | undefined => {
+    return scheduleRequests.find(r => r.employee_id === specialistId && r.date === dateStr);
+  };
 
   // Toast auto-clear
   useEffect(() => {
@@ -588,6 +617,80 @@ const Schedules: React.FC = () => {
       total += calculateHours(s);
     });
     return parseFloat(total.toFixed(1));
+  };
+
+  // ── Handle request cell click (Specialist only) ──────────────────────────
+  const handleRequestCellClick = (specialist: User, day: { name: string; dateStr: string }) => {
+    if (!isFutureWeek) return; // Cannot request for current or past week
+    const existing = getCellRequest(specialist.id, day.dateStr);
+    setReqType(existing?.request_type || 'Descanso');
+    setReqShiftId(existing?.requested_shift_id || '');
+    setReqComments(existing?.comments || '');
+    setRequestModal({ specialist, date: day.dateStr, dayName: day.name, existingRequest: existing });
+  };
+
+  const handleSaveRequest = async () => {
+    if (!requestModal || !auth.user) return;
+    setIsSavingRequest(true);
+    try {
+      const now = new Date().toISOString();
+      const req: ScheduleRequest = {
+        employee_id: requestModal.specialist.id,
+        date: requestModal.date,
+        request_type: reqType,
+        requested_shift_id: reqType === 'Horario Específico' ? (reqShiftId || null) : null,
+        comments: reqComments.trim() || undefined,
+        status: 'PENDIENTE',
+        created_at: requestModal.existingRequest?.created_at || now
+      };
+      await dataService.saveScheduleRequest(req);
+      showToast('Solicitud enviada correctamente.');
+      await loadWeekSchedules();
+      setRequestModal(null);
+    } catch (err) {
+      console.error('[Schedules] Error al guardar solicitud:', err);
+      showToast('Error al guardar la solicitud.', true);
+    } finally {
+      setIsSavingRequest(false);
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestModal?.existingRequest) return;
+    setIsSavingRequest(true);
+    try {
+      await dataService.deleteScheduleRequest(requestModal.specialist.id, requestModal.date);
+      showToast('Solicitud cancelada.');
+      await loadWeekSchedules();
+      setRequestModal(null);
+    } catch (err) {
+      console.error('[Schedules] Error al cancelar solicitud:', err);
+      showToast('Error al cancelar la solicitud.', true);
+    } finally {
+      setIsSavingRequest(false);
+    }
+  };
+
+  const handleMarkRequestProcessed = async (req: ScheduleRequest) => {
+    if (!req.id) return;
+    try {
+      await dataService.markScheduleRequestProcessed(req.id);
+      showToast('Solicitud marcada como procesada.');
+      await loadWeekSchedules();
+    } catch (err) {
+      console.error('[Schedules] Error al procesar solicitud:', err);
+      showToast('Error al actualizar estado de la solicitud.', true);
+    }
+  };
+
+  // Format a timestamp in a readable way for Colombia
+  const formatRequestTimestamp = (isoStr?: string): string => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} a las ${pad(d.getHours())}:${pad(d.getMinutes())} hs`;
+    } catch { return isoStr; }
   };
 
   // Handle cell click (open editor modal)
@@ -1224,15 +1327,44 @@ const Schedules: React.FC = () => {
 
                       const isToday = day.dateStr === todayStr;
                       const holidayName = getColombianHoliday(day.dateObj);
+                      const cellRequest = getCellRequest(spec.id, day.dateStr);
+                      // Determine click behavior by role
+                      const handleCellInteraction = () => {
+                        if (isReadOnly) {
+                          // Specialist: open request modal only for future weeks
+                          handleRequestCellClick(spec, day);
+                        } else {
+                          handleCellClick(spec, day);
+                        }
+                      };
                       return (
-                        <td 
-                          key={day.dateStr} 
-                          onClick={() => handleCellClick(spec, day)}
+                        <td
+                          key={day.dateStr}
+                          onClick={handleCellInteraction}
                           className={`p-1.5 border-r border-b border-slate-100 hover:bg-slate-50 cursor-pointer w-[145px] min-w-[145px] vertical-align-top transition-all select-none group/cell 
-                            ${isToday ? 'bg-red-50/10' : ''} 
+                            ${isToday ? 'bg-red-50/10' : ''}
                             ${(!isToday && holidayName) ? 'bg-amber-50/10' : ''}`}
                         >
-                          {content}
+                          <div className="relative">
+                            {content}
+                            {/* Request badge — visible to admins/coordinators/leaders on cells with a pending request */}
+                            {!isReadOnly && cellRequest && (
+                              <div
+                                className={`absolute top-0.5 right-0.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider border shadow-sm pointer-events-none
+                                  ${cellRequest.status === 'PENDIENTE'
+                                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                                    : 'bg-slate-100 border-slate-300 text-slate-500'}`}
+                              >
+                                <span>{cellRequest.status === 'PENDIENTE' ? 'Solicitud' : 'Procesado'}</span>
+                              </div>
+                            )}
+                            {/* Specialist view: show own pending request badge */}
+                            {isReadOnly && cellRequest && auth.user?.id === spec.id && (
+                              <div className="absolute top-0.5 right-0.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider border shadow-sm bg-amber-50 border-amber-300 text-amber-700 pointer-events-none">
+                                <span>{cellRequest.status === 'PENDIENTE' ? 'Solicitud enviada' : 'Procesado'}</span>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       );
                     })}
@@ -1454,6 +1586,61 @@ const Schedules: React.FC = () => {
               ) : (
                 /* VISTA DE EDICIÓN (ADMIN / LÍDER / COORDINADOR) */
                 <>
+                  {/* Request notification panel — shown when the cell has a pending specialist request */}
+                  {(() => {
+                    const cellReq = selectedCell ? getCellRequest(selectedCell.specialist.id, selectedCell.date) : undefined;
+                    if (!cellReq) return null;
+                    const reqTypeLabel: Record<string, string> = {
+                      'Descanso': 'Día de Descanso',
+                      'Horario Específico': 'Horario Específico',
+                      'Permiso Especial': 'Permiso Especial'
+                    };
+                    const shiftLabel = cellReq.requested_shift_id
+                      ? SHIFT_CATALOG_LIST.find(s => s.id === cellReq.requested_shift_id)
+                      : null;
+                    return (
+                      <div className={`rounded-2xl border p-4 space-y-3 animate-slide-down ${cellReq.status === 'PENDIENTE' ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${cellReq.status === 'PENDIENTE' ? 'text-amber-700' : 'text-slate-500'}`}>
+                            Solicitud del Especialista — {cellReq.status}
+                          </span>
+                          {cellReq.status === 'PENDIENTE' && (
+                            <button
+                              onClick={() => handleMarkRequestProcessed(cellReq)}
+                              className="text-[8px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-700 text-white hover:bg-amber-800 transition-all"
+                            >
+                              Marcar Procesado
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wide w-20 shrink-0">Tipo:</span>
+                            <span className="text-[10px] font-black text-slate-800">{reqTypeLabel[cellReq.request_type] || cellReq.request_type}</span>
+                          </div>
+                          {shiftLabel && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wide w-20 shrink-0">Turno:</span>
+                              <span className="text-[10px] font-black text-slate-800">{shiftLabel.checkIn} - {shiftLabel.checkOut} ({shiftLabel.hours}h)</span>
+                            </div>
+                          )}
+                          {cellReq.comments && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wide w-20 shrink-0 mt-0.5">Comentario:</span>
+                              <span className="text-[10px] font-medium text-slate-700 italic leading-relaxed">"{cellReq.comments}"</span>
+                            </div>
+                          )}
+                          {cellReq.created_at && (
+                            <div className="flex items-center gap-2 pt-1 border-t border-amber-200/60">
+                              <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wide w-20 shrink-0">Enviado el:</span>
+                              <span className="text-[9px] font-bold text-slate-600">{formatRequestTimestamp(cellReq.created_at)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Type of Turn Selector */}
                   <div>
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Actividad</label>
@@ -1684,6 +1871,167 @@ const Schedules: React.FC = () => {
                     </button>
                   </div>
                 </>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Specialist Request Modal */}
+      {requestModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up">
+
+            {/* Header */}
+            <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                  Solicitud de Permiso o Preferencia
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 uppercase mt-0.5 tracking-tight">
+                  {requestModal.dayName} {requestModal.date.split('-').reverse().slice(0, 2).join('/')}
+                </h3>
+                <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                  Especialista: <span className="font-bold text-slate-800">{formatName(requestModal.specialist.username)}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setRequestModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-200/60 rounded-xl transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4">
+              {!isFutureWeek ? (
+                /* Blocked: current or past week */
+                <div className="py-8 px-4 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-slate-700">Semana no disponible</h4>
+                    <p className="text-[10px] font-medium text-slate-400 mt-1 leading-relaxed">
+                      Las solicitudes solo pueden realizarse para semanas futuras. Navega a la próxima semana para enviar una solicitud.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Existing request info */}
+                  {requestModal.existingRequest && (
+                    <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[9.5px] font-bold leading-relaxed">
+                      Ya tienes una solicitud enviada el {formatRequestTimestamp(requestModal.existingRequest.created_at)}. Puedes modificarla o cancelarla.
+                    </div>
+                  )}
+
+                  {/* Request type selector */}
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Solicitud</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {([
+                        { key: 'Descanso', label: 'Solicitar Día de Descanso', desc: 'Pedir un día libre en esta fecha.' },
+                        { key: 'Horario Específico', label: 'Solicitar Horario Específico', desc: 'Preferencia por un turno del catálogo.' },
+                        { key: 'Permiso Especial', label: 'Permiso Especial', desc: 'Otro tipo de permiso con justificación.' },
+                      ] as { key: ScheduleRequestType; label: string; desc: string }[]).map(item => (
+                        <button
+                          key={item.key}
+                          onClick={() => setReqType(item.key)}
+                          className={`px-4 py-3 rounded-xl border text-left transition-all ${reqType === item.key ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-slate-50 border-slate-150 text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          <div className="text-[10px] font-black uppercase">{item.label}</div>
+                          <div className={`text-[9px] mt-0.5 font-medium ${reqType === item.key ? 'text-slate-300' : 'text-slate-400'}`}>{item.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Shift selector (only for Horario Específico) */}
+                  {reqType === 'Horario Específico' && (
+                    <div className="animate-slide-down">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Turno Preferido del Catálogo</label>
+                      <div className="relative">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
+                        <select
+                          value={reqShiftId}
+                          onChange={(e) => setReqShiftId(e.target.value ? Number(e.target.value) : '')}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-amber-500 transition-all uppercase truncate"
+                        >
+                          <option value="">Selecciona un turno...</option>
+                          {SHIFT_CATALOG_LIST.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.checkIn} a {s.checkOut} ({s.hours}h {s.break > 0 ? `+ ${s.break}h descanso` : 'sin descanso'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comment/justification */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Comentario / Justificación</label>
+                      <span className={`text-[8.5px] font-bold ${reqComments.length >= 200 ? 'text-red-600' : 'text-slate-400'}`}>
+                        {reqComments.length}/200
+                      </span>
+                    </div>
+                    <textarea
+                      maxLength={200}
+                      rows={3}
+                      value={reqComments}
+                      onChange={(e) => setReqComments(e.target.value.slice(0, 200))}
+                      placeholder="Explica el motivo de tu solicitud (opcional)..."
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-xs font-medium text-slate-800 outline-none focus:border-amber-500 transition-all resize-none"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div className="bg-slate-50 p-4 sm:p-6 border-t border-slate-100 flex items-center justify-between shrink-0">
+              {isFutureWeek ? (
+                <>
+                  <div>
+                    {requestModal.existingRequest && (
+                      <button
+                        onClick={handleDeleteRequest}
+                        disabled={isSavingRequest}
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 border border-red-200 hover:border-red-600 hover:bg-red-50 text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Cancelar Solicitud</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setRequestModal(null)}
+                      disabled={isSavingRequest}
+                      className="px-4 py-2.5 border-2 border-slate-150 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all disabled:opacity-50"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      onClick={handleSaveRequest}
+                      disabled={isSavingRequest}
+                      className="flex items-center gap-1.5 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSavingRequest ? 'Enviando...' : (requestModal.existingRequest ? 'Actualizar' : 'Enviar Solicitud')}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full flex justify-end">
+                  <button
+                    onClick={() => setRequestModal(null)}
+                    className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               )}
             </div>
 

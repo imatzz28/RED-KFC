@@ -146,6 +146,21 @@ export interface SafeHandsSettings {
   updatedAt?: string;
 }
 
+// ── Schedule Requests ──────────────────────────────────────────────────────
+export type ScheduleRequestType = 'Descanso' | 'Horario Específico' | 'Permiso Especial';
+export type ScheduleRequestStatus = 'PENDIENTE' | 'PROCESADO';
+
+export interface ScheduleRequest {
+  id?: string;
+  employee_id: string;   // Cédula del especialista
+  date: string;          // YYYY-MM-DD — fecha solicitada
+  request_type: ScheduleRequestType;
+  requested_shift_id?: number | null; // ID del turno catalogo si es Horario Específico
+  comments?: string;     // Justificación / nota del especialista
+  status: ScheduleRequestStatus;
+  created_at?: string;   // TIMESTAMPTZ — registrado automáticamente
+}
+
 export interface DailySchedule {
   id?: string;
   employee_id: string; // Cédula del especialista (snake_case para matching directo de base de datos)

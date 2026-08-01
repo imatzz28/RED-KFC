@@ -1,5 +1,6 @@
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule } from '@/types';
+
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule, ScheduleRequest } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -1091,5 +1092,26 @@ export const dataService = {
   deleteDailySchedule: async (employeeId: string, date: string): Promise<void> => {
     const query = `?employee_id=eq.${employeeId}&date=eq.${date}`;
     await dataService.supabaseFetch('schedules', 'DELETE', null, query);
+  },
+
+  // ── Schedule Requests ────────────────────────────────────────────────────
+  getScheduleRequestsForDateRange: async (startDate: string, endDate: string): Promise<ScheduleRequest[]> => {
+    const query = `?date=gte.${startDate}&date=lte.${endDate}&order=created_at.asc`;
+    const result = await dataService.supabaseFetch('schedule_requests', 'GET', null, query);
+    return (result || []) as ScheduleRequest[];
+  },
+
+  saveScheduleRequest: async (req: ScheduleRequest): Promise<void> => {
+    await dataService.supabaseFetch('schedule_requests', 'POST', req, '?on_conflict=employee_id,date');
+  },
+
+  deleteScheduleRequest: async (employeeId: string, date: string): Promise<void> => {
+    const query = `?employee_id=eq.${employeeId}&date=eq.${date}`;
+    await dataService.supabaseFetch('schedule_requests', 'DELETE', null, query);
+  },
+
+  markScheduleRequestProcessed: async (id: string): Promise<void> => {
+    const query = `?id=eq.${id}`;
+    await dataService.supabaseFetch('schedule_requests', 'PATCH', { status: 'PROCESADO' }, query);
   }
 };
