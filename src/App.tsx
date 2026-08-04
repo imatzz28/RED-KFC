@@ -77,7 +77,7 @@ const App: React.FC = () => {
               const nonGuest = (roles: UserRole[]) => !isGuest && roles.includes(user.role);
 
               // Redirect destino para GUEST: primer módulo habilitado
-              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands'];
+              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands', 'schedules'];
               const guestHome = MODULE_ORDER.find(m => guestMods.includes(m)) ?? 'banca';
 
               return (
@@ -91,7 +91,7 @@ const App: React.FC = () => {
                   {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('entries-exits')) && (
                     <Route path="/entries-exits" element={<EntriesExitsReport />} />
                   )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || isGuest) && (
+                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || guestCan('banca')) && (
                     <Route path="/banca" element={<Banca />} />
                   )}
                   {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (

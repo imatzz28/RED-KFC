@@ -6,7 +6,7 @@ import { dataService } from '@/services/dataService';
 import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT, EVALUATION_GROUPS } from '@/utils/constants';
 import GradeEditor from '@/features/dashboard/GradeEditor';
 import { generateStorePdf } from './utils/pdfGenerator';
-import { getSeniorityMonths, normalizeRole } from './utils/storeUtils';
+import { getSeniorityMonths, normalizeRole, getStoreEmployeesForMonth } from './utils/storeUtils';
 
 
 import { useAppStore } from '@/store/useAppStore';
@@ -113,31 +113,8 @@ const MyStores: React.FC = () => {
   }, [assigned, currentPage]);
 
   const storesWithStats = useMemo(() => {
-    // Optimización: Agrupar empleados por tienda una sola vez (O(N))
-    const [y, m] = selectedMonth.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    const periodEndStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-    const periodStartStr = `${selectedMonth}-01`;
-
-    const employeesByStore = new Map<string, Employee[]>();
-    employees.forEach(e => {
-      // Lógica histórica: el empleado estuvo activo durante este período si
-      // ingresó antes del fin del período Y su salida fue DESPUÉS del inicio.
-      // Usar > (estricto) para que exit_date el día 1 del mes lo excluya de ese mes.
-      const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
-      const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-      const wasActiveInPeriod = (joinDateStr <= periodEndStr) && (exitDateStr > periodStartStr);
-
-      if (wasActiveInPeriod) {
-        const normId = (e.restaurant_id || '').trim().toUpperCase();
-        if (!employeesByStore.has(normId)) employeesByStore.set(normId, []);
-        employeesByStore.get(normId)!.push(e);
-      }
-    });
-
     return assigned.map(store => {
-      const normStoreId = store.id.trim().toUpperCase();
-      const storeEmps = employeesByStore.get(normStoreId) || [];
+      const storeEmps = getStoreEmployeesForMonth(store.id, selectedMonth, employees, summaryMap);
       if (storeEmps.length === 0) return { ...store, stats: { total: 0, approved: 0, percent: 0, groupStats: {} as Record<string, { avg: number, approvalRate: number, hasGrades: boolean }>, cargoCounts: {} as Record<string, number> } };
 
       let storeApprovedCount = 0;
@@ -148,14 +125,14 @@ const MyStores: React.FC = () => {
         groupData[gid] = { scores: [], passed: 0, hasGrades: false };
       });
 
-      const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+      const summaryMapLocal = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
 
       storeEmps.forEach(emp => {
         const normTitle = normalizeRole(emp.title);
         cargoCounts[normTitle] = (cargoCounts[normTitle] || 0) + 1;
 
         const effective = dataService.getEffectiveGrades(emp.id, selectedMonth, store.id);
-        const empSummary = summaryMap.get(String(emp.id).trim());
+        const empSummary = summaryMapLocal.get(String(emp.id).trim());
 
         let sum = 0;
         let isApproved = false;
@@ -235,19 +212,8 @@ const MyStores: React.FC = () => {
     }
 
     // Si no, hacemos el cálculo (para PDFs históricos por ejemplo)
-    const normStoreId = storeId.trim().toUpperCase();
-    const [yVal, mVal] = month.split('-').map(Number);
-    const lastDayVal = new Date(yVal, mVal, 0).getDate();
-    const periodEndStr = `${month}-${String(lastDayVal).padStart(2, '0')}`;
-    const periodStartStr = `${month}-01`;
-
-    const storeEmps = employees.filter(e => {
-      const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
-      const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-      // Mismo criterio que el PDF: exit_date estrictamente mayor que inicio del período
-      const wasActiveInPeriod = (joinDateStr <= periodEndStr) && (exitDateStr > periodStartStr);
-      return (e.restaurant_id || '').trim().toUpperCase() === normStoreId && wasActiveInPeriod;
-    });
+    const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
+    const storeEmps = getStoreEmployeesForMonth(storeId, month, employees, summaryMap);
     if (storeEmps.length === 0) return { total: 0, approved: 0, percent: 0, groupStats: {} as Record<string, { avg: number, approvalRate: number, hasGrades: boolean }>, cargoCounts: {} as Record<string, number> };
 
     let storeApprovedCount = 0;
@@ -257,8 +223,6 @@ const MyStores: React.FC = () => {
     Object.keys(EVALUATION_GROUPS).forEach(gid => {
       groupData[gid] = { scores: [], passed: 0, hasGrades: false };
     });
-
-    const summaryMap = new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
 
     storeEmps.forEach(emp => {
       const normTitle = normalizeRole(emp.title);
@@ -349,20 +313,7 @@ const MyStores: React.FC = () => {
 
   if (selectedStore) {
     const stats = getStoreStatsForMonth(selectedStore.id, selectedMonth);
-    const storeEmps = employees
-      .filter(e => {
-        // Normalizar IDs
-        const empStoreId = (e.restaurant_id || '').trim().toUpperCase();
-        const selStoreId = selectedStore.id.trim().toUpperCase();
-        if (empStoreId !== selStoreId) return false;
-
-        // Excluir CUALQUIER persona inactiva del panel de ingreso de notas.
-        // Una persona es inactiva si active=false O tiene fecha de salida registrada.
-        const hasExitDate = e.exit_date && e.exit_date.trim() !== '';
-        if (!e.active || hasExitDate) return false;
-
-        return true;
-      })
+    const storeEmps = getStoreEmployeesForMonth(selectedStore.id, selectedMonth, employees, summaryMap)
       .filter(e => empSearch === '' || e.name.toLowerCase().includes(empSearch.toLowerCase()) || e.id.includes(empSearch))
       .sort((a, b) => (JobHierarchy[a.title] || 99) - (JobHierarchy[b.title] || 99));
 

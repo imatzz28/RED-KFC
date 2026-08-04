@@ -1,4 +1,5 @@
-import { JobTitle } from '@/types';
+import { Employee, JobTitle } from '@/types';
+import { dataService } from '@/services/dataService';
 
 export const normalizeRole = (title: string): string => {
     const upper = (title || '').toUpperCase();
@@ -28,3 +29,43 @@ export const getMonthText = (monthStr: string) => {
     ];
     return `${months[parseInt(month, 10) - 1]} ${year}`;
 };
+
+export const getStoreEmployeesForMonth = (
+    storeId: string,
+    month: string,
+    employees: Employee[],
+    summaryMap?: Map<string, any>
+): Employee[] => {
+    const normStoreId = storeId.trim().toUpperCase();
+    const [yVal, mVal] = month.split('-').map(Number);
+    const lastDayVal = new Date(yVal, mVal, 0).getDate();
+    const periodEndStr = `${month}-${String(lastDayVal).padStart(2, '0')}`;
+    const periodStartStr = `${month}-01`;
+
+    return employees.filter(e => {
+        const empStoreId = (e.restaurant_id || '').trim().toUpperCase();
+        if (empStoreId !== normStoreId) return false;
+
+        const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
+        const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
+
+        // Estaba contratado en el período: ingresó antes del fin de mes Y no salió antes del inicio
+        let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr > periodStartStr);
+
+        if (isHistoricalActive) {
+            const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');
+            if (isRetired) {
+                const empSummary = summaryMap?.get(String(e.id).trim());
+                const effective = dataService.getEffectiveGrades(e.id, month, normStoreId);
+                const hasNotes = (effective && effective.length > 0) || !!empSummary;
+                // Si el empleado está retirado y NO tiene notas grabadas para este período, no se incluye
+                if (!hasNotes && (exitDateStr <= periodEndStr || !e.active)) {
+                    isHistoricalActive = false;
+                }
+            }
+        }
+
+        return isHistoricalActive;
+    });
+};
+

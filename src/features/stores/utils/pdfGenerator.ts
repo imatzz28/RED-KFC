@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { APPROVAL_THRESHOLD, EVALUATION_GROUPS } from '@/utils/constants';
 import { APP_LOGO_B64 } from '@/utils/logo_final';
 import { Restaurant, Employee, JobTitle, JobHierarchy } from '@/types';
-import { getMonthText, normalizeRole } from './storeUtils';
+import { getMonthText, normalizeRole, getStoreEmployeesForMonth } from './storeUtils';
 import { dataService } from '@/services/dataService';
 
 export const generateStorePdf = async (
@@ -16,34 +16,8 @@ export const generateStorePdf = async (
         setTimeout(async () => {
             try {
                 const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
-                // Filtrado histórico de empleados para el PDF
-                const [yVal, mVal] = pdfMonth.split('-').map(Number);
-                const lastDayVal = new Date(yVal, mVal, 0).getDate();
-                const periodEndStr = `${pdfMonth}-${String(lastDayVal).padStart(2, '0')}`;
-                const periodStartStr = `${pdfMonth}-01`;
-
-                const storeEmps = employees.filter(e => {
-                    // Normalizar IDs
-                    const empStoreId = (e.restaurant_id || '').trim().toUpperCase();
-                    const selStoreId = selectedStore.id.trim().toUpperCase();
-                    if (empStoreId !== selStoreId) return false;
-
-                    const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
-                    const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
-
-                    // Regla histórica correcta:
-                    // ✅ Incluir si: ingresó antes del fin del período Y
-                    //    (no tiene fecha de salida O su salida fue DESPUÉS del inicio del período)
-                    //
-                    // Ejemplo: exit_date=2026-05-01, período=MAYO (inicio 2026-05-01)
-                    //   → "2026-05-01" > "2026-05-01" = false → EXCLUIDO de mayo ✅
-                    //
-                    // Ejemplo: exit_date=2026-05-01, período=ABRIL (inicio 2026-04-01)
-                    //   → "2026-05-01" > "2026-04-01" = true → INCLUIDO en abril ✅
-                    const wasActiveInPeriod = (joinDateStr <= periodEndStr) && (exitDateStr > periodStartStr);
-
-                    return wasActiveInPeriod;
-                });
+                // Filtrado de empleados para el PDF usando la misma función unificada
+                const storeEmps = getStoreEmployeesForMonth(selectedStore.id, pdfMonth, employees);
 
                 const colors: Record<string, [number, number, number]> = {
                     kfcRed: [227, 24, 55],
