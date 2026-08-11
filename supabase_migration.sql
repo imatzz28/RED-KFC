@@ -262,7 +262,7 @@ CREATE POLICY "Public settings access" ON safe_hands_settings FOR SELECT USING (
 -- Asegurar columna guest_can_edit en tabla users
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS guest_can_edit BOOLEAN DEFAULT false;
 
--- Escritura permitida para roles autorizados (ADMIN, COORDINATOR, LIDER o GUEST)
+-- Escritura permitida para roles autorizados (ADMIN, COORDINATOR, LIDER o GUEST con permiso de edición)
 DROP POLICY IF EXISTS "Allow all for safe_hands_certs" ON safe_hands_certs;
 DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_certs;
 DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_certs;
@@ -273,14 +273,20 @@ USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 );
 
@@ -294,14 +300,20 @@ USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 );
 
@@ -315,14 +327,20 @@ USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER', 'GUEST')
+      AND (
+        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
+        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
+      )
   )
 );
 
