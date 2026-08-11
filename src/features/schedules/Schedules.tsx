@@ -37,112 +37,6 @@ const formatDateString = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-const SHIFT_CATALOG: Record<string, number> = {
-  '06:00-12:00': 1,
-  '06:00-15:00': 2,
-  '07:00-11:00': 3,
-  '07:00-12:00': 4,
-  '07:00-13:00': 5,
-  '07:00-15:00': 6,
-  '07:00-16:00': 7,
-  '07:00-17:00': 8,
-  '08:00-12:00': 9,
-  '08:00-13:00': 10,
-  '08:00-14:00': 11,
-  '08:00-16:00': 12,
-  '08:00-17:00': 13,
-  '08:00-18:00': 14,
-  '09:00-13:00': 15,
-  '09:00-14:00': 16,
-  '09:00-15:00': 17,
-  '09:00-17:00': 18,
-  '09:00-18:00': 19,
-  '09:00-19:00': 20,
-  '10:00-14:00': 21,
-  '10:00-15:00': 22,
-  '10:00-16:00': 23,
-  '10:00-18:00': 24,
-  '10:00-19:00': 25,
-  '10:00-20:00': 26,
-  '11:00-15:00': 27,
-  '11:00-16:00': 28,
-  '11:00-17:00': 29,
-  '11:00-19:00': 30,
-  '12:00-16:00': 33,
-  '12:00-17:00': 34,
-  '12:00-18:00': 35,
-  '12:00-20:00': 36,
-  '12:00-21:00': 37,
-  '12:00-22:00': 38,
-  '13:00-17:00': 39,
-  '13:00-18:00': 40,
-  '13:00-19:00': 41,
-  '13:00-21:00': 42,
-  '13:00-22:00': 43,
-  '13:00-23:00': 44,
-  '14:00-18:00': 45,
-  '14:00-19:00': 46,
-  '14:00-20:00': 47,
-  '14:00-22:00': 48,
-  '14:00-23:00': 49,
-  '14:00-00:00': 50,
-  '14:00-24:00': 50,
-  '15:00-19:00': 51,
-  '15:00-20:00': 52,
-  '15:00-21:00': 53,
-  '15:00-23:00': 54,
-  '15:00-00:00': 55,
-  '15:00-24:00': 55,
-  '15:00-01:00': 56,
-  '16:00-20:00': 57,
-  '16:00-21:05': 58,
-  '16:00-21:00': 58,
-  '16:00-22:00': 59,
-  '16:00-00:00': 60,
-  '16:00-24:00': 60,
-  '16:00-01:00': 61,
-  '16:00-02:00': 62,
-  '17:00-21:00': 63,
-  '17:00-22:00': 64,
-  '17:00-23:00': 65,
-  '17:00-01:00': 66,
-  '17:00-02:00': 67,
-  '17:00-03:00': 68,
-  '18:00-22:00': 69,
-  '18:00-23:00': 70,
-  '18:00-00:00': 71,
-  '18:00-24:00': 71,
-  '18:00-02:00': 72,
-  '18:00-03:00': 73,
-  '18:00-04:00': 74,
-  '19:00-23:00': 75,
-  '19:00-00:00': 76,
-  '19:00-24:00': 76,
-  '19:00-01:00': 77,
-  '19:00-03:00': 78,
-  '19:00-04:00': 79,
-  '19:00-05:00': 80,
-  '20:00-00:00': 81,
-  '20:00-24:00': 81,
-  '20:00-01:00': 82,
-  '20:00-02:00': 83,
-  '20:00-04:00': 84,
-  '20:00-05:00': 85,
-  '20:00-06:00': 86,
-  '21:00-01:00': 87,
-  '21:00-02:00': 88,
-  '21:00-03:00': 89,
-  '21:00-05:00': 90,
-  '21:00-06:00': 91,
-  '22:00-02:00': 92,
-  '22:00-03:00': 93,
-  '22:00-04:00': 94,
-  '22:00-06:00': 95,
-  '23:00-05:00': 96,
-  '00:00-06:00': 97,
-  '24:00-06:00': 97
-};
-
 const normalizeTime = (time?: string): string => {
   if (!time) return '';
   const parts = time.split(':');
@@ -160,45 +54,113 @@ interface CatalogShift {
   break: number;
 }
 
-const SHIFT_CATALOG_LIST: CatalogShift[] = [];
-const seenIds = new Set<number>();
+const SHIFT_CATALOG_LIST: CatalogShift[] = [
+  { id: 6, checkIn: '08:00', checkOut: '14:00', hours: 6, break: 0 },
+  { id: 12, checkIn: '09:00', checkOut: '13:00', hours: 4, break: 0 },
+  { id: 13, checkIn: '09:00', checkOut: '14:00', hours: 5, break: 0 },
+  { id: 14, checkIn: '09:00', checkOut: '15:00', hours: 6, break: 0 },
+  { id: 20, checkIn: '10:00', checkOut: '14:00', hours: 4, break: 0 },
+  { id: 21, checkIn: '10:00', checkOut: '15:00', hours: 5, break: 0 },
+  { id: 22, checkIn: '10:00', checkOut: '16:00', hours: 6, break: 0 },
+  { id: 28, checkIn: '11:00', checkOut: '15:00', hours: 4, break: 0 },
+  { id: 29, checkIn: '11:00', checkOut: '16:00', hours: 5, break: 0 },
+  { id: 36, checkIn: '12:00', checkOut: '16:00', hours: 4, break: 0 },
+  { id: 37, checkIn: '12:00', checkOut: '17:00', hours: 5, break: 0 },
+  { id: 107, checkIn: '18:00', checkOut: '22:00', hours: 4, break: 0 },
+  { id: 145, checkIn: '17:00', checkOut: '22:00', hours: 5, break: 0 },
+  { id: 146, checkIn: '17:00', checkOut: '23:00', hours: 6, break: 0 },
+  { id: 147, checkIn: '18:00', checkOut: '23:00', hours: 5, break: 0 },
+  { id: 148, checkIn: '18:00', checkOut: '00:00', hours: 6, break: 0 },
+  { id: 174, checkIn: '06:00', checkOut: '12:00', hours: 6, break: 0 },
+  { id: 175, checkIn: '07:00', checkOut: '13:00', hours: 6, break: 0 },
+  { id: 176, checkIn: '11:00', checkOut: '17:00', hours: 6, break: 0 },
+  { id: 177, checkIn: '12:00', checkOut: '18:00', hours: 6, break: 0 },
+  { id: 178, checkIn: '16:00', checkOut: '22:00', hours: 6, break: 0 },
+  { id: 200, checkIn: '17:00', checkOut: '21:00', hours: 4, break: 0 },
+  { id: 206, checkIn: '19:00', checkOut: '23:00', hours: 4, break: 0 },
+  { id: 207, checkIn: '19:00', checkOut: '00:00', hours: 5, break: 0 },
+  { id: 208, checkIn: '19:00', checkOut: '01:00', hours: 6, break: 0 },
+  { id: 209, checkIn: '20:00', checkOut: '00:00', hours: 4, break: 0 },
+  { id: 210, checkIn: '20:00', checkOut: '01:00', hours: 5, break: 0 },
+  { id: 211, checkIn: '20:00', checkOut: '02:00', hours: 6, break: 0 },
+  { id: 212, checkIn: '15:00', checkOut: '21:00', hours: 6, break: 0 },
+  { id: 213, checkIn: '16:00', checkOut: '21:00', hours: 5, break: 0 },
+  { id: 215, checkIn: '21:00', checkOut: '01:00', hours: 4, break: 0 },
+  { id: 216, checkIn: '21:00', checkOut: '02:00', hours: 5, break: 0 },
+  { id: 218, checkIn: '23:00', checkOut: '05:00', hours: 6, break: 0 },
+  { id: 220, checkIn: '13:00', checkOut: '17:00', hours: 4, break: 0 },
+  { id: 221, checkIn: '13:00', checkOut: '18:00', hours: 5, break: 0 },
+  { id: 222, checkIn: '13:00', checkOut: '19:00', hours: 6, break: 0 },
+  { id: 224, checkIn: '16:00', checkOut: '20:00', hours: 4, break: 0 },
+  { id: 226, checkIn: '07:00', checkOut: '11:00', hours: 4, break: 0 },
+  { id: 227, checkIn: '07:00', checkOut: '12:00', hours: 5, break: 0 },
+  { id: 228, checkIn: '08:00', checkOut: '12:00', hours: 4, break: 0 },
+  { id: 229, checkIn: '08:00', checkOut: '13:00', hours: 5, break: 0 },
+  { id: 230, checkIn: '14:00', checkOut: '18:00', hours: 4, break: 0 },
+  { id: 231, checkIn: '14:00', checkOut: '19:00', hours: 5, break: 0 },
+  { id: 232, checkIn: '14:00', checkOut: '20:00', hours: 6, break: 0 },
+  { id: 233, checkIn: '15:00', checkOut: '19:00', hours: 4, break: 0 },
+  { id: 234, checkIn: '15:00', checkOut: '20:00', hours: 5, break: 0 },
+  { id: 236, checkIn: '21:00', checkOut: '03:00', hours: 6, break: 0 },
+  { id: 237, checkIn: '22:00', checkOut: '02:00', hours: 4, break: 0 },
+  { id: 238, checkIn: '22:00', checkOut: '03:00', hours: 5, break: 0 },
+  { id: 239, checkIn: '00:00', checkOut: '06:00', hours: 6, break: 0 },
+  { id: 254, checkIn: '22:00', checkOut: '04:00', hours: 6, break: 0 },
+  { id: 256, checkIn: '06:00', checkOut: '15:00', hours: 8, break: 1 },
+  { id: 257, checkIn: '07:00', checkOut: '15:00', hours: 7, break: 1 },
+  { id: 258, checkIn: '07:00', checkOut: '16:00', hours: 8, break: 1 },
+  { id: 259, checkIn: '07:00', checkOut: '17:00', hours: 9, break: 1 },
+  { id: 260, checkIn: '08:00', checkOut: '16:00', hours: 7, break: 1 },
+  { id: 261, checkIn: '08:00', checkOut: '17:00', hours: 8, break: 1 },
+  { id: 262, checkIn: '08:00', checkOut: '18:00', hours: 9, break: 1 },
+  { id: 263, checkIn: '09:00', checkOut: '17:00', hours: 7, break: 1 },
+  { id: 264, checkIn: '09:00', checkOut: '18:00', hours: 8, break: 1 },
+  { id: 265, checkIn: '09:00', checkOut: '19:00', hours: 9, break: 1 },
+  { id: 266, checkIn: '10:00', checkOut: '18:00', hours: 7, break: 1 },
+  { id: 267, checkIn: '10:00', checkOut: '19:00', hours: 8, break: 1 },
+  { id: 268, checkIn: '10:00', checkOut: '20:00', hours: 9, break: 1 },
+  { id: 269, checkIn: '11:00', checkOut: '19:00', hours: 7, break: 1 },
+  { id: 270, checkIn: '11:00', checkOut: '20:00', hours: 8, break: 1 },
+  { id: 271, checkIn: '11:00', checkOut: '21:00', hours: 9, break: 1 },
+  { id: 272, checkIn: '12:00', checkOut: '20:00', hours: 7, break: 1 },
+  { id: 273, checkIn: '12:00', checkOut: '21:00', hours: 8, break: 1 },
+  { id: 274, checkIn: '12:00', checkOut: '22:00', hours: 9, break: 1 },
+  { id: 275, checkIn: '13:00', checkOut: '21:00', hours: 7, break: 1 },
+  { id: 276, checkIn: '13:00', checkOut: '22:00', hours: 8, break: 1 },
+  { id: 277, checkIn: '13:00', checkOut: '23:00', hours: 9, break: 1 },
+  { id: 278, checkIn: '14:00', checkOut: '22:00', hours: 7, break: 1 },
+  { id: 279, checkIn: '14:00', checkOut: '23:00', hours: 8, break: 1 },
+  { id: 280, checkIn: '14:00', checkOut: '00:00', hours: 9, break: 1 },
+  { id: 281, checkIn: '15:00', checkOut: '23:00', hours: 7, break: 1 },
+  { id: 282, checkIn: '15:00', checkOut: '00:00', hours: 8, break: 1 },
+  { id: 283, checkIn: '15:00', checkOut: '01:00', hours: 9, break: 1 },
+  { id: 284, checkIn: '16:00', checkOut: '00:00', hours: 7, break: 1 },
+  { id: 285, checkIn: '16:00', checkOut: '01:00', hours: 8, break: 1 },
+  { id: 286, checkIn: '16:00', checkOut: '02:00', hours: 9, break: 1 },
+  { id: 287, checkIn: '17:00', checkOut: '01:00', hours: 7, break: 1 },
+  { id: 288, checkIn: '17:00', checkOut: '02:00', hours: 8, break: 1 },
+  { id: 289, checkIn: '17:00', checkOut: '03:00', hours: 9, break: 1 },
+  { id: 290, checkIn: '18:00', checkOut: '02:00', hours: 7, break: 1 },
+  { id: 291, checkIn: '18:00', checkOut: '03:00', hours: 8, break: 1 },
+  { id: 292, checkIn: '18:00', checkOut: '04:00', hours: 9, break: 1 },
+  { id: 293, checkIn: '19:00', checkOut: '03:00', hours: 7, break: 1 },
+  { id: 294, checkIn: '19:00', checkOut: '04:00', hours: 8, break: 1 },
+  { id: 295, checkIn: '19:00', checkOut: '05:00', hours: 9, break: 1 },
+  { id: 296, checkIn: '20:00', checkOut: '04:00', hours: 7, break: 1 },
+  { id: 297, checkIn: '20:00', checkOut: '05:00', hours: 8, break: 1 },
+  { id: 298, checkIn: '20:00', checkOut: '06:00', hours: 9, break: 1 },
+  { id: 299, checkIn: '21:00', checkOut: '05:00', hours: 7, break: 1 },
+  { id: 300, checkIn: '21:00', checkOut: '06:00', hours: 8, break: 1 },
+  { id: 301, checkIn: '22:00', checkOut: '06:00', hours: 7, break: 1 }
+];
 
-Object.entries(SHIFT_CATALOG).forEach(([key, id]) => {
-  if (seenIds.has(id)) return;
-  seenIds.add(id);
-
-  const [checkIn, checkOut] = key.split('-');
-  let hours = 0;
-  let breakHours = 0;
-  try {
-    const [inH, inM] = checkIn.split(':').map(Number);
-    const [outH, outM] = checkOut.split(':').map(Number);
-    let diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    if (diffMinutes < 0) {
-      diffMinutes += 24 * 60;
-    }
-    const elapsed = diffMinutes / 60;
-    breakHours = elapsed > 6 ? 1 : 0;
-    hours = elapsed - breakHours;
-  } catch {
-    hours = 0;
+const SHIFT_CATALOG: Record<string, number> = {};
+SHIFT_CATALOG_LIST.forEach(item => {
+  SHIFT_CATALOG[`${item.checkIn}-${item.checkOut}`] = item.id;
+  if (item.checkOut === '00:00') {
+    SHIFT_CATALOG[`${item.checkIn}-24:00`] = item.id;
   }
-
-  // Ajuste de excepciones del catálogo oficial (ej. Turno 80)
-  if (id === 80) {
-    hours = 8;
-  }
-
-  SHIFT_CATALOG_LIST.push({
-    id,
-    checkIn,
-    checkOut,
-    hours,
-    break: breakHours
-  });
 });
-
-SHIFT_CATALOG_LIST.sort((a, b) => a.id - b.id);
 
 /**
  * Calcula la fecha de Pascua (algoritmo de Gauss)
