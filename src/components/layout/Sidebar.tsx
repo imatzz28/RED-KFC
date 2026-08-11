@@ -95,14 +95,14 @@ const Sidebar: React.FC = () => {
     <aside className={sidebarClasses}>
       {/* Header Area */}
       <div className="px-4 pt-5 pb-4 border-b border-slate-900/50 relative">
-        <div className="w-full bg-white rounded-2xl p-3 flex items-center gap-3 relative shadow-md">
-          <img src="/Favicon.png" alt="RED Logo" className="w-10 h-10 object-contain rounded-xl shrink-0" />
-          <div className="flex flex-col min-w-0 pr-5">
-            <span className="text-xl font-black text-red-600 tracking-tight leading-none italic uppercase">
+        <div className="w-full bg-white rounded-2xl p-3.5 flex items-center gap-3.5 relative shadow-md">
+          <img src="/Favicon.png" alt="RED Logo" className="w-12 h-12 object-contain rounded-xl shrink-0" />
+          <div className="flex flex-col min-w-0 justify-center pr-3">
+            <span className="text-2xl font-black text-red-600 tracking-tight leading-none uppercase">
               RED
             </span>
-            <span className="text-[7.5px] font-black uppercase text-slate-500 tracking-wider leading-tight mt-1.5">
-              RED DE ENTRENAMIENTO Y DESEMPEÑO
+            <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider leading-tight mt-1">
+              RUTA DE ENTRENAMIENTO Y DESEMPEÑO
             </span>
           </div>
           <button
