@@ -259,64 +259,67 @@ CREATE POLICY "Public person access" ON safe_hands_personnel FOR SELECT USING (t
 DROP POLICY IF EXISTS "Public settings access" ON safe_hands_settings;
 CREATE POLICY "Public settings access" ON safe_hands_settings FOR SELECT USING (true);
 
--- Escritura restringida únicamente a administradores
+-- Escritura permitida para roles autorizados (ADMIN, COORDINATOR, LIDER o GUEST con edición)
 DROP POLICY IF EXISTS "Allow all for safe_hands_certs" ON safe_hands_certs;
 DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_certs;
-CREATE POLICY "Allow write for admin only" ON safe_hands_certs 
+DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_certs;
+CREATE POLICY "Allow write for authorized roles" ON safe_hands_certs 
 FOR ALL 
 TO authenticated 
 USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 );
 
 DROP POLICY IF EXISTS "Allow all for safe_hands_personnel" ON safe_hands_personnel;
 DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_personnel;
-CREATE POLICY "Allow write for admin only" ON safe_hands_personnel 
+DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_personnel;
+CREATE POLICY "Allow write for authorized roles" ON safe_hands_personnel 
 FOR ALL 
 TO authenticated 
 USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 );
 
 DROP POLICY IF EXISTS "Allow all for safe_hands_settings" ON safe_hands_settings;
 DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_settings;
-CREATE POLICY "Allow write for admin only" ON safe_hands_settings 
+DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_settings;
+CREATE POLICY "Allow write for authorized roles" ON safe_hands_settings 
 FOR ALL 
 TO authenticated 
 USING (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM users
     WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(users.role) = 'ADMIN'
+      AND (UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true))
   )
 );
 
