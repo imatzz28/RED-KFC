@@ -6,12 +6,15 @@ import localforage from 'localforage';
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = (import.meta as any).env.VITE_SUPABASE_KEY;
+const rawSupabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+const rawSupabaseKey = (import.meta as any).env.VITE_SUPABASE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ ERROR: Las variables de entorno de Supabase no están configuradas. Verifica tu archivo .env o la configuración de tu hosting.");
+if (!rawSupabaseUrl || !rawSupabaseKey) {
+  console.warn("⚠️ Advertencia: Las variables de entorno VITE_SUPABASE_URL o VITE_SUPABASE_KEY no están configuradas en el archivo .env.");
 }
+
+const SUPABASE_URL = rawSupabaseUrl || 'https://placeholder.supabase.co';
+const SUPABASE_KEY = rawSupabaseKey || 'placeholder-anon-key';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 

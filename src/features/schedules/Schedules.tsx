@@ -837,11 +837,11 @@ const Schedules: React.FC = () => {
             const key = `${normalizeTime(s.check_in)}-${normalizeTime(s.check_out)}`;
             turnId = SHIFT_CATALOG[key] || `${s.check_in}-${s.check_out}`;
           } else if (s.shift_type === 'Capacitación') {
-            turnId = 'CAPACITACION';
+            turnId = -2;
           } else if (s.shift_type === 'Descanso') {
             turnId = -1;
           } else if (s.shift_type === 'Incapacidad') {
-            turnId = 'INCAPACIDAD';
+            turnId = -2;
           }
           
           const [y, m, d] = s.date.split('-').map(Number);

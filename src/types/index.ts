@@ -99,10 +99,13 @@ export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenad
 
 export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Potencial'];
 
+export type StoreCategory = 'A' | 'B' | 'C';
+
 export interface StoreIdeal {
   gerentes: number;
   lideresTurno: number;
   entrenadores: number;
+  category?: StoreCategory;
 }
 
 export interface BancaData {
