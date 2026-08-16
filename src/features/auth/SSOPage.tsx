@@ -6,6 +6,7 @@ import { dataService, supabase } from '@/services/dataService';
 const SSOPage: React.FC = () => {
   const navigate = useNavigate();
   const handleLogin = useAppStore(state => state.handleLogin);
+  const [status, setStatus] = useState('Iniciando sesión segura...');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -13,9 +14,14 @@ const SSOPage: React.FC = () => {
 
     const processUser = async () => {
       try {
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          setStatus('Autenticando token con Supabase...');
+        }
+
         const ssoUser = await dataService.checkSsoSession();
         if (ssoUser) {
           handled = true;
+          setStatus('¡Sesión activada! Entrando a GES...');
           await handleLogin(ssoUser);
           navigate('/dashboard', { replace: true });
           return true;
@@ -26,7 +32,7 @@ const SSOPage: React.FC = () => {
       return false;
     };
 
-    // 1. Escuchar eventos de autenticación de Supabase (por si el hash se está procesando)
+    // 1. Escuchar eventos de autenticación de Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (handled) return;
 
@@ -59,7 +65,7 @@ const SSOPage: React.FC = () => {
         KFC
       </div>
       <p className="text-sm font-bold text-slate-300 animate-pulse tracking-wide">
-        Conectando a GES desde RED...
+        {status}
       </p>
       {error && (
         <p className="text-xs text-red-400 font-semibold bg-red-950/50 px-4 py-2 rounded-xl border border-red-800">

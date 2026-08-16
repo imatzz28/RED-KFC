@@ -554,6 +554,26 @@ export const dataService = {
 
   checkSsoSession: async (): Promise<User | null> => {
     try {
+      // 1. Extraer e inyectar tokens explícitamente desde la URL Hash si vienen de RED
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+
+          if (!error && data?.session) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
+      }
+
+      // 2. Obtener sesión activa de Supabase
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return null;
 
