@@ -154,6 +154,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     initData: async (force: boolean = false) => {
         set({ syncStatus: 'syncing' });
 
+        // 0. Autenticación SSO desde RED (o restauración de sesión activa)
+        if (!get().auth.isAuthenticated) {
+            const ssoUser = await dataService.checkSsoSession();
+            if (ssoUser) {
+                set({ auth: { user: ssoUser, isAuthenticated: true } });
+            }
+        }
+
         // 1. Carga instantánea desde localforage (offline-first)
         await dataService.initLocalCache();
         get().refreshData();
@@ -194,18 +202,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 }));
 
-// Fix #18: Listener global de sesión expirada de Supabase.
-// Si el token JWT vence, Supabase emite SIGNED_OUT y la app hace logout limpio.
-// La bandera _isLoggingOut evita el loop: el propio handleLogout dispara SIGNED_OUT,
-// sin la bandera el listener volvería a llamar handleLogout indefinidamente.
-// Guardamos la suscripción para poder cancelarla si fuera necesario
+// Listener global de estado de autenticación (SSO y sesión expirada)
 let _authSubscription: { unsubscribe: () => void } | null = null;
 (async () => {
     const { supabase } = await import('@/services/dataService');
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-            const store = useAppStore.getState();
-            // Solo actuar si es una expiración externa (no un logout iniciado por nosotros)
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const store = useAppStore.getState();
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (!store.auth.isAuthenticated && session?.user) {
+                const ssoUser = await dataService.checkSsoSession();
+                if (ssoUser) {
+                    store.handleLogin(ssoUser);
+                }
+            }
+        } else if (event === 'SIGNED_OUT') {
             if (store.auth.isAuthenticated && !_isLoggingOut) {
                 console.warn('[Auth] Sesión expirada. Cerrando sesión automáticamente.');
                 store.handleLogout();

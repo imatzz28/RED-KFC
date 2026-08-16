@@ -552,6 +552,39 @@ export const dataService = {
     }));
   },
 
+  checkSsoSession: async (): Promise<User | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
+
+      const userEmail = session.user.email || '';
+      const baseUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+
+      const result = await dataService.supabaseFetch('users', 'GET', null, `?or=(id.eq.${session.user.id},username.ilike.${baseUsername})&limit=1`);
+      const profileData = Array.isArray(result) && result.length > 0 ? result[0] : null;
+
+      if (profileData) {
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+
+        return {
+          id: profileData.id,
+          username: profileData.username,
+          role: profileData.role as UserRole,
+          assignedRegions: profileData.assignedRegions ?? profileData.assigned_regions ?? [],
+          assignedZones: profileData.assignedZones ?? profileData.assigned_zones ?? [],
+          assignedRestaurants: profileData.assignedRestaurants ?? profileData.assigned_restaurants ?? [],
+          allowedModules: profileData.allowedModules ?? profileData.allowed_modules ?? [],
+          guestCanEdit: profileData.guestCanEdit ?? profileData.guest_can_edit ?? false
+        };
+      }
+    } catch (err) {
+      console.warn('[SSO] Error verificando sesión SSO:', err);
+    }
+    return null;
+  },
+
   saveBancaData: async (banca: BancaData) => {
     await localforage.setItem('la_akademia_banca', banca);
     dataService._cache.banca = banca;
