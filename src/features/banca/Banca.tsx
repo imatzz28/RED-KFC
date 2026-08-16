@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
@@ -9,7 +10,7 @@ import {
   Store, Building2, Users, Award, X, Save, Search, ChevronRight,
   UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp, Landmark,
   Plus, Check, Trash2, ChevronDown, AlertTriangle, Info, Calendar, BarChart3,
-  Bell, Trophy, Medal, MinusCircle, FileText, CheckCircle2
+  Bell, Trophy, Medal, MinusCircle, FileText, CheckCircle2, Maximize2, Minimize2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -1344,6 +1345,50 @@ const Banca: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isTableMaximized, setIsTableMaximized] = useState(false);
+  const toggleTableMaximize = async () => {
+    if (!isTableMaximized) {
+      setIsTableMaximized(true);
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (err) {
+        console.warn('Pantalla completa nativa no permitida:', err);
+      }
+    } else {
+      setIsTableMaximized(false);
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        console.warn('Error saliendo de pantalla completa nativa:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isTableMaximized) {
+        setIsTableMaximized(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isTableMaximized) {
+        setIsTableMaximized(false);
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTableMaximized]);
 
   // Set de IDs de colaboradores activos en la nómina
   const activeEmployeeIds = useMemo(() => {
@@ -1738,94 +1783,126 @@ const Banca: React.FC = () => {
       )}
 
       {/* NIVEL 2: Vista de Tabla Ultra Optimizada por Región */}
-      {view.level === 'table' && currentRegion && (
-        <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-3.5 space-y-2.5">
+      {view.level === 'table' && currentRegion && (() => {
+        const tableContent = (
+          <div className={
+            isTableMaximized 
+              ? "fixed inset-0 z-[99999] bg-white w-screen h-screen p-4 md:p-6 flex flex-col space-y-3 overflow-hidden animate-in fade-in duration-200"
+              : "bg-white rounded-[24px] border border-slate-100 shadow-sm p-3.5 space-y-2.5"
+          }>
           {/* Breadcrumb Limpio */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
-            <button
-              onClick={() => setView({ level: 'regions' })}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition"
-            >
-              <ArrowLeft className="w-4 h-4 text-red-600" />
-              <span>Volver a Regiones ({currentRegion.name})</span>
-            </button>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-lg">
-              Mostrando {currentStores.length} Tiendas
-            </span>
-          </div>
-
-          {/* Barra de Filtros Compacta */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50/80 p-2 rounded-2xl border border-slate-100">
-            <div>
-              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
-                Jefe de Área (Zona)
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedZone}
-                  onChange={e => {
-                    setSelectedZone(e.target.value);
-                    setSelectedStore('all');
-                  }}
-                  className="w-full bg-white text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 outline-none appearance-none cursor-pointer focus:border-red-500 transition-colors"
-                >
-                  <option value="all">Todos los Jefes de Área</option>
-                  {currentZones.map(z => (
-                    <option key={z.name} value={z.name}>{z.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            {isTableMaximized ? (
+              <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-tight">
+                <Store className="w-4 h-4 text-red-600" />
+                <span>Región: {currentRegion.name}</span>
               </div>
-            </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsTableMaximized(false);
+                  setView({ level: 'regions' });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition"
+              >
+                <ArrowLeft className="w-4 h-4 text-red-600" />
+                <span>Volver a Regiones ({currentRegion.name})</span>
+              </button>
+            )}
 
-            <div>
-              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
-                Tienda / CECO
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedStore}
-                  onChange={e => setSelectedStore(e.target.value)}
-                  className="w-full bg-white text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 outline-none appearance-none cursor-pointer focus:border-red-500 transition-colors"
-                >
-                  <option value="all">Todas las Tiendas</option>
-                  {availableStoreOptions.map(id => {
-                    const r = restaurants.find(x => x.id === id);
-                    return (
-                      <option key={id} value={id}>
-                        {id} - {r?.name ?? id}
-                      </option>
-                    );
-                  })}
-                </select>
-                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
-                Buscar Colaborador o Tienda
-              </label>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Nombre, cédula o CECO..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full bg-white pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-red-500 transition-colors placeholder:text-slate-300"
-                />
-                {search && (
-                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X className="w-3 h-3" />
-                  </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-lg">
+                Mostrando {currentStores.length} Tiendas
+              </span>
+              <button
+                type="button"
+                onClick={toggleTableMaximize}
+                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-red-600 transition cursor-pointer shadow-xs border border-slate-200/60"
+                title={isTableMaximized ? "Restaurar pantalla normal" : "Maximizar tabla a pantalla completa"}
+              >
+                {isTableMaximized ? (
+                  <Minimize2 className="w-4 h-4 text-red-600" />
+                ) : (
+                  <Maximize2 className="w-4 h-4 text-slate-700" />
                 )}
-              </div>
+              </button>
             </div>
           </div>
 
-          {/* TABLA DE TIENDAS */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 shadow-sm max-h-[calc(100vh-230px)] overflow-y-auto">
+            {/* Barra de Filtros Compacta */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50/80 p-2 rounded-2xl border border-slate-100">
+              <div>
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
+                  Jefe de Área (Zona)
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedZone}
+                    onChange={e => {
+                      setSelectedZone(e.target.value);
+                      setSelectedStore('all');
+                    }}
+                    className="w-full bg-white text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 outline-none appearance-none cursor-pointer focus:border-red-500 transition-colors"
+                  >
+                    <option value="all">Todos los Jefes de Área</option>
+                    {currentZones.map(z => (
+                      <option key={z.name} value={z.name}>{z.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
+                  Tienda / CECO
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedStore}
+                    onChange={e => setSelectedStore(e.target.value)}
+                    className="w-full bg-white text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 outline-none appearance-none cursor-pointer focus:border-red-500 transition-colors"
+                  >
+                    <option value="all">Todas las Tiendas</option>
+                    {availableStoreOptions.map(id => {
+                      const r = restaurants.find(x => x.id === id);
+                      return (
+                        <option key={id} value={id}>
+                          {id} - {r?.name ?? id}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">
+                  Buscar Colaborador o Tienda
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Nombre, cédula o CECO..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full bg-white pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-red-500 transition-colors placeholder:text-slate-300"
+                  />
+                  {search && (
+                    <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* TABLA DE TIENDAS */}
+            <div className={`overflow-x-auto rounded-2xl border border-slate-200/80 shadow-sm ${
+              isTableMaximized ? "flex-1 min-h-0 overflow-y-auto" : "max-h-[calc(100vh-230px)] overflow-y-auto"
+            }`}>
             <table className="w-full text-left border-collapse min-w-[780px]">
               <thead className="sticky top-0 z-20 shadow-md">
                 <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider divide-x divide-slate-800">
@@ -1988,7 +2065,10 @@ const Banca: React.FC = () => {
             </table>
           </div>
         </div>
-      )}
+        );
+
+        return isTableMaximized ? createPortal(tableContent, document.body) : tableContent;
+      })()}
 
       {/* Modal Dashboard Bancas (Filtrado Dinámicamente por Región / Zona / Tienda o Rol de Usuario) */}
       {isDashboardOpen && (
