@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import { dataService } from '@/services/dataService';
+import { dataService, supabase } from '@/services/dataService';
 
 const SSOPage: React.FC = () => {
   const navigate = useNavigate();
@@ -11,30 +11,46 @@ const SSOPage: React.FC = () => {
   useEffect(() => {
     let handled = false;
 
-    const checkSso = async () => {
+    const processUser = async () => {
       try {
         const ssoUser = await dataService.checkSsoSession();
         if (ssoUser) {
           handled = true;
           await handleLogin(ssoUser);
           navigate('/dashboard', { replace: true });
-        } else {
-          // Si tras 2.5s no hay sesión activa, redirigir a Login
-          setTimeout(() => {
-            if (!handled) {
-              handled = true;
-              navigate('/login', { replace: true });
-            }
-          }, 2500);
+          return true;
         }
       } catch (err) {
-        console.error('[SSOPage] Error validando SSO:', err);
-        setError('No se pudo validar la sesión de SSO.');
-        setTimeout(() => navigate('/login', { replace: true }), 3000);
+        console.error('[SSOPage] Error procesando usuario SSO:', err);
       }
+      return false;
     };
 
-    void checkSso();
+    // 1. Escuchar eventos de autenticación de Supabase (por si el hash se está procesando)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (handled) return;
+
+      if (session) {
+        const ok = await processUser();
+        if (ok) return;
+      }
+    });
+
+    // 2. Comprobar sesión inmediatamente
+    void processUser();
+
+    // 3. Fallback de seguridad: si tras 3.5 segundos no hay sesión activa, redirigir a Login
+    const timeout = setTimeout(() => {
+      if (!handled) {
+        handled = true;
+        navigate('/login', { replace: true });
+      }
+    }, 3500);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [handleLogin, navigate]);
 
   return (
@@ -43,7 +59,7 @@ const SSOPage: React.FC = () => {
         KFC
       </div>
       <p className="text-sm font-bold text-slate-300 animate-pulse tracking-wide">
-        Iniciando sesión en GES mediante RED...
+        Conectando a GES desde RED...
       </p>
       {error && (
         <p className="text-xs text-red-400 font-semibold bg-red-950/50 px-4 py-2 rounded-xl border border-red-800">
