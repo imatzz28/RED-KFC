@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { UserRole } from '@/types';
 import Login from '@/features/auth/Login';
+import SSOPage from '@/features/auth/SSOPage';
 import Dashboard from '@/features/dashboard/Dashboard';
 import Sidebar from '@/components/layout/Sidebar';
 import AdminPanel from '@/features/admin/AdminPanel';
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   if (!auth.isAuthenticated) {
     return (
       <Routes>
+        <Route path="/sso" element={<SSOPage />} />
         <Route path="/verify" element={<PublicValidation />} />
         <Route path="/verify/:id" element={<PublicValidation />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
