@@ -17,6 +17,7 @@ const SUPABASE_URL = rawSupabaseUrl || 'https://placeholder.supabase.co';
 const SUPABASE_KEY = rawSupabaseKey || 'placeholder-anon-key';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+let _ssoInFlightPromise: Promise<User | null> | null = null;
 
 const getAuthHeaders = async (isUpsert: boolean = false) => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -553,56 +554,70 @@ export const dataService = {
   },
 
   checkSsoSession: async (): Promise<User | null> => {
-    try {
-      // 1. Extraer e inyectar tokens explícitamente desde la URL Hash si vienen de RED
-      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+    if (_ssoInFlightPromise) {
+      return _ssoInFlightPromise;
+    }
 
-        if (accessToken) {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          });
+    _ssoInFlightPromise = (async () => {
+      try {
+        // 1. Extraer e inyectar tokens explícitamente desde la URL Hash si vienen de RED
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          const hash = window.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
 
-          if (!error && data?.session) {
-            window.history.replaceState(null, '', window.location.pathname);
+          if (accessToken) {
+            try {
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || '',
+              });
+
+              if (!error && data?.session) {
+                window.history.replaceState(null, '', window.location.pathname);
+              }
+            } catch (lockErr) {
+              console.warn('[SSO] Manejo suave de bloqueo de sesión Supabase:', lockErr);
+            }
           }
         }
-      }
 
-      // 2. Obtener sesión activa de Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
+        // 2. Obtener sesión activa de Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return null;
 
-      const userEmail = session.user.email || '';
-      const baseUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+        const userEmail = session.user.email || '';
+        const baseUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
 
-      const result = await dataService.supabaseFetch('users', 'GET', null, `?or=(id.eq.${session.user.id},username.ilike.${baseUsername})&limit=1`);
-      const profileData = Array.isArray(result) && result.length > 0 ? result[0] : null;
+        const result = await dataService.supabaseFetch('users', 'GET', null, `?or=(id.eq.${session.user.id},username.ilike.${baseUsername})&limit=1`);
+        const profileData = Array.isArray(result) && result.length > 0 ? result[0] : null;
 
-      if (profileData) {
-        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-          window.history.replaceState(null, '', window.location.pathname);
+        if (profileData) {
+          if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+
+          return {
+            id: profileData.id,
+            username: profileData.username,
+            role: profileData.role as UserRole,
+            assignedRegions: profileData.assignedRegions ?? profileData.assigned_regions ?? [],
+            assignedZones: profileData.assignedZones ?? profileData.assigned_zones ?? [],
+            assignedRestaurants: profileData.assignedRestaurants ?? profileData.assigned_restaurants ?? [],
+            allowedModules: profileData.allowedModules ?? profileData.allowed_modules ?? [],
+            guestCanEdit: profileData.guestCanEdit ?? profileData.guest_can_edit ?? false
+          };
         }
-
-        return {
-          id: profileData.id,
-          username: profileData.username,
-          role: profileData.role as UserRole,
-          assignedRegions: profileData.assignedRegions ?? profileData.assigned_regions ?? [],
-          assignedZones: profileData.assignedZones ?? profileData.assigned_zones ?? [],
-          assignedRestaurants: profileData.assignedRestaurants ?? profileData.assigned_restaurants ?? [],
-          allowedModules: profileData.allowedModules ?? profileData.allowed_modules ?? [],
-          guestCanEdit: profileData.guestCanEdit ?? profileData.guest_can_edit ?? false
-        };
+      } catch (err) {
+        console.warn('[SSO] Error verificando sesión SSO:', err);
+      } finally {
+        _ssoInFlightPromise = null;
       }
-    } catch (err) {
-      console.warn('[SSO] Error verificando sesión SSO:', err);
-    }
-    return null;
+      return null;
+    })();
+
+    return _ssoInFlightPromise;
   },
 
   saveBancaData: async (banca: BancaData) => {
