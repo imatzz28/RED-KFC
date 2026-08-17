@@ -177,3 +177,5 @@ export interface DailySchedule {
   no_restaurant?: boolean; // Opción para no programar un restaurante específico
   created_at?: string;
 }
+
+export * from './pulse';

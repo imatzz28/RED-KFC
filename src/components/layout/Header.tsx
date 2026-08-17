@@ -85,21 +85,33 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-      <div className="flex items-center space-x-5">
+    <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+      <div className="flex items-center space-x-4">
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition shadow-inner"
+          className="lg:hidden p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition shadow-inner"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5" />
         </button>
 
+        <div className="flex items-center gap-3">
+          <img src="/Favicon.png" alt="RED Logo" className="w-8 h-8 object-contain rounded-xl shrink-0 hidden sm:block" />
+          <div>
+            <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none uppercase italic">
+              RED <span className="text-[#E4002B]">KFC</span>
+            </h1>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
+              Ruta de Entrenamiento y Desempeño
+            </p>
+          </div>
+        </div>
+
         {location.pathname === '/my-stores' && (
-          <div className="flex flex-col animate-in fade-in duration-300">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 italic">Periodo Evaluación</label>
-            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-2 border-slate-100 rounded-xl text-xs font-black text-slate-700 uppercase tracking-wider shadow-sm select-none">
-              <div className="p-1.5 bg-red-50 rounded-lg shrink-0">
-                <Calendar className="w-4 h-4 text-red-600" />
+          <div className="hidden md:flex flex-col animate-in fade-in duration-300 ml-4 border-l border-slate-200 pl-4">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Periodo Evaluación</label>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-700 uppercase tracking-wider shadow-2xs select-none">
+              <div className="p-1 bg-red-50 rounded-md shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-red-600" />
               </div>
               <span>{(() => {
                 if (!selectedMonth) return '';

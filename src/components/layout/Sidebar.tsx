@@ -13,7 +13,8 @@ import {
   CloudOff,
   RefreshCw,
   ChevronRight,
-  Calendar
+  Calendar,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -73,6 +74,13 @@ const Sidebar: React.FC = () => {
       icon: Calendar,
       roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST],
       key: 'schedules'
+    },
+    {
+      to: '/pulse',
+      label: 'Pulse',
+      icon: FileSpreadsheet,
+      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST, UserRole.GUEST],
+      key: 'encuestas'
     },
     {
       to: '/admin',

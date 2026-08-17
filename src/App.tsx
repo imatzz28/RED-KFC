@@ -14,6 +14,8 @@ import { useAppStore } from '@/store/useAppStore';
 import SafeHands from '@/features/safe-hands/SafeHands';
 import PublicValidation from '@/features/safe-hands/PublicValidation';
 import Schedules from '@/features/schedules/Schedules';
+import PulseModule from '@/features/pulse/PulseModule';
+import { PublicSurveyRunner } from '@/features/pulse/PublicSurveyRunner';
 import { AlertTriangle, Info } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -49,6 +51,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/verify" element={<PublicValidation />} />
         <Route path="/verify/:id" element={<PublicValidation />} />
+        <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
       </Routes>
     );
@@ -77,7 +80,7 @@ const App: React.FC = () => {
               const nonGuest = (roles: UserRole[]) => !isGuest && roles.includes(user.role);
 
               // Redirect destino para GUEST: primer módulo habilitado
-              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands', 'schedules'];
+              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands', 'schedules', 'encuestas'];
               const guestHome = MODULE_ORDER.find(m => guestMods.includes(m)) ?? 'banca';
 
               return (
@@ -99,6 +102,12 @@ const App: React.FC = () => {
                   )}
                   {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('schedules')) && (
                     <Route path="/schedules" element={<Schedules />} />
+                  )}
+                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('encuestas')) && (
+                    <>
+                      <Route path="/pulse" element={<PulseModule />} />
+                      <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
+                    </>
                   )}
                   {nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) && (
                     <Route path="/admin" element={<AdminPanel />} />

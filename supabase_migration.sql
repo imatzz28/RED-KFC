@@ -762,6 +762,201 @@ CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedu
       WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
         AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
     )
+  v_email := LOWER(p_username) || '@kfc.co';
+  
+  -- Verificar accion
+  IF p_action = 'CREATE' THEN
+    -- Verificar si ya existe en auth.users
+    SELECT id INTO v_user_id FROM auth.users WHERE email = v_email;
+    IF v_user_id IS NOT NULL THEN
+      RETURN v_user_id::TEXT;
+    END IF;
+    
+    v_user_id := gen_random_uuid();
+    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
+    
+    -- Columnas base obligatorias comunes (inicializadas como ARRAY)
+    v_cols := ARRAY['id', 'instance_id', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at', 'aud', 'role', 'raw_app_meta_data', 'raw_user_meta_data'];
+    v_vals := ARRAY[quote_literal(v_user_id::text), quote_literal('00000000-0000-0000-0000-000000000000'), quote_literal(v_email), quote_literal(v_encrypted_password), 'NOW()', 'NOW()', 'NOW()', quote_literal('authenticated'), quote_literal('authenticated'), quote_literal('{"provider":"email","providers":["email"]}'), quote_literal('{}')];
+    
+    -- Inspeccionar dinámicamente columnas existentes en la tabla auth.users
+    -- y setear valores seguros por defecto para evitar errores de Scan de GoTrue (NULL a tipo estricto)
+    FOR v_col IN 
+      SELECT column_name::text as colname
+      FROM information_schema.columns 
+      WHERE table_schema = 'auth' AND table_name = 'users'
+    LOOP
+      IF v_col.colname = 'is_super_admin' THEN
+        v_cols := array_append(v_cols, 'is_super_admin');
+        v_vals := array_append(v_vals, 'FALSE');
+      ELSIF v_col.colname = 'is_sso_user' THEN
+        v_cols := array_append(v_cols, 'is_sso_user');
+        v_vals := array_append(v_vals, 'FALSE');
+      ELSIF v_col.colname = 'email_change_confirm_status' THEN
+        v_cols := array_append(v_cols, 'email_change_confirm_status');
+        v_vals := array_append(v_vals, '0');
+      ELSIF v_col.colname = 'confirmation_token' THEN
+        v_cols := array_append(v_cols, 'confirmation_token');
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'recovery_token' THEN
+        v_cols := array_append(v_cols, 'recovery_token');
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'phone_change' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change_token_new' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'phone_change_token_new' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'email_change_token_current' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      ELSIF v_col.colname = 'reauthentication_token' THEN
+        v_cols := array_append(v_cols, v_col.colname);
+        v_vals := array_append(v_vals, quote_literal(''));
+      END IF;
+    END LOOP;
+    
+    -- Compilar y ejecutar la inserción dinámica
+    v_sql := 'INSERT INTO auth.users (' || array_to_string(v_cols, ', ') || ') VALUES (' || array_to_string(v_vals, ', ') || ')';
+    EXECUTE v_sql;
+    
+    -- Insertar en auth.identities
+    INSERT INTO auth.identities (
+      id,
+      user_id,
+      identity_data,
+      provider,
+      last_sign_in_at,
+      created_at,
+      updated_at,
+      provider_id
+    ) VALUES (
+      gen_random_uuid(),
+      v_user_id,
+      json_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true, 'phone_verified', false)::jsonb,
+      'email',
+      NOW(),
+      NOW(),
+      NOW(),
+      v_email
+    );
+    
+    RETURN v_user_id::TEXT;
+    
+  ELSIF p_action = 'UPDATE_PASSWORD' THEN
+    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
+    UPDATE auth.users 
+    SET encrypted_password = v_encrypted_password,
+        updated_at = NOW()
+    WHERE email = v_email;
+    RETURN 'PASSWORD_UPDATED';
+    
+  ELSIF p_action = 'DELETE' THEN
+    DELETE FROM auth.users WHERE email = v_email;
+    RETURN 'USER_DELETED';
+  ELSE
+    RAISE EXCEPTION 'Accion no valida: %', p_action;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+
+-- ============================================================
+-- 5. TABLA DE HORARIOS (SCHEDULES)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.schedules (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id   TEXT NOT NULL,       -- Cédula del especialista
+  date          DATE NOT NULL,       -- Fecha del turno (YYYY-MM-DD)
+  shift_type    TEXT NOT NULL,       -- 'Laboral', 'Capacitación', 'Descanso', 'Incapacidad'
+  check_in      TEXT,                -- Formato 'HH:MM' (ej. '08:00')
+  check_out     TEXT,                -- Formato 'HH:MM' (ej. '16:00')
+  restaurant_id TEXT,              -- CECO de la tienda asignada
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, date)
+);
+
+-- Habilitar RLS en la tabla
+ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS para Horarios
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.schedules;
+CREATE POLICY "Permitir lectura a autenticados" ON public.schedules
+  FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir gestión de turnos a gestores" ON public.schedules;
+CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
+  FOR ALL TO authenticated USING (true);
+
+-- ============================================================
+-- 6. ACTUALIZACIONES DE ESQUEMA (AJUSTES DE HORARIOS)
+-- ============================================================
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS activity TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "pendingDays" INTEGER DEFAULT 0;
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS custom_message TEXT;
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS no_restaurant BOOLEAN DEFAULT FALSE;
+
+
+-- ============================================================
+-- 7. TABLA DE SOLICITUDES DE DÍAS Y PERMISOS (SCHEDULE REQUESTS)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.schedule_requests (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id          TEXT NOT NULL,           -- Cédula del especialista
+  date                 DATE NOT NULL,           -- Fecha solicitada (YYYY-MM-DD)
+  request_type         TEXT NOT NULL,           -- 'Descanso', 'Horario Específico', 'Permiso Especial'
+  requested_shift_id   INTEGER,                 -- ID del turno del catálogo (si aplica)
+  comments             TEXT,                    -- Justificación / nota del especialista
+  status               TEXT NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'PROCESADO'
+  created_at           TIMESTAMPTZ DEFAULT NOW(), -- Timestamp exacto de la solicitud
+  UNIQUE (employee_id, date)
+);
+
+-- Índices para mejorar búsquedas
+CREATE INDEX IF NOT EXISTS idx_sr_date       ON public.schedule_requests(date);
+CREATE INDEX IF NOT EXISTS idx_sr_employee   ON public.schedule_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_sr_status     ON public.schedule_requests(status);
+
+-- Habilitar RLS
+ALTER TABLE public.schedule_requests ENABLE ROW LEVEL SECURITY;
+
+-- Lectura para todos los roles autenticados (admins/coordinadores/líderes ven todo)
+DROP POLICY IF EXISTS "Lectura de solicitudes para autenticados" ON public.schedule_requests;
+CREATE POLICY "Lectura de solicitudes para autenticados" ON public.schedule_requests
+  FOR SELECT TO authenticated USING (true);
+
+-- Escritura: especialistas solo pueden gestionar sus propias solicitudes
+DROP POLICY IF EXISTS "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests;
+CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests
+  FOR ALL TO authenticated
+  USING (
+    -- Admin, Coordinator y Lider pueden ver y modificar todo
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+    )
+    OR
+    -- Specialist solo puede gestionar sus propias solicitudes (donde employee_id = su cédula)
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) = 'SPECIALIST'
+        AND u.cedula = employee_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+    )
     OR
     EXISTS (
       SELECT 1 FROM public.users u
@@ -770,3 +965,61 @@ CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedu
         AND u.cedula = employee_id
     )
   );
+
+-- ========================================================
+-- RED PULSE - ENCUESTAS Y EVALUACIONES (SURVEYS & RESPONSES)
+-- ========================================================
+
+CREATE TABLE IF NOT EXISTS public.surveys (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  owner_name TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  type TEXT NOT NULL DEFAULT 'survey',
+  category TEXT DEFAULT 'General',
+  status TEXT NOT NULL DEFAULT 'draft',
+  access_mode TEXT NOT NULL DEFAULT 'open',
+  access_password TEXT,
+  passing_score_percent INTEGER DEFAULT 70,
+  scoring_type TEXT DEFAULT 'simple',
+  theme JSONB NOT NULL DEFAULT '{"primary_color": "#E4002B", "background_color": "#F8FAFC", "card_style": "standard", "font_family": "jakarta"}'::jsonb,
+  thank_you JSONB NOT NULL DEFAULT '{"title": "¡Muchas gracias!", "message": "Tus respuestas han sido registradas exitosamente.", "show_button": false}'::jsonb,
+  questions JSONB DEFAULT '[]'::jsonb,
+  hidden_fields JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.responses (
+  id TEXT PRIMARY KEY,
+  survey_id TEXT NOT NULL REFERENCES public.surveys(id) ON DELETE CASCADE,
+  token TEXT,
+  respondent_id TEXT,
+  respondent_email TEXT,
+  respondent_ref TEXT,
+  status TEXT NOT NULL DEFAULT 'completed',
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ DEFAULT NOW(),
+  duration_seconds INTEGER DEFAULT 0,
+  score_percent INTEGER,
+  passed BOOLEAN,
+  earned_points INTEGER,
+  total_points INTEGER,
+  last_question_id TEXT,
+  answers JSONB DEFAULT '[]'::jsonb,
+  segments JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.responses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Lectura pública de encuestas publicadas" ON public.surveys;
+CREATE POLICY "Lectura pública de encuestas publicadas" ON public.surveys FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Control total para personal autenticado en encuestas" ON public.surveys;
+CREATE POLICY "Control total para personal autenticado en encuestas" ON public.surveys FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir guardar y actualizar respuestas" ON public.responses;
+CREATE POLICY "Permitir guardar y actualizar respuestas" ON public.responses FOR ALL USING (true) WITH CHECK (true);

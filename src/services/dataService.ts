@@ -1,6 +1,6 @@
 
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule, ScheduleRequest } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule, ScheduleRequest, Survey, ResponseRecord } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -198,6 +198,9 @@ export const dataService = {
     hierarchy: null as HierarchyData | null,
     users: null as User[] | null,
     banca: null as BancaData | null,
+    surveys: null as Survey[] | null,
+    responses: null as ResponseRecord[] | null,
+    surveyCategories: null as string[] | null,
     // TTL: momento en que se cargó el último datos maestros desde la nube
     lastCloudSync: null as number | null,
   },
@@ -218,6 +221,16 @@ export const dataService = {
       dataService._cache.hierarchy = (await localforage.getItem<HierarchyData>('la_akademia_hierarchy')) || { lockedMonths: [], regions: [] };
       dataService._cache.users = (await localforage.getItem<User[]>('la_akademia_users')) || [];
       dataService._cache.banca = (await localforage.getItem<BancaData>('la_akademia_banca')) || { assignments: [] };
+      dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
+      dataService._cache.responses = (await localforage.getItem<ResponseRecord[]>('la_akademia_responses')) || [];
+      dataService._cache.surveyCategories = (await localforage.getItem<string[]>('la_akademia_survey_categories')) || [
+        'Entrenamientos',
+        'Seguridad y Salud',
+        'Operaciones',
+        'Clima Laboral',
+        'Auditorías',
+        'Servicio al Cliente',
+      ];
       dataService._cache.gradeIndex = null;
     } catch (e) {
       console.error("Error inicializando caché localforage:", e);
@@ -231,18 +244,22 @@ export const dataService = {
       return true;
     }
     try {
-      const [employees, restaurants, hierarchy, users, banca] = await Promise.all([
+      const [employees, restaurants, hierarchy, users, banca, cloudSurveys, cloudResponses] = await Promise.all([
         dataService.supabaseFetchAll('employees'),
         dataService.supabaseFetchAll('restaurants'),
         dataService.supabaseFetch('hierarchy').catch(() => []),
         dataService.supabaseFetchAll('users').catch(() => []),
-        dataService.supabaseFetch('banca').catch(() => [])
+        dataService.supabaseFetch('banca').catch(() => []),
+        dataService.supabaseFetchAll('surveys').catch(() => []),
+        dataService.supabaseFetchAll('responses').catch(() => [])
       ]);
 
       await Promise.all([
         localforage.setItem('la_akademia_employees', employees || []),
         localforage.setItem('la_akademia_stores', restaurants || []),
-        localforage.setItem('la_akademia_users', users || [])
+        localforage.setItem('la_akademia_users', users || []),
+        localforage.setItem('la_akademia_surveys', cloudSurveys || []),
+        localforage.setItem('la_akademia_responses', cloudResponses || [])
       ]);
 
       const defaultHierarchy = { lockedMonths: [], regions: [] };
@@ -258,6 +275,8 @@ export const dataService = {
       dataService._cache.users = (users as User[]) || [];
       dataService._cache.hierarchy = cloudHierarchy;
       dataService._cache.banca = cloudBanca;
+      dataService._cache.surveys = (cloudSurveys as Survey[]) || [];
+      dataService._cache.responses = (cloudResponses as ResponseRecord[]) || [];
       dataService._cache.gradeIndex = null;
       dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
 
@@ -613,6 +632,123 @@ export const dataService = {
     await dataService.supabaseFetch('users', 'PATCH', payload, `?id=eq.${userId}`);
   },
 
+  // ── Encuestas y Evaluaciones (RED Pulse) ────────────────────────────────
+  getSurveys: (): Survey[] => {
+    return dataService._cache.surveys || [];
+  },
+
+  saveSurvey: async (survey: Survey) => {
+    const list = dataService.getSurveys();
+    const idx = list.findIndex(s => s.id === survey.id);
+    const updatedList = idx >= 0
+      ? list.map((s, i) => i === idx ? survey : s)
+      : [survey, ...list];
+
+    dataService._cache.surveys = updatedList;
+    await localforage.setItem('la_akademia_surveys', updatedList);
+
+    try {
+      await dataService.supabaseFetch('surveys', 'POST', survey, '?on_conflict=id');
+    } catch (err) {
+      console.warn('Sincronización local activa de encuesta (sin nube temporal):', err);
+    }
+  },
+
+  deleteSurvey: async (surveyId: string) => {
+    const list = dataService.getSurveys().filter(s => s.id !== surveyId);
+    dataService._cache.surveys = list;
+    await localforage.setItem('la_akademia_surveys', list);
+
+    try {
+      await dataService.supabaseFetch(`surveys?id=eq.${surveyId}`, 'DELETE');
+    } catch (err) {
+      console.warn('Eliminación local de encuesta finalizada:', err);
+    }
+  },
+
+  getResponses: (surveyId?: string): ResponseRecord[] => {
+    const all = dataService._cache.responses || [];
+    if (surveyId) {
+      return all.filter(r => r.survey_id === surveyId);
+    }
+    return all;
+  },
+
+  saveResponse: async (response: ResponseRecord) => {
+    const list = dataService._cache.responses || [];
+    const idx = list.findIndex(r => r.id === response.id);
+    const updatedList = idx >= 0
+      ? list.map((r, i) => i === idx ? response : r)
+      : [response, ...list];
+
+    dataService._cache.responses = updatedList;
+    await localforage.setItem('la_akademia_responses', updatedList);
+
+    try {
+      await dataService.supabaseFetch('responses', 'POST', response, '?on_conflict=id');
+    } catch (err) {
+      console.warn('Sincronización local activa de respuesta:', err);
+    }
+  },
+
+  deleteResponse: async (responseId: string) => {
+    const list = (dataService._cache.responses || []).filter(r => r.id !== responseId);
+    dataService._cache.responses = list;
+    await localforage.setItem('la_akademia_responses', list);
+
+    try {
+      await dataService.supabaseFetch(`responses?id=eq.${responseId}`, 'DELETE');
+    } catch (err) {
+      console.warn('Eliminación local de respuesta finalizada:', err);
+    }
+  },
+
+  fetchSinglePublicSurvey: async (surveyId: string): Promise<Survey | null> => {
+    try {
+      // 1. Verificar si está en el caché local primero
+      const local = (dataService._cache.surveys || []).find(s => s.id === surveyId);
+      if (local) return local;
+
+      // 2. Si no está en caché, traer ÚNICAMENTE la encuesta solicitada por su ID (sin consultar responses ni otras encuestas)
+      const cloudSurveys = await dataService.supabaseFetchAll(`surveys?id=eq.${surveyId}`) as Survey[];
+      if (Array.isArray(cloudSurveys) && cloudSurveys.length > 0) {
+        return cloudSurveys[0];
+      }
+      return null;
+    } catch (err) {
+      console.warn('Consulta de encuesta pública individual:', err);
+      return (dataService._cache.surveys || []).find(s => s.id === surveyId) || null;
+    }
+  },
+
+  fetchSurveysAndResponses: async () => {
+    try {
+      const [cloudSurveys, cloudResponses] = await Promise.all([
+        dataService.supabaseFetchAll('surveys').catch(() => []),
+        dataService.supabaseFetchAll('responses').catch(() => [])
+      ]);
+
+      if (Array.isArray(cloudSurveys)) {
+        dataService._cache.surveys = cloudSurveys as Survey[];
+        await localforage.setItem('la_akademia_surveys', cloudSurveys);
+      }
+      if (Array.isArray(cloudResponses)) {
+        dataService._cache.responses = cloudResponses as ResponseRecord[];
+        await localforage.setItem('la_akademia_responses', cloudResponses);
+      }
+      return {
+        surveys: dataService._cache.surveys || [],
+        responses: dataService._cache.responses || []
+      };
+    } catch (err) {
+      console.warn('Consulta de encuestas desde la nube:', err);
+      return {
+        surveys: dataService.getSurveys(),
+        responses: dataService.getResponses()
+      };
+    }
+  },
+
   clearAllDataInCloud: async () => {
     // IMPORTANTE: Primero borrar notas (hijas) y luego empleados (padres) por integridad referencial
     await dataService.supabaseFetch('grades', 'DELETE', null, '?employee_id=not.is.null');
@@ -683,6 +819,27 @@ export const dataService = {
     await localforage.setItem('la_akademia_hierarchy', hierarchy);
     dataService._cache.hierarchy = hierarchy;
     await dataService.supabaseFetch('hierarchy', 'POST', { id: 1, data: hierarchy }, '?on_conflict=id');
+  },
+
+  getSurveyCategories: (): string[] => {
+    if (dataService._cache.surveyCategories && dataService._cache.surveyCategories.length > 0) {
+      return dataService._cache.surveyCategories;
+    }
+    const defaultCats = [
+      'Entrenamientos',
+      'Seguridad y Salud',
+      'Operaciones',
+      'Clima Laboral',
+      'Auditorías',
+      'Servicio al Cliente',
+    ];
+    dataService._cache.surveyCategories = defaultCats;
+    return defaultCats;
+  },
+
+  saveSurveyCategories: async (categories: string[]) => {
+    dataService._cache.surveyCategories = categories;
+    await localforage.setItem('la_akademia_survey_categories', categories);
   },
 
   deleteUser: async (userId: string) => {

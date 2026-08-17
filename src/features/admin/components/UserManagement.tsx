@@ -893,7 +893,8 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                           { key: 'entries-exits', label: 'Ingresos y Retiros' },
                           { key: 'banca', label: 'Banca' },
                           { key: 'safe-hands', label: 'Safe Hands' },
-                          { key: 'schedules', label: 'Planificación' }
+                          { key: 'schedules', label: 'Planificación' },
+                          { key: 'encuestas', label: 'Pulse' }
                         ].map(mod => {
                           const isAllowed = newUser.allowedModules?.includes(mod.key) ?? (mod.key === 'banca');
                           return (
