@@ -93,7 +93,7 @@ const App: React.FC = () => {
                   {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('schedules')) && (
                     <Route path="/schedules" element={<Schedules />} />
                   )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('encuestas')) && (
+                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('encuestas')) && (
                     <>
                       <Route path="/pulse" element={<PulseModule />} />
                       <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />

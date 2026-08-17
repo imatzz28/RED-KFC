@@ -79,7 +79,7 @@ const Sidebar: React.FC = () => {
       to: '/pulse',
       label: 'Pulse',
       icon: FileSpreadsheet,
-      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST, UserRole.GUEST],
+      roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.GUEST],
       key: 'encuestas'
     },
     {
