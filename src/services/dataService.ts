@@ -705,14 +705,21 @@ export const dataService = {
 
   fetchSinglePublicSurvey: async (surveyId: string): Promise<Survey | null> => {
     try {
-      // 1. Verificar si está en el caché local primero
+      // 1. Inicializar caché local si está vacío
+      if (!dataService._cache.surveys) {
+        dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
+      }
+
+      // 2. Verificar si está en el caché local primero
       const local = (dataService._cache.surveys || []).find(s => s.id === surveyId);
       if (local) return local;
 
-      // 2. Si no está en caché, traer ÚNICAMENTE la encuesta solicitada por su ID (sin consultar responses ni otras encuestas)
-      const cloudSurveys = await dataService.supabaseFetchAll(`surveys?id=eq.${surveyId}`) as Survey[];
+      // 3. Si no está en caché local, consultar Supabase con parámetros correctos (table='surveys', queryParams='?id=eq.${surveyId}')
+      const cloudSurveys = await dataService.supabaseFetchAll('surveys', `?id=eq.${surveyId}`) as Survey[];
       if (Array.isArray(cloudSurveys) && cloudSurveys.length > 0) {
-        return cloudSurveys[0];
+        const found = cloudSurveys[0];
+        dataService._cache.surveys = [...(dataService._cache.surveys || []), found];
+        return found;
       }
       return null;
     } catch (err) {
