@@ -638,19 +638,24 @@ export const dataService = {
   },
 
   saveSurvey: async (survey: Survey) => {
+    const updatedSurvey: Survey = {
+      ...survey,
+      updated_at: new Date().toISOString()
+    };
+
     const list = dataService.getSurveys();
-    const idx = list.findIndex(s => s.id === survey.id);
+    const idx = list.findIndex(s => s.id === updatedSurvey.id);
     const updatedList = idx >= 0
-      ? list.map((s, i) => i === idx ? survey : s)
-      : [survey, ...list];
+      ? list.map((s, i) => i === idx ? updatedSurvey : s)
+      : [updatedSurvey, ...list];
 
     dataService._cache.surveys = updatedList;
     await localforage.setItem('la_akademia_surveys', updatedList);
 
     try {
-      await dataService.supabaseFetch('surveys', 'POST', survey, '?on_conflict=id');
+      await dataService.supabaseFetch('surveys', 'POST', updatedSurvey, '?on_conflict=id');
     } catch (err) {
-      console.warn('Sincronización local activa de encuesta (sin nube temporal):', err);
+      console.warn('Sincronización local activa de encuesta:', err);
     }
   },
 
@@ -705,16 +710,13 @@ export const dataService = {
 
   fetchSinglePublicSurvey: async (surveyId: string): Promise<Survey | null> => {
     try {
-      // 1. Inicializar caché local si está vacío
       if (!dataService._cache.surveys) {
         dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
       }
 
-      // 2. Verificar si está en el caché local primero
       const local = (dataService._cache.surveys || []).find(s => s.id === surveyId);
       if (local) return local;
 
-      // 3. Si no está en caché local, consultar Supabase con parámetros correctos (table='surveys', queryParams='?id=eq.${surveyId}')
       const cloudSurveys = await dataService.supabaseFetchAll('surveys', `?id=eq.${surveyId}`) as Survey[];
       if (Array.isArray(cloudSurveys) && cloudSurveys.length > 0) {
         const found = cloudSurveys[0];
@@ -736,8 +738,23 @@ export const dataService = {
       ]);
 
       if (Array.isArray(cloudSurveys)) {
-        dataService._cache.surveys = cloudSurveys as Survey[];
-        await localforage.setItem('la_akademia_surveys', cloudSurveys);
+        const localSurveys = dataService._cache.surveys || [];
+        const mergedSurveys = (cloudSurveys as Survey[]).map(cs => {
+          const localMatch = localSurveys.find(ls => ls.id === cs.id);
+          if (localMatch && localMatch.updated_at && cs.updated_at) {
+            return new Date(localMatch.updated_at) >= new Date(cs.updated_at) ? localMatch : cs;
+          }
+          return localMatch || cs;
+        });
+
+        localSurveys.forEach(ls => {
+          if (!mergedSurveys.some(ms => ms.id === ls.id)) {
+            mergedSurveys.unshift(ls);
+          }
+        });
+
+        dataService._cache.surveys = mergedSurveys;
+        await localforage.setItem('la_akademia_surveys', mergedSurveys);
       }
       if (Array.isArray(cloudResponses)) {
         dataService._cache.responses = cloudResponses as ResponseRecord[];

@@ -94,20 +94,10 @@ const Header: React.FC = () => {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3">
-          <img src="/Favicon.png" alt="RED Logo" className="w-8 h-8 object-contain rounded-xl shrink-0 hidden sm:block" />
-          <div>
-            <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none uppercase italic">
-              RED <span className="text-[#E4002B]">KFC</span>
-            </h1>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
-              Ruta de Entrenamiento y Desempeño
-            </p>
-          </div>
-        </div>
+
 
         {location.pathname === '/my-stores' && (
-          <div className="hidden md:flex flex-col animate-in fade-in duration-300 ml-4 border-l border-slate-200 pl-4">
+          <div className="flex flex-col animate-in fade-in duration-300">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Periodo Evaluación</label>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-700 uppercase tracking-wider shadow-2xs select-none">
               <div className="p-1 bg-red-50 rounded-md shrink-0">

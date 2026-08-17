@@ -36,7 +36,11 @@ const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 const ALL_MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 const EntriesExitsReport: React.FC = () => {
-  const { filteredEmployees: employees, restaurants, auth } = useAppStore();
+  const { filteredEmployees: employees, restaurants, auth, selectedMonth, loadMonthly } = useAppStore();
+
+  React.useEffect(() => {
+    void loadMonthly();
+  }, [selectedMonth, loadMonthly]);
   const user = auth.user!;
   const currentYear = new Date().getFullYear();
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');

@@ -152,6 +152,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     initData: async (force: boolean = false) => {
+        if (!get().auth.isAuthenticated) return;
+
         set({ syncStatus: 'syncing' });
 
         // 1. Carga instantánea desde localforage (offline-first)
@@ -187,6 +189,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     loadMonthly: async () => {
+        if (!get().auth.isAuthenticated) return;
+
         set({ syncStatus: 'syncing' });
         await dataService.loadGradesSummary(get().selectedMonth);
         get().refreshData();

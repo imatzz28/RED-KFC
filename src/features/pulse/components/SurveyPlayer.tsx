@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Trophy, Sparkles,
-  Star, Check, Clock, Store, ArrowUp, ArrowDown, Upload, Calendar
+  Star, Check, Clock, Store, ArrowUp, ArrowDown, Upload, Calendar, FileSpreadsheet
 } from 'lucide-react';
 
 interface SurveyPlayerProps {
@@ -144,6 +144,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const restaurants = React.useMemo(() => {
     return storeRestaurants?.length ? storeRestaurants : dataService.getRestaurants();
   }, [storeRestaurants]);
+  const [isStarted, setIsStarted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [completed, setCompleted] = useState(false);
@@ -158,7 +159,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const isQuiz = survey.type === 'quiz';
 
   useEffect(() => {
-    if (!hasTimer || completed) return;
+    if (!hasTimer || completed || !isStarted) return;
     const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -170,7 +171,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [hasTimer, completed]);
+  }, [hasTimer, completed, isStarted]);
 
   // Ordering question state initializer
   useEffect(() => {
@@ -317,6 +318,77 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
+
+  if (!isStarted && !completed) {
+    return (
+      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-xl max-w-2xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-200">
+        {/* Header Badge & Category */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-4">
+          <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
+            isQuiz ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-100 text-blue-900 border border-blue-300'
+          }`}>
+            {isQuiz ? 'EVALUACIÓN (QUIZ)' : 'ENCUESTA ESTÁNDAR'}
+          </span>
+
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+            {survey.category || 'General'}
+          </span>
+        </div>
+
+        {/* Brand Banner */}
+        <div className="text-center space-y-3 py-2">
+          <div className="w-16 h-16 rounded-3xl bg-red-50 text-[#E4002B] border-2 border-red-100 flex items-center justify-center mx-auto shadow-sm">
+            <FileSpreadsheet className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-snug">
+            {survey.title}
+          </h1>
+          <p className="text-xs font-medium text-slate-500 max-w-lg mx-auto leading-relaxed">
+            {survey.description || 'Te damos la bienvenida a este formulario de RED Pulse. Por favor responde las preguntas atentamente para completar el proceso.'}
+          </p>
+        </div>
+
+        {/* Quick Info Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center space-y-1">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Preguntas</span>
+            <span className="text-base font-black text-slate-800">{questions.length}</span>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center space-y-1">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Duración</span>
+            <span className="text-base font-black text-slate-800">
+              {survey.time_limit_seconds ? `${Math.round(survey.time_limit_seconds / 60)} min` : 'Sin límite'}
+            </span>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center space-y-1 col-span-2 sm:col-span-1">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Modalidad</span>
+            <span className="text-xs font-black text-slate-800 uppercase">
+              {isQuiz ? `${survey.passing_score_percent || 80}% Mín. Aprobación` : 'Opinión Directa'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+          >
+            Volver
+          </button>
+          <button
+            onClick={() => setIsStarted(true)}
+            className="w-full sm:flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-lg shadow-red-600/25 transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>{isQuiz ? 'Iniciar Evaluación' : 'Comenzar Encuesta'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (completed) {
     return (

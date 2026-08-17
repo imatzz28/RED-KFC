@@ -28,23 +28,13 @@ const App: React.FC = () => {
   } = useAppStore();
 
   useEffect(() => {
+    if (!auth.isAuthenticated) return;
+
     const load = async () => {
       await initData();
     };
     void load();
-    const interval = setInterval(() => {
-      if (useAppStore.getState().auth.isAuthenticated) {
-        void useAppStore.getState().loadMonthly();
-      }
-    }, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [initData]);
-
-  useEffect(() => {
-    if (auth.isAuthenticated) {
-      void loadMonthly();
-    }
-  }, [selectedMonth, auth.isAuthenticated, loadMonthly]);
+  }, [initData, auth.isAuthenticated]);
 
   if (!auth.isAuthenticated) {
     return (

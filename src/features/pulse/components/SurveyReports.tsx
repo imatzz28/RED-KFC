@@ -1370,6 +1370,45 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
           </div>
         </div>
       )}
+
+      {/* MODAL: ELIMINAR RESPUESTA INDIVIDUAL */}
+      {deletingResponseRecord && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in"
+          onClick={() => setDeletingResponseRecord(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">¿Eliminar registro de respuesta?</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Se eliminará el registro de respuesta con ID <strong className="font-mono text-slate-800">{deletingResponseRecord.id}</strong> del sistema. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingResponseRecord(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteSingleResponse(deletingResponseRecord.id)}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                Sí, Eliminar Registro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -24,7 +24,11 @@ const GroupIcons: Record<string, React.ReactNode> = {
 
 
 const MyStores: React.FC = () => {
-  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog } = useAppStore();
+  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog, loadMonthly } = useAppStore();
+
+  React.useEffect(() => {
+    void loadMonthly();
+  }, [selectedMonth, loadMonthly]);
   const user = auth.user!;
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);

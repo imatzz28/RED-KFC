@@ -112,9 +112,19 @@ export const PulseModule: React.FC = () => {
     loadData();
   };
 
-  const handleSaveSurveyFromBuilder = async (survey: Survey) => {
-    await dataService.saveSurvey(survey);
-    loadData();
+  const handleSaveSurveyFromBuilder = async (surveyToSave: Survey) => {
+    const updatedSurvey = {
+      ...surveyToSave,
+      updated_at: new Date().toISOString()
+    };
+    await dataService.saveSurvey(updatedSurvey);
+    setSurveys(prev => {
+      const idx = prev.findIndex(s => s.id === updatedSurvey.id);
+      if (idx >= 0) {
+        return prev.map((s, i) => i === idx ? updatedSurvey : s);
+      }
+      return [updatedSurvey, ...prev];
+    });
     setActiveTab('list');
     setSelectedSurvey(null);
   };
