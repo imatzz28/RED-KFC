@@ -114,7 +114,7 @@ const StoreHierarchySelector: React.FC<{
           <option value="">-- Selecciona tu Tienda --</option>
           {filteredStores.map(r => (
             <option key={r.id} value={r.id}>
-              {r.id} - {r.name} ({r.region} &gt; {r.zone})
+              {r.id} - {r.name}
             </option>
           ))}
         </select>
@@ -141,8 +141,32 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   onClose,
 }) => {
   const { restaurants: storeRestaurants } = useAppStore();
+  const [localRestaurants, setLocalRestaurants] = React.useState(dataService.getRestaurants());
+
   const restaurants = React.useMemo(() => {
-    return storeRestaurants?.length ? storeRestaurants : dataService.getRestaurants();
+    return storeRestaurants?.length ? storeRestaurants : localRestaurants;
+  }, [storeRestaurants, localRestaurants]);
+
+  // Si no hay restaurantes en el store (usuario público/no autenticado), cargarlos desde Supabase
+  useEffect(() => {
+    if (storeRestaurants?.length) return;
+    const cached = dataService.getRestaurants();
+    if (cached.length) {
+      setLocalRestaurants(cached);
+      return;
+    }
+    // Carga directa desde Supabase sin exponer datos protegidos
+    dataService.supabaseFetchAll('restaurants')
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          import('localforage').then(lf => {
+            void lf.default.setItem('la_akademia_stores', data);
+          });
+          dataService._cache.restaurants = data as any[];
+          setLocalRestaurants(data as any[]);
+        }
+      })
+      .catch(err => console.warn('[SurveyPlayer] No se pudieron cargar restaurantes:', err));
   }, [storeRestaurants]);
   const [isStarted, setIsStarted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
