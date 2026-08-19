@@ -4,7 +4,7 @@ import {
   Type, AlignLeft, CircleDot, CheckSquare, Star, ToggleLeft,
   Calendar, Upload, Plus, Trash2, GitFork, GripVertical,
   ChevronDown, ChevronUp, ListPlus, FileText, X, Sparkles,
-  Minimize2, MapPin, ListOrdered, Pencil
+  Minimize2, MapPin, ListOrdered, Pencil, BookTemplate
 } from 'lucide-react';
 
 interface QuestionEditorProps {
@@ -34,6 +34,49 @@ const QUESTION_TYPES: { type: QuestionType; label: string; icon: any; descriptio
   { type: 'store_hierarchy', label: 'Jerarquía KFC', icon: MapPin, description: 'Selector de Tienda / CECO' },
 ];
 
+const OPTION_TEMPLATES: { name: string; category: string; options: string[] }[] = [
+  {
+    name: 'Nivel de Satisfacción',
+    category: 'Satisfacción',
+    options: ['Muy Satisfecho', 'Satisfecho', 'Neutral / Regular', 'Insatisfecho', 'Muy Insatisfecho'],
+  },
+  {
+    name: 'Escala de Acuerdo',
+    category: 'Opinión',
+    options: ['Totalmente de Acuerdo', 'De Acuerdo', 'Neutral', 'En Desacuerdo', 'Totalmente en Desacuerdo'],
+  },
+  {
+    name: 'Calificación de Desempeño',
+    category: 'Evaluación',
+    options: ['Excelente', 'Bueno', 'Regular', 'Deficiente'],
+  },
+  {
+    name: 'Frecuencia de Ocurrencia',
+    category: 'Frecuencia',
+    options: ['Siempre', 'Casi Siempre', 'Frecuentemente', 'Rara Vez', 'Nunca'],
+  },
+  {
+    name: 'Probabilidad / Recomendación',
+    category: 'Recomendación',
+    options: ['Definitivamente Sí', 'Probablemente Sí', 'Probablemente No', 'Definitivamente No'],
+  },
+  {
+    name: 'Cumplimiento Operativo KFC',
+    category: 'Auditoría',
+    options: ['Cumple al 100%', 'Cumple Parcialmente', 'No Cumple / Crítico'],
+  },
+  {
+    name: 'Sí / No / No Aplica',
+    category: 'Dicotómica',
+    options: ['Sí', 'No', 'No Aplica'],
+  },
+  {
+    name: 'Verdadero / Falso',
+    category: 'Quiz',
+    options: ['Verdadero', 'Falso'],
+  },
+];
+
 function generateId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 10000)}`;
 }
@@ -54,8 +97,17 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
 }) => {
   const [showLogicEditor, setShowLogicEditor] = useState(false);
   const [showBulkOptions, setShowBulkOptions] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [bulkOptionsText, setBulkOptionsText] = useState('');
   const [bulkOptionsMode, setBulkOptionsMode] = useState<'add' | 'replace'>('add');
+
+  // Si es Evaluación (quiz), solo permitir Opción Única, Opción Múltiple, Ordenar Secuencia
+  const availableQuestionTypes = QUESTION_TYPES.filter(t => {
+    if (surveyType === 'quiz') {
+      return ['single_choice', 'multiple_choice', 'ordering'].includes(t.type);
+    }
+    return true;
+  });
 
   const currentTypeObj = QUESTION_TYPES.find((t) => t.type === question.type) || QUESTION_TYPES[0];
   const CurrentTypeIcon = currentTypeObj.icon;
@@ -82,6 +134,20 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       weight: 1,
     };
     onUpdate({ ...question, options: [...currentOpts, newOpt] });
+  };
+
+  const handleApplyTemplate = (tpl: { name: string; options: string[] }) => {
+    const newGeneratedOpts: QuestionOption[] = tpl.options.map((text, idx) => ({
+      id: generateId(`opt_${idx}`),
+      question_id: question.id,
+      text,
+      value: text.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `opcion_${idx + 1}`,
+      is_correct: surveyType === 'quiz' && idx === 0 ? true : false,
+      weight: 1,
+    }));
+
+    onUpdate({ ...question, options: newGeneratedOpts });
+    setShowTemplates(false);
   };
 
   const handleApplyBulkOptions = () => {
@@ -148,59 +214,39 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     return (
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all p-4 mb-4 border-l-4 border-l-[#E4002B] flex flex-wrap items-center justify-between gap-3 group">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-slate-300 hover:text-slate-500 transition-colors">
-            <GripVertical className="w-4 h-4 cursor-grab" />
-            <div className="flex flex-col gap-0.5">
-              <button onClick={onMoveUp} disabled={isFirst} className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-20 cursor-pointer">
-                <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
-              </button>
-              <button onClick={onMoveDown} disabled={isLast} className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-20 cursor-pointer">
-                <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
-              </button>
-            </div>
-          </div>
-
-          <span className="w-7 h-7 rounded-lg bg-[#E4002B] text-white font-black text-xs flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-black text-xs flex items-center justify-center shrink-0">
             #{question.order}
-          </span>
-
-          <div className="min-w-0 flex-1 cursor-pointer" onClick={handleExpand}>
-            <h4 className="text-sm font-black text-slate-800 truncate group-hover:text-[#E4002B] transition-colors">
-              {question.title || <span className="italic text-slate-400 font-normal">Sin título de pregunta</span>}
-            </h4>
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
-              <span className="inline-flex items-center gap-1 font-extrabold text-slate-700 bg-slate-100 border border-slate-200/60 rounded-md px-2 py-0.5">
-                <CurrentTypeIcon className="w-3 h-3 text-[#E4002B]" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
                 {currentTypeObj.label}
               </span>
-
               {question.required && (
-                <span className="bg-red-50 text-[#E4002B] font-extrabold text-[10px] rounded px-2 py-0.5 border border-red-200/60">
-                  Obligatoria
-                </span>
-              )}
-
-              {['single_choice', 'multiple_choice', 'ordering'].includes(question.type) && (
-                <span className="text-slate-500 font-bold bg-slate-50 rounded px-1.5 py-0.5 border border-slate-200/50">
-                  {question.options?.length || 0} elementos
-                </span>
-              )}
-
-              {surveyType === 'quiz' && (
-                <span className="bg-amber-100 text-amber-900 font-extrabold text-[10px] rounded px-2 py-0.5">
-                  {question.points || 10} pts
-                </span>
+                <span className="text-[9px] font-black text-[#E4002B] uppercase tracking-wider">* Obligatoria</span>
               )}
             </div>
+            <h4 className="text-xs font-black text-slate-900 truncate">
+              {question.title || 'Pregunta sin título'}
+            </h4>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button onClick={handleExpand} className="px-3 py-1.5 bg-slate-100 hover:bg-[#E4002B] hover:text-white text-slate-700 font-extrabold text-xs rounded-xl transition flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleExpand}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+          >
             <Pencil className="w-3.5 h-3.5" />
             <span>Editar</span>
           </button>
-          <button onClick={onDelete} className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition">
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition cursor-pointer"
+            title="Eliminar Pregunta"
+          >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -208,23 +254,23 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     );
   }
 
-  // EXPANDED EDITING VIEW
+  // EXPANDED / FULL EDITOR VIEW
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-md p-6 mb-6 relative space-y-6 border-t-4 border-t-[#E4002B]">
-      {/* Header controls */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-6 mb-5 space-y-5 border-l-4 border-l-[#E4002B] animate-in fade-in duration-150">
+      {/* Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <span className="w-8 h-8 rounded-xl bg-[#E4002B] text-white font-black text-xs flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-[#E4002B] text-white font-black text-xs flex items-center justify-center shadow-xs">
             #{question.order}
-          </span>
+          </div>
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tipo de Pregunta</span>
             <select
               value={question.type}
               onChange={(e) => onUpdate({ ...question, type: e.target.value as QuestionType })}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-xs font-black text-slate-800 outline-none focus:border-red-500 cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-xs font-black text-slate-800 outline-none focus:border-[#E4002B] cursor-pointer"
             >
-              {QUESTION_TYPES.map((t) => (
+              {availableQuestionTypes.map((t) => (
                 <option key={t.type} value={t.type}>{t.label}</option>
               ))}
             </select>
@@ -232,11 +278,20 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={handleMinimize} className="p-2 hover:bg-slate-100 text-slate-500 rounded-xl text-xs font-bold transition flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleMinimize}
+            className="p-2 hover:bg-slate-100 text-slate-500 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+          >
             <Minimize2 className="w-4 h-4" />
             <span>Minimizar</span>
           </button>
-          <button onClick={onDelete} className="p-2 hover:bg-red-50 text-red-600 rounded-xl text-xs font-bold transition">
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-2 hover:bg-red-50 text-red-600 rounded-xl text-xs font-bold transition cursor-pointer"
+            title="Eliminar Pregunta"
+          >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -267,19 +322,78 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       {/* Options Editor for Choice & Ordering Types */}
       {['single_choice', 'multiple_choice', 'ordering'].includes(question.type) && (
         <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
               {question.type === 'ordering' ? 'Secuencia de Elementos a Ordenar' : 'Opciones de Respuesta'}
             </label>
-            <button
-              onClick={() => setShowBulkOptions(!showBulkOptions)}
-              className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
-            >
-              <ListPlus className="w-3.5 h-3.5" />
-              <span>Importar Masivo</span>
-            </button>
+
+            {/* Template & Bulk Actions */}
+            <div className="flex items-center gap-2">
+              {question.type !== 'ordering' && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTemplates(!showTemplates);
+                      setShowBulkOptions(false);
+                    }}
+                    className="text-xs font-black text-[#E4002B] bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  >
+                    <BookTemplate className="w-3.5 h-3.5" />
+                    <span>Plantillas de Respuestas</span>
+                  </button>
+
+                  {/* Dropdown Menu de Plantillas */}
+                  {showTemplates && (
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2.5 z-50 animate-in zoom-in-95 duration-150 space-y-1">
+                      <div className="px-2 py-1 border-b border-slate-100 mb-1 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Selecciona una Plantilla</span>
+                        <button type="button" onClick={() => setShowTemplates(false)} className="text-slate-400 hover:text-slate-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
+                        {OPTION_TEMPLATES.map((tpl) => (
+                          <button
+                            key={tpl.name}
+                            type="button"
+                            onClick={() => handleApplyTemplate(tpl)}
+                            className="w-full text-left p-2 rounded-xl hover:bg-red-50 group transition cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-slate-800 group-hover:text-[#E4002B]">
+                                {tpl.name}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {tpl.options.length}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+                              {tpl.options.join(' • ')}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkOptions(!showBulkOptions);
+                  setShowTemplates(false);
+                }}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <ListPlus className="w-3.5 h-3.5" />
+                <span>Importar Masivo</span>
+              </button>
+            </div>
           </div>
 
+          {/* Bulk Options Importer Box */}
           {showBulkOptions && (
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 animate-in fade-in duration-200">
               <span className="text-xs font-bold text-slate-700">Pega las opciones (una por línea):</span>
@@ -287,31 +401,33 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 value={bulkOptionsText}
                 onChange={(e) => setBulkOptionsText(e.target.value)}
                 placeholder="Opción 1&#10;Opción 2&#10;Opción 3"
-                className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-medium outline-none h-24"
+                className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-medium outline-none h-24 shadow-2xs"
               />
               <div className="flex items-center justify-between">
                 <select
                   value={bulkOptionsMode}
                   onChange={(e) => setBulkOptionsMode(e.target.value as any)}
-                  className="bg-white border border-slate-200 px-3 py-1 rounded-xl text-xs font-bold"
+                  className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   <option value="add">Añadir a las existentes</option>
                   <option value="replace">Reemplazar existentes</option>
                 </select>
                 <button
+                  type="button"
                   onClick={handleApplyBulkOptions}
-                  className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl"
+                  className="px-5 py-2 bg-[#E4002B] hover:bg-red-700 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 cursor-pointer"
                 >
-                  Aplicar
+                  Aplicar Opciones
                 </button>
               </div>
             </div>
           )}
 
+          {/* Individual Options List */}
           <div className="space-y-2">
             {(question.options || []).map((opt, oIdx) => (
-              <div key={opt.id} className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 w-5 text-center">{oIdx + 1}.</span>
+              <div key={opt.id} className="flex items-center gap-2 bg-slate-50/60 p-1.5 rounded-2xl border border-slate-200/60">
+                <span className="text-xs font-black text-slate-400 w-6 text-center">{oIdx + 1}.</span>
                 {surveyType === 'quiz' && question.type !== 'ordering' && (
                   <input
                     type="checkbox"
@@ -324,7 +440,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                         handleUpdateOption(opt.id, { is_correct: e.target.checked });
                       }
                     }}
-                    className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-slate-300 text-[#E4002B] focus:ring-red-500 cursor-pointer"
                     title="Marcar como respuesta correcta"
                   />
                 )}
@@ -332,16 +448,25 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   type="text"
                   value={opt.text}
                   onChange={(e) => handleUpdateOption(opt.id, { text: e.target.value })}
-                  className="flex-1 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-red-500"
+                  className="flex-1 text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#E4002B]"
                 />
-                <button onClick={() => handleDeleteOption(opt.id)} className="text-slate-400 hover:text-red-600 p-1">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteOption(opt.id)}
+                  className="text-slate-400 hover:text-red-600 p-1.5 transition cursor-pointer"
+                  title="Eliminar Opción"
+                >
                   ✕
                 </button>
               </div>
             ))}
-            <button onClick={handleAddOption} className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 pt-1">
-              <Plus className="w-3.5 h-3.5" />
-              <span>Agregar Elemento</span>
+            <button
+              type="button"
+              onClick={handleAddOption}
+              className="text-xs font-black text-[#E4002B] hover:text-red-700 flex items-center gap-1.5 pt-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Agregar Opción Manual</span>
             </button>
           </div>
         </div>
@@ -357,7 +482,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               value={question.rating_min_label || ''}
               onChange={(e) => onUpdate({ ...question, rating_min_label: e.target.value })}
               placeholder="Ej. Muy Insatisfecho"
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-[#E4002B]"
             />
           </div>
           <div>
@@ -366,58 +491,12 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               type="text"
               value={question.rating_max_label || ''}
               onChange={(e) => onUpdate({ ...question, rating_max_label: e.target.value })}
-              placeholder="Ej. Excelente"
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+              placeholder="Ej. Muy Satisfecho"
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-[#E4002B]"
             />
           </div>
         </div>
       )}
-
-      {/* Quiz Settings for Question */}
-      {surveyType === 'quiz' && (
-        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              Configuración de Quiz para esta Pregunta
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-amber-800">Puntos:</span>
-              <input
-                type="number"
-                min="0"
-                value={question.points ?? 10}
-                onChange={(e) => onUpdate({ ...question, points: parseInt(e.target.value) || 0 })}
-                className="w-16 text-center font-black text-xs bg-white border border-amber-300 rounded-xl py-1 outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-1">Retroalimentación si Acierta</label>
-            <input
-              type="text"
-              value={question.correct_feedback || ''}
-              onChange={(e) => onUpdate({ ...question, correct_feedback: e.target.value })}
-              placeholder="Explicación si acierta la respuesta..."
-              className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-medium outline-none"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Footer controls: Required toggle & Jump logic toggle */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-        <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={question.required}
-            onChange={(e) => onUpdate({ ...question, required: e.target.checked })}
-            className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-          />
-          <span>Respuesta Obligatoria</span>
-        </label>
-      </div>
     </div>
   );
 };

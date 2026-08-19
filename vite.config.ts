@@ -19,6 +19,30 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       }
+    },
+
+    build: {
+      chunkSizeWarningLimit: 800,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('pdfmake') || id.includes('jspdf')) {
+                return 'vendor-pdf';
+              }
+              if (id.includes('xlsx')) {
+                return 'vendor-xlsx';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('@supabase') || id.includes('localforage')) {
+                return 'vendor-data';
+              }
+            }
+          }
+        }
+      }
     }
   };
 });

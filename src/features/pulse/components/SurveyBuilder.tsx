@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Survey, Question, QuestionType, QuestionOption, SurveyStatus, ThemeConfig } from '@/types';
 import {
   Save, ArrowLeft, Plus, Trash2, CheckCircle2, AlertCircle, Settings,
   Sparkles, Layers, Palette, Eye, HelpCircle, Check, Clock, Shuffle,
-  Lock, FileText, ArrowRight, ShieldCheck, Zap
+  Lock, FileText, ArrowRight, ShieldCheck, Zap, RefreshCw
 } from 'lucide-react';
 
 interface SurveyBuilderProps {
@@ -19,6 +19,37 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
 }) => {
   const [survey, setSurvey] = useState<Survey>(initialSurvey);
   const [activeTab, setActiveTab] = useState<'questions' | 'settings' | 'theme' | 'logic'>('questions');
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const initialSnapshotRef = useRef<string>(JSON.stringify(initialSurvey));
+  const hasUnsavedChanges = JSON.stringify(survey) !== initialSnapshotRef.current;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleAttemptExit = () => {
+    if (hasUnsavedChanges) {
+      setShowExitConfirmModal(true);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    initialSnapshotRef.current = JSON.stringify(survey);
+    await onSave(survey);
+    setIsSaving(false);
+  };
 
   const isQuiz = survey.type === 'quiz';
 
@@ -135,8 +166,10 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
       <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={onCancel}
-            className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-500"
+            type="button"
+            onClick={handleAttemptExit}
+            className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-500 cursor-pointer"
+            title="Volver"
           >
             <ArrowLeft className="w-5 h-5 text-red-600" />
           </button>
@@ -159,12 +192,19 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+              Cambios sin guardar
+            </span>
+          )}
           <button
-            onClick={() => onSave(survey)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition cursor-pointer"
+            type="button"
+            disabled={isSaving}
+            onClick={handleSave}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition cursor-pointer disabled:opacity-50"
           >
-            <Save className="w-4 h-4" />
-            <span>Guardar Cambios</span>
+            {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>
           </button>
         </div>
       </div>
@@ -211,63 +251,35 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
           {/* Sidebar - Añadir Preguntas */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Agregar Pregunta</h3>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                {isQuiz ? 'Preguntas Permitidas (Quiz)' : 'Agregar Pregunta'}
+              </h3>
               <div className="grid grid-cols-1 gap-1.5">
-                <button
-                  onClick={() => handleAddQuestion('single_choice')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-red-600" />
-                  <span>Selección Única</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('multiple_choice')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                  <span>Selección Múltiple</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('rating')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Calificación (1-5 Estrellas)</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('yes_no')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                  <span>Sí / No</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('short_text')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span>Texto Corto</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('long_text')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-sky-500" />
-                  <span>Respuesta Larga (Comentarios)</span>
-                </button>
-
-                <button
-                  onClick={() => handleAddQuestion('store_hierarchy')}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2"
-                >
-                  <span className="w-2 h-2 rounded-full bg-teal-600" />
-                  <span>Selección de Tienda (CECO)</span>
-                </button>
+                {[
+                  { type: 'single_choice', label: 'Selección Única', color: 'bg-[#E4002B]' },
+                  { type: 'multiple_choice', label: 'Selección Múltiple', color: 'bg-red-700' },
+                  { type: 'ordering', label: 'Ordenar Secuencia', color: 'bg-slate-900' },
+                  { type: 'rating', label: 'Calificación (1-5 Estrellas)', color: 'bg-[#E4002B]' },
+                  { type: 'yes_no', label: 'Sí / No', color: 'bg-slate-800' },
+                  { type: 'short_text', label: 'Texto Corto', color: 'bg-slate-700' },
+                  { type: 'long_text', label: 'Respuesta Larga', color: 'bg-slate-600' },
+                  { type: 'store_hierarchy', label: 'Selección de Tienda (CECO)', color: 'bg-[#E4002B]' },
+                ].filter(item => {
+                  if (isQuiz) {
+                    return ['single_choice', 'multiple_choice', 'ordering'].includes(item.type);
+                  }
+                  return true;
+                }).map(item => (
+                  <button
+                    key={item.type}
+                    type="button"
+                    onClick={() => handleAddQuestion(item.type as QuestionType)}
+                    className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-[#E4002B] border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -571,6 +583,48 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
                   {style}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación: Salir sin Guardar */}
+      {showExitConfirmModal && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowExitConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">¿Salir sin guardar los cambios?</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Tienes modificaciones pendientes en este formulario. Si sales ahora, se perderán los cambios recientes.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Continuar Editando
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirmModal(false);
+                  onCancel();
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                Salir sin Guardar
+              </button>
             </div>
           </div>
         </div>

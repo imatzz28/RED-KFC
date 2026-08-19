@@ -888,7 +888,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { key: 'dashboard', label: 'Dashboard' },
+                          { key: 'dashboard', label: 'Métricas Curvas' },
                           { key: 'my-stores', label: 'Mis Tiendas' },
                           { key: 'entries-exits', label: 'Ingresos y Retiros' },
                           { key: 'banca', label: 'Banca' },

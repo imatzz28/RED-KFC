@@ -8,7 +8,7 @@ import { SurveyPlayer } from './components/SurveyPlayer';
 import { SurveyReports } from './components/SurveyReports';
 
 export const PulseModule: React.FC = () => {
-  const { auth } = useAppStore();
+  const { auth, showAlertDialog } = useAppStore();
   const currentUser = auth.user;
 
   const [surveys, setSurveys] = useState<Survey[]>([]);
@@ -48,7 +48,7 @@ export const PulseModule: React.FC = () => {
       type,
       category: 'General',
       title: type === 'quiz' ? 'Evaluación Operativa KFC' : 'Encuesta de Satisfacción',
-      description: 'Ingresa una breve descripción de los objetivos de este formulario.',
+      description: '',
       status: 'draft',
       access_mode: 'open',
       passing_score_percent: 70,
@@ -127,6 +127,7 @@ export const PulseModule: React.FC = () => {
     });
     setActiveTab('list');
     setSelectedSurvey(null);
+    showAlertDialog('¡El formulario ha sido guardado exitosamente!');
   };
 
   const handleSubmitResponseFromPlayer = async (record: ResponseRecord) => {

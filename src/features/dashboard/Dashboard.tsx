@@ -65,11 +65,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth, showAlertDialog, loadMonthly } = useAppStore();
-
-  useEffect(() => {
-    void loadMonthly();
-  }, [selectedMonth, loadMonthly]);
+  const { filteredEmployees: initialEmployees, restaurants, selectedMonth, auth, showAlertDialog } = useAppStore();
 
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);

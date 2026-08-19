@@ -1,30 +1,35 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { UserRole } from '@/types';
-import Login from '@/features/auth/Login';
-import Dashboard from '@/features/dashboard/Dashboard';
 import Sidebar from '@/components/layout/Sidebar';
-import AdminPanel from '@/features/admin/AdminPanel';
 import Header from '@/components/layout/Header';
-import MyStores from '@/features/stores/MyStores';
-import EntriesExitsReport from '@/features/reports/EntriesExitsReport';
-import Banca from '@/features/banca/Banca';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import SafeHands from '@/features/safe-hands/SafeHands';
-import PublicValidation from '@/features/safe-hands/PublicValidation';
-import Schedules from '@/features/schedules/Schedules';
-import PulseModule from '@/features/pulse/PulseModule';
-import { PublicSurveyRunner } from '@/features/pulse/PublicSurveyRunner';
+import { ModuleLoader } from '@/components/common/ModuleLoader';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { AlertTriangle, Info } from 'lucide-react';
+
+// Carga bajo demanda (Code Splitting) por ruta
+const Login = lazy(() => import('@/features/auth/Login'));
+const Dashboard = lazy(() => import('@/features/dashboard/Dashboard'));
+const AdminPanel = lazy(() => import('@/features/admin/AdminPanel'));
+const MyStores = lazy(() => import('@/features/stores/MyStores'));
+const EntriesExitsReport = lazy(() => import('@/features/reports/EntriesExitsReport'));
+const Banca = lazy(() => import('@/features/banca/Banca'));
+const SafeHands = lazy(() => import('@/features/safe-hands/SafeHands'));
+const PublicValidation = lazy(() => import('@/features/safe-hands/PublicValidation'));
+const Schedules = lazy(() => import('@/features/schedules/Schedules'));
+const PulseModule = lazy(() => import('@/features/pulse/PulseModule'));
+const PublicSurveyRunner = lazy(() => import('@/features/pulse/PublicSurveyRunner').then(m => ({ default: m.PublicSurveyRunner })));
 
 const App: React.FC = () => {
   const {
-    auth, employees, restaurants, filteredEmployees,
-    selectedMonth, isSidebarOpen, syncStatus,
-    handleLogin, handleLogout, setSelectedMonth, setIsSidebarOpen,
-    refreshData, initData, loadMonthly,
-    dialog, closeDialog
+    auth,
+    isSidebarOpen,
+    handleLogin,
+    setIsSidebarOpen,
+    initData,
+    dialog,
+    closeDialog
   } = useAppStore();
 
   useEffect(() => {
@@ -38,12 +43,16 @@ const App: React.FC = () => {
 
   if (!auth.isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/verify" element={<PublicValidation />} />
-        <Route path="/verify/:id" element={<PublicValidation />} />
-        <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
-        <Route path="*" element={<Login onLogin={handleLogin} />} />
-      </Routes>
+      <ErrorBoundary fallbackTitle="Error al cargar la página">
+        <Suspense fallback={<ModuleLoader message="Cargando acceso..." />}>
+          <Routes>
+            <Route path="/verify" element={<PublicValidation />} />
+            <Route path="/verify/:id" element={<PublicValidation />} />
+            <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
+            <Route path="*" element={<Login onLogin={handleLogin} />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
@@ -58,57 +67,61 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
-          <Routes>
-            {/* Helper: verifica si el usuario actual puede acceder a un módulo */}
-            {(() => {
-              const user = auth.user!;
-              const isGuest = user.role === UserRole.GUEST;
-              const guestMods: string[] = isGuest
-                ? (user.allowedModules?.length ? user.allowedModules : ['banca'])
-                : [];
-              const guestCan = (mod: string) => isGuest && guestMods.includes(mod);
-              const nonGuest = (roles: UserRole[]) => !isGuest && roles.includes(user.role);
+          <ErrorBoundary fallbackTitle="Error al cargar el módulo">
+            <Suspense fallback={<ModuleLoader />}>
+              <Routes>
+                {/* Helper: verifica si el usuario actual puede acceder a un módulo */}
+                {(() => {
+                  const user = auth.user!;
+                  const isGuest = user.role === UserRole.GUEST;
+                  const guestMods: string[] = isGuest
+                    ? (user.allowedModules?.length ? user.allowedModules : ['banca'])
+                    : [];
+                  const guestCan = (mod: string) => isGuest && guestMods.includes(mod);
+                  const nonGuest = (roles: UserRole[]) => !isGuest && roles.includes(user.role);
 
-              // Redirect destino para GUEST: primer módulo habilitado
-              const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands', 'schedules', 'encuestas'];
-              const guestHome = MODULE_ORDER.find(m => guestMods.includes(m)) ?? 'banca';
+                  // Redirect destino para GUEST: primer módulo habilitado
+                  const MODULE_ORDER = ['dashboard', 'my-stores', 'entries-exits', 'banca', 'safe-hands', 'schedules', 'encuestas'];
+                  const guestHome = MODULE_ORDER.find(m => guestMods.includes(m)) ?? 'banca';
 
-              return (
-                <>
-                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('dashboard')) && (
-                    <Route path="/dashboard" element={<Dashboard />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('my-stores')) && (
-                    <Route path="/my-stores" element={<MyStores />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('entries-exits')) && (
-                    <Route path="/entries-exits" element={<EntriesExitsReport />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || guestCan('banca')) && (
-                    <Route path="/banca" element={<Banca />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (
-                    <Route path="/safe-hands" element={<SafeHands />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('schedules')) && (
-                    <Route path="/schedules" element={<Schedules />} />
-                  )}
-                  {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('encuestas')) && (
+                  return (
                     <>
-                      <Route path="/pulse" element={<PulseModule />} />
-                      <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
+                      {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('dashboard')) && (
+                        <Route path="/dashboard" element={<Dashboard />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.SPECIALIST]) || guestCan('my-stores')) && (
+                        <Route path="/my-stores" element={<MyStores />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('entries-exits')) && (
+                        <Route path="/entries-exits" element={<EntriesExitsReport />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || guestCan('banca')) && (
+                        <Route path="/banca" element={<Banca />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (
+                        <Route path="/safe-hands" element={<SafeHands />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR, UserRole.SPECIALIST]) || guestCan('schedules')) && (
+                        <Route path="/schedules" element={<Schedules />} />
+                      )}
+                      {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('encuestas')) && (
+                        <>
+                          <Route path="/pulse" element={<PulseModule />} />
+                          <Route path="/pulse/play/:surveyId" element={<PublicSurveyRunner />} />
+                        </>
+                      )}
+                      {nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) && (
+                        <Route path="/admin" element={<AdminPanel />} />
+                      )}
+                      <Route path="/verify" element={<PublicValidation />} />
+                      <Route path="/verify/:id" element={<PublicValidation />} />
+                      <Route path="*" element={<Navigate to={isGuest ? `/${guestHome}` : '/dashboard'} replace />} />
                     </>
-                  )}
-                  {nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) && (
-                    <Route path="/admin" element={<AdminPanel />} />
-                  )}
-                  <Route path="/verify" element={<PublicValidation />} />
-                  <Route path="/verify/:id" element={<PublicValidation />} />
-                  <Route path="*" element={<Navigate to={isGuest ? `/${guestHome}` : '/dashboard'} replace />} />
-                </>
-              );
-            })()}
-          </Routes>
+                  );
+                })()}
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 

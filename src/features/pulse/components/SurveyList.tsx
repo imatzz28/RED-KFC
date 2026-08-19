@@ -53,15 +53,38 @@ export const SurveyList: React.FC<SurveyListProps> = ({
     }
   }, [shareModalSurvey]);
 
-  const filteredSurveys = surveys.filter(s => {
-    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase()) ||
-                          (s.description || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (s.category || '').toLowerCase().includes(search.toLowerCase());
-    const matchesType = filterType === 'all' || s.type === filterType;
-    const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    const matchesCategory = filterCategory === 'all' || (s.category || 'General') === filterCategory;
-    return matchesSearch && matchesType && matchesStatus && matchesCategory;
-  });
+  const getSurveyTimestamp = (s: Survey): number => {
+    if (s.created_at) {
+      const t = new Date(s.created_at).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (s.updated_at) {
+      const t = new Date(s.updated_at).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (s.id) {
+      const match = s.id.match(/\d{10,13}/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        return num < 10000000000 ? num * 1000 : num;
+      }
+    }
+    return 0;
+  };
+
+  const filteredSurveys = useMemo(() => {
+    return surveys
+      .filter(s => {
+        const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase()) ||
+                              (s.description || '').toLowerCase().includes(search.toLowerCase()) ||
+                              (s.category || '').toLowerCase().includes(search.toLowerCase());
+        const matchesType = filterType === 'all' || s.type === filterType;
+        const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+        const matchesCategory = filterCategory === 'all' || (s.category || 'General') === filterCategory;
+        return matchesSearch && matchesType && matchesStatus && matchesCategory;
+      })
+      .sort((a, b) => getSurveyTimestamp(b) - getSurveyTimestamp(a));
+  }, [surveys, search, filterType, filterStatus, filterCategory]);
 
   const getShareUrl = (surveyId: string) => {
     return `${window.location.origin}/pulse/play/${surveyId}`;
@@ -161,121 +184,165 @@ export const SurveyList: React.FC<SurveyListProps> = ({
         </div>
       </div>
 
-      {/* Survey Grid */}
+      {/* Survey List View */}
       {filteredSurveys.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center space-y-3">
           <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="text-base font-black text-slate-800">No hay encuestas creadas</h3>
+          <h3 className="text-base font-black text-slate-800">No hay formularios creados</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
             Crea tu primera encuesta de satisfacción o examen de conocimientos para el personal de tiendas.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredSurveys.map(survey => {
-            const respCount = responsesCountMap[survey.id] || 0;
-            const isQuiz = survey.type === 'quiz';
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="py-4 px-5">Tipo</th>
+                  <th className="py-4 px-5">Formulario</th>
+                  <th className="py-4 px-4 text-center">Preguntas</th>
+                  <th className="py-4 px-4 text-center">Respuestas</th>
+                  <th className="py-4 px-4 text-center">Estado</th>
+                  <th className="py-4 px-5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredSurveys.map(survey => {
+                  const respCount = responsesCountMap[survey.id] || 0;
+                  const isQuiz = survey.type === 'quiz';
+                  const hasCustomDesc = survey.description && 
+                    survey.description.trim() !== '' && 
+                    survey.description !== 'Ingresa una breve descripción de los objetivos de este formulario.' &&
+                    survey.description !== 'Sin descripción asignada.';
 
-            return (
-              <div
-                key={survey.id}
-                className="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
-              >
-                <div className="space-y-3">
-                  {/* Category & Status badges */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg ${
-                      isQuiz ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
-                    }`}>
-                      {isQuiz ? 'Evaluación (Quiz)' : 'Encuesta'}
-                    </span>
-
-                    <select
-                      value={survey.status}
-                      onChange={e => onToggleStatus(survey, e.target.value as SurveyStatus)}
-                      className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border outline-none cursor-pointer ${
-                        survey.status === 'published'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : survey.status === 'draft'
-                          ? 'bg-slate-100 text-slate-600 border-slate-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}
+                  return (
+                    <tr
+                      key={survey.id}
+                      className="hover:bg-slate-50/70 transition-colors group"
                     >
-                      <option value="draft">Borrador</option>
-                      <option value="published">Publicada</option>
-                      <option value="archived">Archivada</option>
-                    </select>
-                  </div>
+                      {/* Tipo */}
+                      <td className="py-4 px-5 align-middle">
+                        <span className={`inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-xl whitespace-nowrap ${
+                          isQuiz 
+                            ? 'bg-red-50 text-[#E4002B] border border-red-200' 
+                            : 'bg-slate-100 text-slate-800 border border-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isQuiz ? 'bg-[#E4002B]' : 'bg-slate-500'}`} />
+                          {isQuiz ? 'Evaluación (Quiz)' : 'Encuesta'}
+                        </span>
+                      </td>
 
-                  {/* Title & Description */}
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900 group-hover:text-red-600 transition line-clamp-1">
-                      {survey.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 font-medium line-clamp-2 mt-1 min-h-[32px]">
-                      {survey.description || 'Sin descripción asignada.'}
-                    </p>
-                  </div>
-                </div>
+                      {/* Título y Categoría */}
+                      <td className="py-4 px-5 align-middle max-w-xs md:max-w-md">
+                        <div className="space-y-1">
+                          <h4 
+                            onClick={() => onEdit(survey)}
+                            className="text-xs font-black text-slate-900 group-hover:text-red-600 transition cursor-pointer leading-snug line-clamp-1"
+                          >
+                            {survey.title}
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                              {survey.category || 'General'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                {/* Footer Metrics & Actions */}
-                <div className="pt-3 border-t border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-                      {survey.questions?.length || 0} Preguntas
-                    </span>
-                    <span className="flex items-center gap-1.5 text-slate-700">
-                      <BarChart2 className="w-3.5 h-3.5 text-red-500" />
-                      {respCount} Respuestas
-                    </span>
-                  </div>
+                      {/* Conteo de Preguntas */}
+                      <td className="py-4 px-4 align-middle text-center">
+                        <span className="inline-flex items-center gap-1 text-xs font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-xl">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                          {survey.questions?.length || 0}
+                        </span>
+                      </td>
 
-                  <div className="grid grid-cols-5 gap-1 pt-1">
-                    <button
-                      onClick={() => onPlay(survey)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
-                      title="Responder / Vista Previa"
-                    >
-                      <Play className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                    </button>
+                      {/* Conteo de Respuestas */}
+                      <td className="py-4 px-4 align-middle text-center">
+                        <span className="inline-flex items-center gap-1 text-xs font-black text-slate-800 bg-red-50 text-red-700 border border-red-100 px-2.5 py-1 rounded-xl">
+                          <BarChart2 className="w-3.5 h-3.5 text-red-600" />
+                          {respCount}
+                        </span>
+                      </td>
 
-                    <button
-                      onClick={() => onEdit(survey)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
-                      title="Editar Preguntas"
-                    >
-                      <Edit3 className="w-4 h-4 text-blue-600" />
-                    </button>
+                      {/* Selector de Estado */}
+                      <td className="py-4 px-4 align-middle text-center">
+                        <select
+                          value={survey.status}
+                          onChange={e => onToggleStatus(survey, e.target.value as SurveyStatus)}
+                          className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl border outline-none cursor-pointer shadow-2xs ${
+                            survey.status === 'published'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : survey.status === 'draft'
+                              ? 'bg-slate-100 text-slate-600 border-slate-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          <option value="draft">Borrador</option>
+                          <option value="published">Publicada</option>
+                          <option value="archived">Archivada</option>
+                        </select>
+                      </td>
 
-                    <button
-                      onClick={() => onReports(survey)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
-                      title="Ver Analítica y Reportes"
-                    >
-                      <BarChart2 className="w-4 h-4 text-purple-600" />
-                    </button>
+                      {/* Botones de Acción */}
+                      <td className="py-4 px-5 align-middle text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => onPlay(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 transition cursor-pointer shadow-2xs"
+                            title="Responder / Vista Previa"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          </button>
 
-                    <button
-                      onClick={() => setShareModalSurvey(survey)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
-                      title="Compartir QR / Enlace"
-                    >
-                      <Share2 className="w-4 h-4 text-red-600" />
-                    </button>
+                          <button
+                            onClick={() => onEdit(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-700 border border-slate-200 hover:border-blue-200 transition cursor-pointer shadow-2xs"
+                            title="Editar Preguntas"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
 
-                    <button
-                      onClick={() => setSurveyToDelete(survey)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
-                      title="Eliminar Encuesta"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                          <button
+                            onClick={() => onReports(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-500 hover:text-purple-700 border border-slate-200 hover:border-purple-200 transition cursor-pointer shadow-2xs"
+                            title="Ver Analítica y Reportes"
+                          >
+                            <BarChart2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => setShareModalSurvey(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 transition cursor-pointer shadow-2xs"
+                            title="Compartir QR / Enlace"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => onDuplicate(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-slate-800 border border-slate-200 transition cursor-pointer shadow-2xs"
+                            title="Duplicar Formulario"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => setSurveyToDelete(survey)}
+                            className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition cursor-pointer shadow-2xs"
+                            title="Eliminar Formulario"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

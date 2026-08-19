@@ -195,6 +195,7 @@ export const dataService = {
     gradeIndex: null as Map<string, GradeEntry[]> | null,
     activeStoreKey: null as string | null,
     summary: null as any[] | null,
+    summaryMonth: null as string | null,
     hierarchy: null as HierarchyData | null,
     users: null as User[] | null,
     banca: null as BancaData | null,
@@ -244,22 +245,21 @@ export const dataService = {
       return true;
     }
     try {
-      const [employees, restaurants, hierarchy, users, banca, cloudSurveys, cloudResponses] = await Promise.all([
+      // surveys y responses NO se descargan aquí: se cargan bajo demanda cuando el usuario
+      // abre el módulo Pulse (via fetchSurveysAndResponses). Esto evita 2 consultas innecesarias
+      // a Supabase en cada login para usuarios que no usan Pulse.
+      const [employees, restaurants, hierarchy, users, banca] = await Promise.all([
         dataService.supabaseFetchAll('employees'),
         dataService.supabaseFetchAll('restaurants'),
         dataService.supabaseFetch('hierarchy').catch(() => []),
         dataService.supabaseFetchAll('users').catch(() => []),
         dataService.supabaseFetch('banca').catch(() => []),
-        dataService.supabaseFetchAll('surveys').catch(() => []),
-        dataService.supabaseFetchAll('responses').catch(() => [])
       ]);
 
       await Promise.all([
         localforage.setItem('la_akademia_employees', employees || []),
         localforage.setItem('la_akademia_stores', restaurants || []),
         localforage.setItem('la_akademia_users', users || []),
-        localforage.setItem('la_akademia_surveys', cloudSurveys || []),
-        localforage.setItem('la_akademia_responses', cloudResponses || [])
       ]);
 
       const defaultHierarchy = { lockedMonths: [], regions: [] };
@@ -275,8 +275,6 @@ export const dataService = {
       dataService._cache.users = (users as User[]) || [];
       dataService._cache.hierarchy = cloudHierarchy;
       dataService._cache.banca = cloudBanca;
-      dataService._cache.surveys = (cloudSurveys as Survey[]) || [];
-      dataService._cache.responses = (cloudResponses as ResponseRecord[]) || [];
       dataService._cache.gradeIndex = null;
       dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
 
@@ -302,8 +300,13 @@ export const dataService = {
     }
   },
 
-  loadGradesSummary: async (month: string) => {
+  loadGradesSummary: async (month: string, force: boolean = false) => {
     try {
+      // Si el resumen de este mes ya está en caché y no se fuerza la recarga, retornarlo inmediatamente
+      if (!force && dataService._cache.summaryMonth === month && dataService._cache.summary && dataService._cache.summary.length > 0) {
+        return dataService._cache.summary;
+      }
+
       const monthDate = `${month}-01`;
       // Consultamos la vista de resúmenes usando 'lte' para permitir herencia en el Dashboard
       // Ordenamos por mes descendente para capturar la nota más reciente primero
@@ -322,6 +325,7 @@ export const dataService = {
       const summary = Array.from(latestMap.values());
       await localforage.setItem('la_akademia_summary', summary);
       dataService._cache.summary = summary;
+      dataService._cache.summaryMonth = month;
 
       // IMPORTANTE: NO limpiamos _cache.grades por completo aquí para permitir la herencia
       // Solo invalidamos el índice para que se reconstruya con los nuevos datos si los hay
@@ -329,7 +333,7 @@ export const dataService = {
       return summary;
     } catch (e) {
       console.error("Error al cargar resúmenes:", e);
-      return [];
+      return dataService._cache.summary || [];
     }
   },
 

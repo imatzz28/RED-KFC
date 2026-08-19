@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Survey, Question, QuestionType, QuestionOption, SurveyStatus, ThemeConfig, ThankYouConfig } from '@/types';
 import {
   Save, ArrowLeft, Plus, Trash2, CheckCircle2, AlertCircle, Settings,
   Sparkles, Layers, Palette, Eye, HelpCircle, Check, Clock, Shuffle,
   Lock, FileText, ArrowRight, ShieldCheck, Zap, GitFork, LayoutGrid,
-  ListOrdered, Award
+  ListOrdered, Award, RefreshCw
 } from 'lucide-react';
 import { QuestionEditor } from './QuestionEditor';
 import { LogicFlowPanel } from './LogicFlowPanel';
@@ -30,8 +30,39 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
   );
 
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isQuiz = survey.type === 'quiz';
+
+  const initialSnapshotRef = useRef<string>(JSON.stringify(initialSurvey));
+  const hasUnsavedChanges = JSON.stringify(survey) !== initialSnapshotRef.current;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleAttemptExit = () => {
+    if (hasUnsavedChanges) {
+      setShowExitConfirmModal(true);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    initialSnapshotRef.current = JSON.stringify(survey);
+    await onSave(survey);
+    setIsSaving(false);
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIdx(index);
@@ -115,26 +146,45 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
     setSurvey({ ...survey, questions: newQuestions });
   };
 
+  // Tipos de pregunta permitidos: si es quiz/evaluación, solo Opción Única, Opción Múltiple, Ordenar Secuencia
+  const availableQuestionTypes = [
+    { type: 'single_choice', label: 'Opción Única', color: 'bg-red-600' },
+    { type: 'multiple_choice', label: 'Opción Múltiple', color: 'bg-red-700' },
+    { type: 'ordering', label: 'Ordenar Secuencia', color: 'bg-slate-900' },
+    { type: 'rating', label: 'Escala / Estrellas', color: 'bg-[#E4002B]' },
+    { type: 'yes_no', label: 'Sí / No', color: 'bg-slate-800' },
+    { type: 'short_text', label: 'Texto Corto', color: 'bg-slate-700' },
+    { type: 'long_text', label: 'Texto Largo', color: 'bg-slate-600' },
+    { type: 'date', label: 'Fecha', color: 'bg-slate-500' },
+    { type: 'store_hierarchy', label: 'Selección de Tienda KFC', color: 'bg-[#E4002B]' },
+  ].filter(item => {
+    if (isQuiz) {
+      return ['single_choice', 'multiple_choice', 'ordering'].includes(item.type);
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Bar Header */}
       <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
         {/* Top Metadata Badges */}
         <div className="flex items-center gap-2">
-          <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-            isQuiz ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-100 text-blue-900 border border-blue-300'
+          <span className={`text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
+            isQuiz ? 'bg-red-50 text-[#E4002B] border border-red-200' : 'bg-slate-100 text-slate-800 border border-slate-200'
           }`}>
-            {isQuiz ? 'EVALUACIÓN (QUIZ)' : 'ENCUESTA ESTÁNDAR'}
+            {isQuiz ? 'EVALUACIÓN OPERATIVA (QUIZ)' : 'ENCUESTA ESTÁNDAR'}
           </span>
           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
             Título del Formulario
           </label>
         </div>
 
-        {/* Input & Save Button Row - 100% Pixel-Perfect Horizontal Alignment */}
+        {/* Input & Save Button Row */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <button
-            onClick={onCancel}
+            type="button"
+            onClick={handleAttemptExit}
             className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl transition text-slate-700 cursor-pointer shrink-0 h-11 flex items-center justify-center"
             title="Volver"
           >
@@ -149,17 +199,26 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
             placeholder="Escribe el Título del Formulario aquí..."
           />
 
-          <button
-            onClick={() => onSave(survey)}
-            className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-6 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition cursor-pointer shrink-0"
-          >
-            <Save className="w-4 h-4 text-white" />
-            <span>Guardar Cambios</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 whitespace-nowrap">
+                Cambios sin guardar
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleSave}
+              className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-6 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-white" />}
+              <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs matching RED Pulse icons & labels */}
+      {/* Navigation Sub-Tabs */}
       <div className="flex border-b border-slate-200 gap-6 overflow-x-auto">
         <button
           onClick={() => setActiveTab('questions')}
@@ -220,19 +279,18 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
           {/* Sidebar - Añadir Preguntas */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Agregar Pregunta</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  {isQuiz ? 'Preguntas Permitidas' : 'Agregar Pregunta'}
+                </h3>
+                {isQuiz && (
+                  <span className="text-[8px] font-black uppercase bg-red-50 text-[#E4002B] px-2 py-0.5 rounded">
+                    Quiz
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-1.5">
-                {[
-                  { type: 'single_choice', label: 'Opción Única', color: 'bg-red-600' },
-                  { type: 'multiple_choice', label: 'Opción Múltiple', color: 'bg-purple-600' },
-                  { type: 'ordering', label: 'Ordenar Secuencia', color: 'bg-indigo-600' },
-                  { type: 'rating', label: 'Escala / Estrellas', color: 'bg-amber-500' },
-                  { type: 'yes_no', label: 'Sí / No', color: 'bg-emerald-600' },
-                  { type: 'short_text', label: 'Texto Corto', color: 'bg-blue-500' },
-                  { type: 'long_text', label: 'Texto Largo', color: 'bg-sky-500' },
-                  { type: 'date', label: 'Fecha', color: 'bg-pink-500' },
-                  { type: 'store_hierarchy', label: 'Selección de Tienda KFC', color: 'bg-teal-600' },
-                ].map(item => (
+                {availableQuestionTypes.map(item => (
                   <button
                     key={item.type}
                     onClick={() => handleAddQuestion(item.type as QuestionType)}
@@ -258,10 +316,10 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
                 <div
                   key={q.id}
                   draggable
-                  onDragStart={e => handleDragStart(e, idx)}
-                  onDragOver={e => handleDragOver(e, idx)}
+                  onDragStart={(e) => handleDragStart(e, idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
                   onDragEnd={handleDragEnd}
-                  className={`transition-all duration-150 ${draggedIdx === idx ? 'opacity-30 scale-[0.98]' : 'opacity-100'}`}
+                  className={`transition-all duration-150 ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
                 >
                   <QuestionEditor
                     question={q}
@@ -284,7 +342,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
         </div>
       )}
 
-      {/* TAB 2: DIAGRAMA DE LÓGICA (CANVAS FLOW) */}
+      {/* TAB 2: FLUJO LÓGICO */}
       {activeTab === 'logic' && (
         <LogicFlowPanel
           survey={survey}
@@ -292,32 +350,74 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
         />
       )}
 
-      {/* TAB 3: DISEÑO & TEMA */}
+      {/* TAB 3: TEMA VISUAL */}
       {activeTab === 'theme' && (
         <ThemeEditor
           theme={survey.theme}
-          thankYou={survey.thank_you}
+          thankYou={survey.thank_you || { title: '¡Muchas Gracias!', message: 'Tus respuestas han sido registradas exitosamente.', show_button: false }}
           category={survey.category}
-          onThemeUpdate={theme => setSurvey({ ...survey, theme })}
-          onThankYouUpdate={thank_you => setSurvey({ ...survey, thank_you })}
-          onCategoryUpdate={category => setSurvey({ ...survey, category })}
+          onThemeUpdate={(theme) => setSurvey(prev => ({ ...prev, theme }))}
+          onThankYouUpdate={(thankYou) => setSurvey(prev => ({ ...prev, thank_you: thankYou }))}
+          onCategoryUpdate={(category) => setSurvey(prev => ({ ...prev, category }))}
         />
       )}
 
-      {/* TAB 4: ACCESO & ENLACES */}
+      {/* TAB 4: ACCESO */}
       {activeTab === 'access' && (
         <AccessSettings
           survey={survey}
-          onUpdateSurvey={updated => setSurvey({ ...survey, ...updated })}
+          onUpdateSurvey={(updates) => setSurvey(prev => ({ ...prev, ...updates }))}
         />
       )}
 
-      {/* TAB 5: AJUSTES DE EVALUACIÓN */}
+      {/* TAB 5: QUIZ */}
       {activeTab === 'quiz' && isQuiz && (
         <QuizSettings
           survey={survey}
-          onUpdateSurvey={updated => setSurvey({ ...survey, ...updated })}
+          onUpdateSurvey={(updates) => setSurvey(prev => ({ ...prev, ...updates }))}
         />
+      )}
+
+      {/* Modal de Confirmación: Salir sin Guardar */}
+      {showExitConfirmModal && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowExitConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-[#E4002B] flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">¿Salir sin guardar los cambios?</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Tienes modificaciones pendientes en este formulario. Si sales ahora, se perderán los cambios recientes.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Continuar Editando
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirmModal(false);
+                  onCancel();
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-[#E4002B] hover:bg-red-700 text-white transition cursor-pointer shadow-md shadow-red-600/20"
+              >
+                Salir sin Guardar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

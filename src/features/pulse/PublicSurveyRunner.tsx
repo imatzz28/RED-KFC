@@ -135,13 +135,31 @@ export const PublicSurveyRunner: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100 p-4 sm:p-6 md:p-8 flex flex-col justify-center items-center">
+      {/* Brand Watermark / Top Header */}
+      <div className="w-full max-w-2xl mb-6 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-[#E4002B] animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">
+            KFC Pulse • Plataforma Oficial de Evaluaciones
+          </span>
+        </div>
+      </div>
+
+      <div className="w-full max-w-2xl">
         <SurveyPlayer
           survey={survey}
           onSubmit={handleSubmitResponse}
           onClose={() => navigate('/')}
+          isPublic={true}
         />
+      </div>
+
+      {/* Footer Branding */}
+      <div className="mt-8 text-center">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+          KFC RED Sistema Operativo Integral
+        </p>
       </div>
     </div>
   );

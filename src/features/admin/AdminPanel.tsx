@@ -33,7 +33,7 @@ const AdminPanel: React.FC = () => {
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase italic leading-none">
-                {currentUser.role === UserRole.ADMIN ? 'Panel Administración' : 'Gestión de Equipo'}
+                {currentUser.role === UserRole.ADMIN ? 'Panel Configuración' : 'Gestión de Equipo'}
               </h2>
               <div className="flex flex-wrap gap-2 mt-2">
                 {currentUser.role === UserRole.ADMIN && (

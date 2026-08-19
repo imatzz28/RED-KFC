@@ -24,11 +24,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
 
 
 const MyStores: React.FC = () => {
-  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog, loadMonthly } = useAppStore();
-
-  React.useEffect(() => {
-    void loadMonthly();
-  }, [selectedMonth, loadMonthly]);
+  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog } = useAppStore();
   const user = auth.user!;
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -58,7 +54,10 @@ const MyStores: React.FC = () => {
       dataService._cache.gradeIndex = null;
 
       setIsLoadingGrades(true);
-      dataService.loadGradesForStore(selectedStore.id, selectedMonth).then(() => {
+      Promise.all([
+        dataService.loadGradesForStore(selectedStore.id, selectedMonth),
+        dataService.loadGradesSummary(selectedMonth)
+      ]).then(() => {
         onUpdate();
         setGradeVersion(v => v + 1); // Fuerza re-computacion de efectivos
         setIsLoadingGrades(false);
@@ -359,7 +358,7 @@ const MyStores: React.FC = () => {
               <div key={id} className={`bg-white p-6 rounded-[32px] border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group ${hasGrades && groupApprovalRate >= 90 ? 'border-emerald-50' : 'border-slate-50'}`}>
                 <div className="flex items-center gap-4">
                   <div className={`p-4 rounded-2xl transition-transform group-hover:rotate-6 shadow-sm shrink-0 ${hasGrades && groupApprovalRate >= 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
-                    {React.cloneElement(GroupIcons[id] as React.ReactElement, { className: 'w-5 h-5' })}
+                    {React.cloneElement(GroupIcons[id] as React.ReactElement<any>, { className: 'w-5 h-5' })}
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] truncate pr-2 mb-1">{group.name}</p>
@@ -644,7 +643,7 @@ const DetailStatCard: React.FC<{ icon: React.ReactNode, label: string, value: st
   return (
     <div className={`p-6 md:p-8 rounded-[32px] border-2 flex flex-col justify-center transition-all hover:shadow-2xl hover:scale-[1.02] group ${colorMap[color]}`}>
       <div className="flex items-center space-x-5">
-        <div className={`p-4 rounded-2xl shadow-inner transition-transform group-hover:rotate-6 ${iconBgMap[color]}`}>{React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}</div>
+        <div className={`p-4 rounded-2xl shadow-inner transition-transform group-hover:rotate-6 ${iconBgMap[color]}`}>{React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}</div>
         <div className="min-w-0">
           <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${color === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>{label}</p>
           <div className="flex items-center gap-3">

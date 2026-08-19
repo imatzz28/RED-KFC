@@ -182,8 +182,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             console.warn('[initData] Error al calcular mes óptimo desde meses asentados. Usando mes actual como fallback.', err);
         }
 
-        await dataService.loadGradesSummary(get().selectedMonth);
-
         get().refreshData();
         set({ syncStatus: success ? 'online' : 'offline' });
     },
