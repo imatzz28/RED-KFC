@@ -275,7 +275,7 @@ export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProp
         const q = survey.questions?.find(x => x.id === ans.question_id);
         if (!q) return ans;
 
-        let qPts = q.points ?? (survey.scoring_type === 'weighted' ? 10 : 1);
+        let qPts = q.points ?? 10;
         totalPts += qPts;
 
         let isCorrect = false;
@@ -290,6 +290,11 @@ export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProp
           isCorrect = correctOpts.length > 0 &&
             correctOpts.length === userVals.length &&
             correctOpts.every(v => userVals.includes(v));
+        } else if (q.type === 'ordering') {
+          const expectedOrder = (q.options || []).map(o => o.text);
+          if (Array.isArray(ans.value)) {
+            isCorrect = ans.value.length === expectedOrder.length && ans.value.every((val, i) => val === expectedOrder[i]);
+          }
         }
 
         if (isCorrect) earnedPts += qPts;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserRole } from '@/types';
 import { 
   LayoutDashboard, 
@@ -135,21 +135,9 @@ const Sidebar: React.FC = () => {
   ];
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    curvas: true,
-    gente: true
+    curvas: false,
+    gente: false
   });
-
-  // Auto-expand category if active route is inside it
-  useEffect(() => {
-    navigationStructure.forEach(entry => {
-      if (entry.type === 'category') {
-        const hasActiveChild = entry.items.some(it => it.key === activeTab || location.pathname === it.to);
-        if (hasActiveChild) {
-          setExpandedCategories(prev => ({ ...prev, [entry.id]: true }));
-        }
-      }
-    });
-  }, [activeTab, location.pathname]);
 
   const toggleCategory = (catId: string) => {
     setExpandedCategories(prev => ({

@@ -4,7 +4,7 @@ import {
   Type, AlignLeft, CircleDot, CheckSquare, Star, ToggleLeft,
   Calendar, Upload, Plus, Trash2, GitFork, GripVertical,
   ChevronDown, ChevronUp, ListPlus, FileText, X, Sparkles,
-  Minimize2, MapPin, ListOrdered, Pencil, BookTemplate
+  Minimize2, MapPin, ListOrdered, Pencil, BookTemplate, Award
 } from 'lucide-react';
 
 interface QuestionEditorProps {
@@ -218,10 +218,16 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
             #{question.order}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
               <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
                 {currentTypeObj.label}
               </span>
+              {surveyType === 'quiz' && (
+                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                  <Award className="w-2.5 h-2.5" />
+                  {question.points ?? 10} pts
+                </span>
+              )}
               {question.required && (
                 <span className="text-[9px] font-black text-[#E4002B] uppercase tracking-wider">* Obligatoria</span>
               )}
@@ -259,7 +265,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-6 mb-5 space-y-5 border-l-4 border-l-[#E4002B] animate-in fade-in duration-150">
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="w-8 h-8 rounded-xl bg-[#E4002B] text-white font-black text-xs flex items-center justify-center shadow-xs">
             #{question.order}
           </div>
@@ -275,6 +281,23 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
               ))}
             </select>
           </div>
+
+          {surveyType === 'quiz' && (
+            <div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Puntos</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={question.points ?? 10}
+                  onChange={(e) => onUpdate({ ...question, points: Math.max(1, Number(e.target.value) || 1) })}
+                  className="w-16 bg-emerald-50/70 border border-emerald-300 rounded-xl px-2.5 py-1 text-xs font-black text-emerald-900 outline-none focus:border-emerald-500 text-center"
+                />
+                <span className="text-[10px] font-black text-emerald-700">pts</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

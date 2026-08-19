@@ -194,6 +194,15 @@ const isQuestionAnswered = (q: Question | undefined, currentAnswers: Record<stri
   }
 };
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   survey,
   onSubmit,
@@ -235,10 +244,37 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [validationAlert, setValidationAlert] = useState(false);
 
+  const attemptStorageKey = `pulse_attempts_${survey.id}`;
+  const [attemptsCount, setAttemptsCount] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem(attemptStorageKey) || '0');
+    } catch {
+      return 0;
+    }
+  });
+
+  const maxAttemptsReached = Boolean(
+    survey.max_attempts && survey.max_attempts > 0 && attemptsCount >= survey.max_attempts
+  );
+
   const hasTimer = (survey.time_limit_seconds || 0) > 0;
   const [timeLeft, setTimeLeft] = useState<number>(survey.time_limit_seconds || 0);
 
-  const questions = survey.questions || [];
+  // Initialize questions with shuffle support if enabled
+  const [questions] = useState<Question[]>(() => {
+    let list = (survey.questions || []).map(q => {
+      if (survey.shuffle_options && ['single_choice', 'multiple_choice'].includes(q.type) && q.options?.length) {
+        return { ...q, options: shuffleArray(q.options) };
+      }
+      return q;
+    });
+
+    if (survey.shuffle_questions && list.length > 1) {
+      list = shuffleArray(list);
+    }
+    return list;
+  });
+
   const currentQuestion = questions[currentIndex];
   const isQuiz = survey.type === 'quiz';
   const isAnswered = isQuestionAnswered(currentQuestion, answers);
@@ -260,8 +296,12 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
   useEffect(() => {
     if (currentQuestion && currentQuestion.type === 'ordering' && !answers[currentQuestion.id]) {
-      const defaultOrder = (currentQuestion.options || []).map(o => o.text);
-      setAnswers(prev => ({ ...prev, [currentQuestion.id]: defaultOrder }));
+      const originalOpts = (currentQuestion.options || []).map(o => o.text);
+      let scrambled = shuffleArray(originalOpts);
+      if (scrambled.length > 1 && scrambled.every((v, i) => v === originalOpts[i])) {
+        scrambled = [...scrambled].reverse();
+      }
+      setAnswers(prev => ({ ...prev, [currentQuestion.id]: scrambled }));
     }
   }, [currentQuestion]);
 
@@ -340,17 +380,21 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
       let qPoints = q.points || 10;
       totalPoints += qPoints;
 
-      if (['single_choice', 'multiple_choice'].includes(q.type)) {
-        const correctOpts = (q.options || []).filter(o => o.is_correct).map(o => o.value);
-        if (q.type === 'single_choice') {
-          isCorrect = correctOpts.includes(userVal);
-        } else if (Array.isArray(userVal)) {
-          isCorrect = userVal.length === correctOpts.length && userVal.every(v => correctOpts.includes(v));
+      if (['single_choice', 'yes_no'].includes(q.type)) {
+        const correctOpt = (q.options || []).find(o => o.is_correct);
+        if (correctOpt) {
+          isCorrect = String(userVal) === String(correctOpt.value || correctOpt.id || correctOpt.text);
         }
+      } else if (q.type === 'multiple_choice') {
+        const correctOpts = (q.options || []).filter(o => o.is_correct).map(o => String(o.value || o.id || o.text));
+        const userVals = Array.isArray(userVal) ? userVal.map(v => String(v)) : [String(userVal)];
+        isCorrect = correctOpts.length > 0 &&
+          correctOpts.length === userVals.length &&
+          correctOpts.every(v => userVals.includes(v));
       } else if (q.type === 'ordering') {
         const expectedOrder = (q.options || []).map(o => o.text);
         if (Array.isArray(userVal)) {
-          isCorrect = userVal.every((val, i) => val === expectedOrder[i]);
+          isCorrect = userVal.length === expectedOrder.length && userVal.every((val, i) => val === expectedOrder[i]);
         }
       }
 
@@ -397,6 +441,16 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
     const scorePercent = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 100;
     const passed = isQuiz ? scorePercent >= (survey.passing_score_percent || 70) : true;
+
+    if (survey.max_attempts && survey.max_attempts > 0) {
+      try {
+        const nextAttempt = attemptsCount + 1;
+        localStorage.setItem(attemptStorageKey, String(nextAttempt));
+        setAttemptsCount(nextAttempt);
+      } catch (err) {
+        console.warn('Could not update attempt count:', err);
+      }
+    }
 
     const record: ResponseRecord = {
       id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -506,25 +560,48 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
           </div>
 
           {/* Action Call To Action */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-            {!isPublic && (
+          {maxAttemptsReached ? (
+            <div className="p-5 bg-amber-50 border border-amber-200 rounded-3xl text-center space-y-3 animate-in fade-in">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                Límite de Intentos Alcanzado
+              </h4>
+              <p className="text-xs text-amber-800 font-medium leading-relaxed max-w-md mx-auto">
+                Ya has completado el número máximo de <strong>{survey.max_attempts}</strong> intento(s) permitido(s) para esta evaluación en este dispositivo.
+              </p>
+              {!isPublic && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="mt-2 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase cursor-pointer shadow-md"
+                >
+                  Volver al Panel
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              {!isPublic && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto px-6 py-4 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer border border-slate-200"
+                >
+                  Volver
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-4 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer border border-slate-200"
+                onClick={() => setIsStarted(true)}
+                className="w-full sm:flex-1 py-4 rounded-2xl bg-gradient-to-r from-[#E4002B] via-red-600 to-[#99001A] hover:brightness-110 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-red-600/30 transition-all transform active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer group"
               >
-                Volver
+                <span>{isQuiz ? 'Iniciar Evaluación Operativa' : 'Comenzar Formulario'}</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsStarted(true)}
-              className="w-full sm:flex-1 py-4 rounded-2xl bg-gradient-to-r from-[#E4002B] via-red-600 to-[#99001A] hover:brightness-110 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-red-600/30 transition-all transform active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer group"
-            >
-              <span>{isQuiz ? 'Iniciar Evaluación Operativa' : 'Comenzar Formulario'}</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
