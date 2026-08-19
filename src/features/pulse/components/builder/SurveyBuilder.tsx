@@ -146,23 +146,18 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
     setSurvey({ ...survey, questions: newQuestions });
   };
 
-  // Tipos de pregunta permitidos: si es quiz/evaluación, solo Opción Única, Opción Múltiple, Ordenar Secuencia
+  // Tipos de pregunta permitidos
   const availableQuestionTypes = [
     { type: 'single_choice', label: 'Opción Única', color: 'bg-red-600' },
     { type: 'multiple_choice', label: 'Opción Múltiple', color: 'bg-red-700' },
     { type: 'ordering', label: 'Ordenar Secuencia', color: 'bg-slate-900' },
-    { type: 'rating', label: 'Escala / Estrellas', color: 'bg-[#E4002B]' },
     { type: 'yes_no', label: 'Sí / No', color: 'bg-slate-800' },
     { type: 'short_text', label: 'Texto Corto', color: 'bg-slate-700' },
     { type: 'long_text', label: 'Texto Largo', color: 'bg-slate-600' },
+    { type: 'store_hierarchy', label: 'Jerarquía KFC', color: 'bg-[#E4002B]' },
     { type: 'date', label: 'Fecha', color: 'bg-slate-500' },
-    { type: 'store_hierarchy', label: 'Selección de Tienda KFC', color: 'bg-[#E4002B]' },
-  ].filter(item => {
-    if (isQuiz) {
-      return ['single_choice', 'multiple_choice', 'ordering'].includes(item.type);
-    }
-    return true;
-  });
+    { type: 'rating', label: 'Escala / Estrellas', color: 'bg-[#E4002B]' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -353,6 +348,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
       {/* TAB 3: TEMA VISUAL */}
       {activeTab === 'theme' && (
         <ThemeEditor
+          survey={survey}
           theme={survey.theme}
           thankYou={survey.thank_you || { title: '¡Muchas Gracias!', message: 'Tus respuestas han sido registradas exitosamente.', show_button: false }}
           category={survey.category}

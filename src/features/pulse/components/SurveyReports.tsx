@@ -273,35 +273,40 @@ export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProp
 
       const updatedAnswers = (r.answers || []).map(ans => {
         const q = survey.questions?.find(x => x.id === ans.question_id);
-        if (!q) return ans;
+        const qType = q?.type || ans.question_type;
+        const isGradable = ['single_choice', 'multiple_choice', 'ordering', 'yes_no'].includes(qType || '');
 
-        let qPts = q.points ?? 10;
+        if (!isGradable) {
+          return { ...ans, is_correct: undefined, points_earned: undefined, max_points: undefined };
+        }
+
+        let qPts = q?.points ?? 10;
         totalPts += qPts;
 
         let isCorrect = false;
-        if (q.type === 'single_choice' || q.type === 'yes_no') {
-          const correctOpt = q.options?.find(o => o.is_correct);
+        if (qType === 'single_choice' || qType === 'yes_no') {
+          const correctOpt = q?.options?.find(o => o.is_correct);
           if (correctOpt) {
             isCorrect = String(ans.value) === String(correctOpt.value || correctOpt.id || correctOpt.text);
           }
-        } else if (q.type === 'multiple_choice') {
-          const correctOpts = q.options?.filter(o => o.is_correct).map(o => String(o.value || o.id || o.text)) || [];
+        } else if (qType === 'multiple_choice') {
+          const correctOpts = q?.options?.filter(o => o.is_correct).map(o => String(o.value || o.id || o.text)) || [];
           const userVals = Array.isArray(ans.value) ? ans.value.map(v => String(v)) : [String(ans.value)];
           isCorrect = correctOpts.length > 0 &&
             correctOpts.length === userVals.length &&
             correctOpts.every(v => userVals.includes(v));
-        } else if (q.type === 'ordering') {
-          const expectedOrder = (q.options || []).map(o => o.text);
+        } else if (qType === 'ordering') {
+          const expectedOrder = (q?.options || []).map(o => o.text);
           if (Array.isArray(ans.value)) {
             isCorrect = ans.value.length === expectedOrder.length && ans.value.every((val, i) => val === expectedOrder[i]);
           }
         }
 
         if (isCorrect) earnedPts += qPts;
-        return { ...ans, is_correct: isCorrect };
+        return { ...ans, is_correct: isCorrect, points_earned: isCorrect ? qPts : 0, max_points: qPts };
       });
 
-      const pct = totalPts > 0 ? Math.round((earnedPts / totalPts) * 100) : 0;
+      const pct = totalPts > 0 ? Math.round((earnedPts / totalPts) * 100) : 100;
       const passed = pct >= (survey.passing_score_percent ?? 70);
 
       return {
@@ -1336,11 +1341,17 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
                         {getFormattedAnswerValue(ans)}
                       </span>
                       {survey.type === 'quiz' && (
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
-                          ans.is_correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {ans.is_correct ? 'Correcta' : 'Incorrecta'}
-                        </span>
+                        ans.is_correct !== undefined ? (
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                            ans.is_correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {ans.is_correct ? 'Correcta' : 'Incorrecta'}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-slate-200/80 text-slate-600 border border-slate-300/60">
+                            Informativa
+                          </span>
+                        )
                       )}
                     </div>
                   </div>

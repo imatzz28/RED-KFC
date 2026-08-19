@@ -145,21 +145,6 @@ const StoreHierarchySelector: React.FC<{
           ))}
         </select>
       </div>
-
-      {value && (
-        <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-950 flex items-center justify-between animate-in fade-in duration-200">
-          <span className="flex items-center gap-1.5 text-emerald-700">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Tienda vinculada:</span>
-          </span>
-          <span className="font-black text-emerald-900">
-            {(() => {
-              const r = restaurants.find(s => s.id === value || value.includes(s.id));
-              return r ? `${r.region} > ${r.zone} > ${r.id} - ${r.name}` : value;
-            })()}
-          </span>
-        </div>
-      )}
     </div>
   );
 };
@@ -398,30 +383,38 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
     const answerItems: Answer[] = questions.map(q => {
       const userVal = answers[q.id];
-      let isCorrect = false;
+      const gradable = isQuiz && ['single_choice', 'multiple_choice', 'ordering', 'yes_no'].includes(q.type);
+      let isCorrect: boolean | undefined = undefined;
       let qPoints = q.points || 10;
-      totalPoints += qPoints;
 
-      if (['single_choice', 'yes_no'].includes(q.type)) {
-        const correctOpt = (q.options || []).find(o => o.is_correct);
-        if (correctOpt) {
-          isCorrect = String(userVal) === String(correctOpt.value || correctOpt.id || correctOpt.text);
-        }
-      } else if (q.type === 'multiple_choice') {
-        const correctOpts = (q.options || []).filter(o => o.is_correct).map(o => String(o.value || o.id || o.text));
-        const userVals = Array.isArray(userVal) ? userVal.map(v => String(v)) : [String(userVal)];
-        isCorrect = correctOpts.length > 0 &&
-          correctOpts.length === userVals.length &&
-          correctOpts.every(v => userVals.includes(v));
-      } else if (q.type === 'ordering') {
-        const expectedOrder = (q.options || []).map(o => o.text);
-        if (Array.isArray(userVal)) {
-          isCorrect = userVal.length === expectedOrder.length && userVal.every((val, i) => val === expectedOrder[i]);
-        }
-      }
+      if (gradable) {
+        totalPoints += qPoints;
 
-      if (isCorrect) {
-        earnedPoints += qPoints;
+        if (['single_choice', 'yes_no'].includes(q.type)) {
+          const correctOpt = (q.options || []).find(o => o.is_correct);
+          if (correctOpt) {
+            isCorrect = String(userVal) === String(correctOpt.value || correctOpt.id || correctOpt.text);
+          } else {
+            isCorrect = false;
+          }
+        } else if (q.type === 'multiple_choice') {
+          const correctOpts = (q.options || []).filter(o => o.is_correct).map(o => String(o.value || o.id || o.text));
+          const userVals = Array.isArray(userVal) ? userVal.map(v => String(v)) : [String(userVal)];
+          isCorrect = correctOpts.length > 0 &&
+            correctOpts.length === userVals.length &&
+            correctOpts.every(v => userVals.includes(v));
+        } else if (q.type === 'ordering') {
+          const expectedOrder = (q.options || []).map(o => o.text);
+          if (Array.isArray(userVal)) {
+            isCorrect = userVal.length === expectedOrder.length && userVal.every((val, i) => val === expectedOrder[i]);
+          } else {
+            isCorrect = false;
+          }
+        }
+
+        if (isCorrect) {
+          earnedPoints += qPoints;
+        }
       }
 
       let valueDisplay: string | undefined = undefined;
@@ -440,9 +433,9 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
         question_type: q.type,
         value: userVal,
         value_display: valueDisplay,
-        is_correct: isQuiz ? isCorrect : undefined,
-        points_earned: isQuiz ? (isCorrect ? qPoints : 0) : undefined,
-        max_points: isQuiz ? qPoints : undefined,
+        is_correct: gradable ? isCorrect : undefined,
+        points_earned: gradable ? (isCorrect ? qPoints : 0) : undefined,
+        max_points: gradable ? qPoints : undefined,
       };
     });
 
@@ -500,18 +493,28 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const themeStyle = survey.theme?.theme_style || 'base';
+  const isCrimson = themeStyle === 'crimson';
+  const isDark = themeStyle === 'dark';
+
   // ==========================================
   // 1. PORTADA / WELCOME SCREEN (KFC DESIGN)
   // ==========================================
   if (!isStarted && !completed) {
     return (
-      <div className="bg-white rounded-[36px] border border-slate-100 shadow-2xl max-w-2xl mx-auto overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+      <div className={`rounded-[36px] border shadow-2xl max-w-2xl mx-auto overflow-hidden animate-in fade-in zoom-in-95 duration-300 transition-all ${
+        isCrimson
+          ? 'bg-[#50000c]/95 border-red-800/70 text-white shadow-red-950/80 backdrop-blur-md'
+          : isDark
+          ? 'bg-[#0f172a]/95 border-slate-800 text-white shadow-black/80 backdrop-blur-md'
+          : 'bg-white border-slate-100 text-slate-900 shadow-2xl'
+      }`}>
         {/* KFC Signature 3-Stripe Decorative Header */}
         <div className="h-2.5 w-full flex">
           <div className="flex-1 bg-[#E4002B]" />
-          <div className="w-6 bg-white" />
+          <div className={`w-6 ${isCrimson ? 'bg-red-950' : isDark ? 'bg-slate-900' : 'bg-white'}`} />
           <div className="flex-1 bg-[#E4002B]" />
-          <div className="w-6 bg-white" />
+          <div className={`w-6 ${isCrimson ? 'bg-red-950' : isDark ? 'bg-slate-900' : 'bg-white'}`} />
           <div className="flex-1 bg-[#E4002B]" />
         </div>
 
@@ -519,15 +522,25 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
           {/* Top Status & Category Badges */}
           <div className="flex items-center justify-between gap-3">
             <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3.5 py-1.5 rounded-xl shadow-2xs ${
-              isQuiz 
+              isCrimson
+                ? 'bg-red-950/80 text-red-200 border border-red-800/80'
+                : isDark
+                ? 'bg-slate-900 text-red-400 border border-slate-800'
+                : isQuiz 
                 ? 'bg-red-50 text-[#E4002B] border border-red-200' 
                 : 'bg-slate-100 text-slate-800 border border-slate-200'
             }`}>
-              <span className={`w-2 h-2 rounded-full animate-pulse ${isQuiz ? 'bg-[#E4002B]' : 'bg-slate-600'}`} />
+              <span className="w-2 h-2 rounded-full bg-[#E4002B] animate-pulse" />
               {isQuiz ? 'Evaluación Operativa KFC' : 'Encuesta Pulse KFC'}
             </span>
 
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200">
+            <span className={`text-[10px] font-black uppercase tracking-widest px-3.5 py-1.5 rounded-xl border ${
+              isCrimson
+                ? 'bg-[#380007] text-red-300 border-red-800/60'
+                : isDark
+                ? 'bg-slate-900 text-slate-400 border-slate-800'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
+            }`}>
               {survey.category || 'General'}
             </span>
           </div>
@@ -535,7 +548,13 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
           {/* Hero Branding Section */}
           <div className="text-center space-y-4 py-2">
             <div className="relative inline-block">
-              <div className="w-24 h-24 rounded-3xl bg-white p-3.5 mx-auto shadow-xl shadow-red-600/15 border-2 border-red-100/80 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-red-600/25 group">
+              <div className={`w-24 h-24 rounded-3xl p-3.5 mx-auto flex items-center justify-center transition-all duration-300 hover:scale-105 group ${
+                isCrimson
+                  ? 'bg-[#6b0213] border-2 border-red-500/50 shadow-xl shadow-red-600/30 hover:shadow-red-600/50'
+                  : isDark
+                  ? 'bg-slate-900 border-2 border-red-600/40 shadow-xl shadow-red-600/25 hover:shadow-red-600/40'
+                  : 'bg-white border-2 border-red-100/80 shadow-xl shadow-red-600/15 hover:shadow-2xl hover:shadow-red-600/25'
+              }`}>
                 <img
                   src="/Favicon.png"
                   alt="RED Logo"
@@ -545,11 +564,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight uppercase italic">
+              <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-tight uppercase italic ${
+                isCrimson || isDark ? 'text-white' : 'text-slate-950'
+              }`}>
                 {survey.title}
               </h1>
               {!isPlaceholderDesc(survey.description) && (
-                <p className="text-xs sm:text-sm font-medium text-slate-500 max-w-lg mx-auto leading-relaxed">
+                <p className={`text-xs sm:text-sm font-medium max-w-lg mx-auto leading-relaxed ${
+                  isCrimson ? 'text-red-200/85' : isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
                   {survey.description}
                 </p>
               )}
@@ -558,26 +581,54 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
           {/* Key Metric Overview Cards */}
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-center space-y-1 shadow-2xs">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Total Preguntas</span>
-              <span className="text-lg sm:text-xl font-black text-slate-900">{questions.length}</span>
-              <span className="text-[9px] font-bold text-slate-400 block">Ítems</span>
+            <div className={`rounded-2xl p-3.5 sm:p-4 text-center space-y-1 border ${
+              isCrimson
+                ? 'bg-[#3b0008]/90 border-red-800/70 text-white shadow-inner'
+                : isDark
+                ? 'bg-slate-900/90 border-slate-800 text-white shadow-inner'
+                : 'bg-slate-50 border-slate-200/80 text-slate-900 shadow-2xs'
+            }`}>
+              <span className={`text-[9px] font-black uppercase tracking-widest block ${isCrimson ? 'text-red-300' : 'text-slate-400'}`}>
+                Total Preguntas
+              </span>
+              <span className="text-lg sm:text-xl font-black block">{questions.length}</span>
+              <span className={`text-[9px] font-bold block ${isCrimson ? 'text-red-400' : 'text-slate-400'}`}>Ítems</span>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-center space-y-1 shadow-2xs">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Tiempo</span>
-              <span className="text-lg sm:text-xl font-black text-slate-900">
+            <div className={`rounded-2xl p-3.5 sm:p-4 text-center space-y-1 border ${
+              isCrimson
+                ? 'bg-[#3b0008]/90 border-red-800/70 text-white shadow-inner'
+                : isDark
+                ? 'bg-slate-900/90 border-slate-800 text-white shadow-inner'
+                : 'bg-slate-50 border-slate-200/80 text-slate-900 shadow-2xs'
+            }`}>
+              <span className={`text-[9px] font-black uppercase tracking-widest block ${isCrimson ? 'text-red-300' : 'text-slate-400'}`}>
+                Tiempo
+              </span>
+              <span className="text-lg sm:text-xl font-black block">
                 {timeLimit > 0 ? (timeLimit >= 60 ? `${Math.round(timeLimit / 60)} min` : `${timeLimit} seg`) : 'Libre'}
               </span>
-              <span className="text-[9px] font-bold text-slate-400 block">{timeLimit > 0 ? 'Límite' : 'Sin límite'}</span>
+              <span className={`text-[9px] font-bold block ${isCrimson ? 'text-red-400' : 'text-slate-400'}`}>
+                {timeLimit > 0 ? 'Límite' : 'Sin límite'}
+              </span>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-center space-y-1 shadow-2xs">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Meta</span>
-              <span className={`text-lg sm:text-xl font-black ${isQuiz ? 'text-[#E4002B]' : 'text-slate-900'}`}>
+            <div className={`rounded-2xl p-3.5 sm:p-4 text-center space-y-1 border ${
+              isCrimson
+                ? 'bg-[#3b0008]/90 border-red-800/70 text-white shadow-inner'
+                : isDark
+                ? 'bg-slate-900/90 border-slate-800 text-white shadow-inner'
+                : 'bg-slate-50 border-slate-200/80 text-slate-900 shadow-2xs'
+            }`}>
+              <span className={`text-[9px] font-black uppercase tracking-widest block ${isCrimson ? 'text-red-300' : 'text-slate-400'}`}>
+                Meta
+              </span>
+              <span className="text-lg sm:text-xl font-black text-[#E4002B] block">
                 {isQuiz ? `${passingScorePercent}%` : '100%'}
               </span>
-              <span className="text-[9px] font-bold text-slate-400 block">{isQuiz ? 'Mín. Aprobación' : 'Confidencial'}</span>
+              <span className={`text-[9px] font-bold block ${isCrimson ? 'text-red-400' : 'text-slate-400'}`}>
+                {isQuiz ? 'Mín. Aprobación' : 'Confidencial'}
+              </span>
             </div>
           </div>
 
@@ -609,7 +660,13 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-6 py-4 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer border border-slate-200"
+                  className={`w-full sm:w-auto px-6 py-4 rounded-2xl text-xs font-bold transition cursor-pointer border ${
+                    isCrimson
+                      ? 'border-red-800 text-red-200 hover:bg-red-950/60'
+                      : isDark
+                      ? 'border-slate-800 text-slate-300 hover:bg-slate-850'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
                 >
                   Volver
                 </button>
@@ -634,18 +691,24 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   // ==========================================
   if (completed) {
     return (
-      <div className="bg-white rounded-[36px] border border-slate-100 shadow-2xl max-w-xl mx-auto overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className={`rounded-[36px] border shadow-2xl max-w-xl mx-auto overflow-hidden animate-in zoom-in-95 duration-300 ${
+        isCrimson
+          ? 'bg-[#50000c]/95 border-red-800/70 text-white shadow-red-950/80'
+          : isDark
+          ? 'bg-[#0f172a]/95 border-slate-800 text-white shadow-black/80'
+          : 'bg-white border-slate-100 text-slate-900 shadow-2xl'
+      }`}>
         {/* KFC Stripes Header */}
         <div className="h-2.5 w-full flex">
           <div className="flex-1 bg-[#E4002B]" />
-          <div className="w-6 bg-white" />
+          <div className={`w-6 ${isCrimson ? 'bg-red-950' : isDark ? 'bg-slate-900' : 'bg-white'}`} />
           <div className="flex-1 bg-[#E4002B]" />
-          <div className="w-6 bg-white" />
+          <div className={`w-6 ${isCrimson ? 'bg-red-950' : isDark ? 'bg-slate-900' : 'bg-white'}`} />
           <div className="flex-1 bg-[#E4002B]" />
         </div>
 
         <div className="p-8 sm:p-10 text-center space-y-6">
-          {isQuiz ? (
+          {isQuiz && (survey.show_results_immediately ?? true) ? (
             <div className="space-y-5">
               {/* Quiz Result Badge */}
               <div className="relative inline-block">
@@ -667,15 +730,21 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                 }`}>
                   {finalScore?.passed ? '✓ Evaluación Aprobada' : '✕ No Aprobado'}
                 </span>
-                <h2 className="text-4xl font-black text-slate-950 mt-3 tracking-tight italic">
+                <h2 className={`text-4xl font-black mt-3 tracking-tight italic ${isCrimson || isDark ? 'text-white' : 'text-slate-950'}`}>
                   {finalScore?.scorePercent}%
                 </h2>
-                <p className="text-xs text-slate-500 font-bold mt-1">
+                <p className={`text-xs font-bold mt-1 ${isCrimson ? 'text-red-300' : 'text-slate-400'}`}>
                   Puntaje mínimo de pase requerido: {passingScorePercent}%
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs text-slate-600 font-medium leading-relaxed">
+              <div className={`p-4 rounded-2xl border text-xs font-medium leading-relaxed ${
+                isCrimson
+                  ? 'bg-[#3b0008] border-red-800/70 text-red-100'
+                  : isDark
+                  ? 'bg-slate-900 border-slate-800 text-slate-300'
+                  : 'bg-slate-50 border-slate-200/80 text-slate-600'
+              }`}>
                 {finalScore?.passed 
                   ? '¡Excelente trabajo! Has demostrado los estándares operativos requeridos para el personal de KFC.'
                   : 'Te invitamos a repasar los conceptos operativos con tu entrenador de tienda para la próxima oportunidad.'}
@@ -687,15 +756,23 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                 <CheckCircle className="w-10 h-10 drop-shadow" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tight">
-                  {survey.thank_you?.title || '¡Muchas Gracias!'}
+                <h2 className={`text-2xl font-black uppercase tracking-tight ${isCrimson || isDark ? 'text-white' : 'text-slate-950'}`}>
+                  {survey.thank_you?.title || (isQuiz ? '¡Evaluación Completada!' : '¡Muchas Gracias!')}
                 </h2>
-                <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto leading-relaxed">
-                  {survey.thank_you?.message || 'Tus respuestas han sido registradas y procesadas exitosamente en el sistema RED KFC.'}
+                <p className={`text-xs font-medium max-w-sm mx-auto leading-relaxed ${
+                  isCrimson ? 'text-red-200/90' : isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  {survey.thank_you?.message || (isQuiz ? 'Tus respuestas han sido registradas y procesadas exitosamente en el sistema RED KFC.' : 'Tus respuestas han sido registradas y procesadas exitosamente en el sistema RED KFC.')}
                 </p>
               </div>
 
-              <div className="p-3 bg-red-50/80 border border-red-100 rounded-2xl text-[11px] font-black text-[#E4002B] uppercase tracking-wider flex items-center justify-center gap-2">
+              <div className={`p-3 rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border ${
+                isCrimson
+                  ? 'bg-red-950/80 border-red-800/80 text-red-200'
+                  : isDark
+                  ? 'bg-slate-900 border-slate-800 text-red-400'
+                  : 'bg-red-50/80 border-red-100 text-[#E4002B]'
+              }`}>
                 <ShieldCheck className="w-4 h-4 text-[#E4002B]" />
                 <span>Registro Operativo Confirmado</span>
               </div>
@@ -737,22 +814,42 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const progressPercent = Math.round(((currentIndex + 1) / questions.length) * 100);
 
   return (
-    <div className="bg-white rounded-[36px] border border-slate-100 shadow-2xl max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[520px] animate-in fade-in duration-200">
+    <div className={`rounded-[36px] border shadow-2xl max-w-2xl mx-auto overflow-hidden flex flex-col min-h-[520px] animate-in fade-in duration-200 ${
+      isCrimson
+        ? 'bg-[#50000c]/95 border-red-800/70 text-white shadow-2xl shadow-red-950/80'
+        : isDark
+        ? 'bg-[#0f172a]/95 border-slate-800 text-white shadow-2xl shadow-black/80'
+        : 'bg-white border-slate-100 text-slate-900 shadow-2xl'
+    }`}>
       {/* Header Bar with KFC Pulse Branding & Progress */}
-      <div className="bg-slate-50/90 p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div className={`p-4 sm:p-5 border-b flex items-center justify-between gap-3 ${
+        isCrimson
+          ? 'bg-[#380007]/90 border-red-900/60 text-red-100'
+          : isDark
+          ? 'bg-slate-900/90 border-slate-800 text-slate-100'
+          : 'bg-slate-50/90 border-slate-100 text-slate-800'
+      }`}>
         <div className="flex items-center gap-2">
           {!isPublic ? (
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-bold text-slate-500 hover:text-slate-900 transition p-1 rounded-lg hover:bg-slate-200/60 cursor-pointer"
+              className={`text-xs font-bold transition p-1 rounded-lg cursor-pointer ${
+                isCrimson
+                  ? 'text-red-300 hover:text-white hover:bg-red-900/50'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
             >
               ✕ Salir
             </button>
           ) : (
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#E4002B]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">RED Pulse</span>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${isCrimson || isDark ? 'text-white' : 'text-slate-800'}`}>
+                RED Pulse
+              </span>
             </div>
           )}
         </div>
@@ -765,15 +862,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
         )}
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <span className={`text-[10px] font-black uppercase tracking-widest ${isCrimson ? 'text-red-300/80' : 'text-slate-400'}`}>
             {currentIndex + 1} / {questions.length}
           </span>
           <span className="text-xs font-black text-[#E4002B]">{progressPercent}%</span>
         </div>
       </div>
 
-      {/* Pure KFC Red Progress Bar (No orange gradient) */}
-      <div className="w-full bg-slate-100 h-1.5 relative overflow-hidden">
+      {/* Pure KFC Red Progress Bar */}
+      <div className={`w-full h-1.5 relative overflow-hidden ${isCrimson ? 'bg-[#380007]' : isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
         <div 
           className="h-full bg-gradient-to-r from-[#E4002B] to-[#99001A] transition-all duration-300 shadow-[0_0_8px_rgba(228,0,43,0.4)]" 
           style={{ width: `${progressPercent}%` }} 
@@ -786,10 +883,16 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
           {/* Question Tag / Index */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-black uppercase tracking-widest bg-red-50 text-[#E4002B] px-3 py-1 rounded-lg border border-red-100">
+              <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border ${
+                isCrimson
+                  ? 'bg-red-950/80 text-red-200 border-red-800/80'
+                  : isDark
+                  ? 'bg-slate-900 text-red-400 border-slate-800'
+                  : 'bg-red-50 text-[#E4002B] border-red-100'
+              }`}>
                 Pregunta {currentIndex + 1}
               </span>
-              <span className="text-[9px] font-bold text-slate-400 uppercase">
+              <span className={`text-[9px] font-bold uppercase ${isCrimson ? 'text-red-400/80' : 'text-slate-400'}`}>
                 * Obligatoria
               </span>
             </div>
@@ -803,11 +906,17 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <h2 className="text-lg sm:text-xl font-black text-slate-950 leading-snug tracking-tight">
+            <h2 className={`text-lg sm:text-xl font-black leading-snug tracking-tight ${isCrimson || isDark ? 'text-white' : 'text-slate-950'}`}>
               {currentQuestion.title}
             </h2>
             {currentQuestion.description && (
-              <p className="text-xs text-slate-500 font-medium leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              <p className={`text-xs font-medium leading-relaxed p-3 rounded-2xl border ${
+                isCrimson
+                  ? 'text-red-200 bg-[#3b0008] border-red-900/60'
+                  : isDark
+                  ? 'text-slate-400 bg-slate-900/80 border-slate-800'
+                  : 'text-slate-500 bg-slate-50 border-slate-100'
+              }`}>
                 {currentQuestion.description}
               </p>
             )}
@@ -829,7 +938,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                       onClick={() => handleSelectOption(currentQuestion.id, opt.value)}
                       className={`w-full text-left p-4 rounded-2xl border-2 font-bold text-xs transition-all flex items-center justify-between cursor-pointer shadow-2xs group ${
                         selected
-                          ? 'bg-gradient-to-r from-red-50/90 to-white text-slate-950 border-[#E4002B] shadow-sm scale-[1.01]'
+                          ? isCrimson
+                            ? 'bg-[#730214] border-red-400 text-white shadow-lg shadow-red-600/30 scale-[1.01]'
+                            : isDark
+                            ? 'bg-red-950/60 border-[#E4002B] text-white shadow-lg shadow-red-600/20 scale-[1.01]'
+                            : 'bg-gradient-to-r from-red-50/90 to-white text-slate-950 border-[#E4002B] shadow-sm scale-[1.01]'
+                          : isCrimson
+                          ? 'bg-[#3b0008]/80 text-red-100 border-red-800/70 hover:border-red-500 hover:bg-[#48000a]'
+                          : isDark
+                          ? 'bg-slate-900/80 text-slate-200 border-slate-800 hover:border-slate-600 hover:bg-slate-850'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
                       }`}
                     >
@@ -837,14 +954,18 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                         <span className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center transition ${
                           selected 
                             ? 'bg-[#E4002B] text-white shadow-xs' 
+                            : isCrimson
+                            ? 'bg-red-950 text-red-300'
+                            : isDark
+                            ? 'bg-slate-800 text-slate-400'
                             : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                         }`}>
                           {letter}
                         </span>
-                        <span className={`leading-snug ${selected ? 'font-black text-slate-900' : ''}`}>{opt.text}</span>
+                        <span className={`leading-snug ${selected ? 'font-black' : ''}`}>{opt.text}</span>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
-                        selected ? 'border-[#E4002B] bg-[#E4002B] text-white' : 'border-slate-300'
+                        selected ? 'border-[#E4002B] bg-[#E4002B] text-white' : isCrimson ? 'border-red-800' : isDark ? 'border-slate-700' : 'border-slate-300'
                       }`}>
                         {selected && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
@@ -857,7 +978,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             {/* Opción Múltiple (Multiple Choice) */}
             {currentQuestion.type === 'multiple_choice' && (
               <div className="space-y-2.5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCrimson ? 'text-red-300/80' : 'text-slate-400'}`}>
                   Selecciona una o varias opciones:
                 </span>
                 {(currentQuestion.options || []).map((opt, idx) => {
@@ -872,7 +993,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                       onClick={() => handleToggleMultipleChoice(currentQuestion.id, opt.value)}
                       className={`w-full text-left p-4 rounded-2xl border-2 font-bold text-xs transition-all flex items-center justify-between cursor-pointer shadow-2xs group ${
                         selected
-                          ? 'bg-gradient-to-r from-red-50/90 to-white text-slate-950 border-[#E4002B] shadow-sm'
+                          ? isCrimson
+                            ? 'bg-[#730214] border-red-400 text-white shadow-lg shadow-red-600/30'
+                            : isDark
+                            ? 'bg-red-950/60 border-[#E4002B] text-white shadow-lg shadow-red-600/20'
+                            : 'bg-gradient-to-r from-red-50/90 to-white text-slate-950 border-[#E4002B] shadow-sm'
+                          : isCrimson
+                          ? 'bg-[#3b0008]/80 text-red-100 border-red-800/70 hover:border-red-500 hover:bg-[#48000a]'
+                          : isDark
+                          ? 'bg-slate-900/80 text-slate-200 border-slate-800 hover:border-slate-600 hover:bg-slate-850'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
                       }`}
                     >
@@ -880,14 +1009,18 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                         <span className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center transition ${
                           selected 
                             ? 'bg-[#E4002B] text-white shadow-xs' 
+                            : isCrimson
+                            ? 'bg-red-950 text-red-300'
+                            : isDark
+                            ? 'bg-slate-800 text-slate-400'
                             : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                         }`}>
                           {letter}
                         </span>
-                        <span className={`leading-snug ${selected ? 'font-black text-slate-900' : ''}`}>{opt.text}</span>
+                        <span className={`leading-snug ${selected ? 'font-black' : ''}`}>{opt.text}</span>
                       </div>
                       <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition ${
-                        selected ? 'border-[#E4002B] bg-[#E4002B] text-white' : 'border-slate-300'
+                        selected ? 'border-[#E4002B] bg-[#E4002B] text-white' : isCrimson ? 'border-red-800' : isDark ? 'border-slate-700' : 'border-slate-300'
                       }`}>
                         {selected && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
@@ -897,7 +1030,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
               </div>
             )}
 
-            {/* Sí / No (Orden: No a la izquierda, Sí a la derecha - Sin emojis) */}
+            {/* Sí / No */}
             {currentQuestion.type === 'yes_no' && (
               <div className="grid grid-cols-2 gap-4">
                 {['No', 'Sí'].map(val => {
@@ -914,6 +1047,10 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                           ? isYes 
                             ? 'bg-[#E4002B] text-white border-red-700 shadow-lg shadow-red-600/30 scale-102'
                             : 'bg-slate-900 text-white border-slate-950 shadow-lg shadow-slate-900/30 scale-102'
+                          : isCrimson
+                          ? 'bg-[#3b0008] text-red-100 border-red-800 hover:border-red-500'
+                          : isDark
+                          ? 'bg-slate-900 text-slate-200 border-slate-800 hover:border-slate-600'
                           : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
                       }`}
                     >
@@ -926,7 +1063,13 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
             {/* Escala / Rating (Estrellas Acumulativas) */}
             {currentQuestion.type === 'rating' && (
-              <div className="space-y-3 text-center bg-slate-50/70 p-6 rounded-3xl border border-slate-100">
+              <div className={`space-y-3 text-center p-6 rounded-3xl border ${
+                isCrimson
+                  ? 'bg-[#3b0008]/80 border-red-800/70'
+                  : isDark
+                  ? 'bg-slate-900/80 border-slate-800'
+                  : 'bg-slate-50/70 border-slate-100'
+              }`}>
                 <div className="flex justify-center gap-2 sm:gap-3 py-2" onMouseLeave={() => setHoverRating(0)}>
                   {[1, 2, 3, 4, 5].map(num => {
                     const currentRating = Number(answers[currentQuestion.id]) || 0;
@@ -942,10 +1085,14 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                         className={`w-12 sm:w-14 h-12 sm:h-14 rounded-2xl border-2 font-black text-sm flex items-center justify-center transition-all cursor-pointer ${
                           isFilled
                             ? 'bg-[#E4002B] text-white border-[#B8001F] shadow-lg shadow-red-600/30 scale-110'
+                            : isCrimson
+                            ? 'bg-[#290005] text-red-700 border-red-900 hover:border-red-400 hover:scale-105'
+                            : isDark
+                            ? 'bg-slate-950 text-slate-700 border-slate-800 hover:border-slate-600 hover:scale-105'
                             : 'bg-white text-slate-300 border-slate-200 hover:border-red-300 hover:scale-105'
                         }`}
                       >
-                        <Star className={`w-6 sm:w-7 h-6 sm:h-7 ${isFilled ? 'fill-white text-white drop-shadow' : 'text-slate-300'}`} />
+                        <Star className={`w-6 sm:w-7 h-6 sm:h-7 ${isFilled ? 'fill-white text-white drop-shadow' : 'text-slate-400'}`} />
                       </button>
                     );
                   })}
@@ -961,7 +1108,9 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                 </div>
 
                 {(currentQuestion.rating_min_label || currentQuestion.rating_max_label) && (
-                  <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider px-2 pt-1 border-t border-slate-200/60">
+                  <div className={`flex justify-between text-[10px] font-black uppercase tracking-wider px-2 pt-1 border-t ${
+                    isCrimson ? 'border-red-800/60 text-red-400' : isDark ? 'border-slate-800 text-slate-500' : 'border-slate-200/60 text-slate-400'
+                  }`}>
                     <span>{currentQuestion.rating_min_label || '1 - Mínimo'}</span>
                     <span>{currentQuestion.rating_max_label || '5 - Máximo'}</span>
                   </div>
@@ -981,13 +1130,19 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             {/* Ordenamiento Secuencial (Ordering) */}
             {currentQuestion.type === 'ordering' && (
               <div className="space-y-2.5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCrimson ? 'text-red-300/80' : 'text-slate-400'}`}>
                   Organiza la secuencia correcta usando las flechas:
                 </span>
                 {((answers[currentQuestion.id] as string[]) || (currentQuestion.options || []).map(o => o.text)).map((itemText, itemIdx, list) => (
                   <div
                     key={itemIdx}
-                    className="p-3.5 bg-white border-2 border-slate-200 rounded-2xl flex items-center justify-between font-bold text-xs text-slate-800 shadow-2xs hover:border-slate-300 transition"
+                    className={`p-3.5 border-2 rounded-2xl flex items-center justify-between font-bold text-xs shadow-2xs transition ${
+                      isCrimson
+                        ? 'bg-[#3b0008] border-red-800/80 text-white hover:border-red-500'
+                        : isDark
+                        ? 'bg-slate-900 border-slate-800 text-slate-100 hover:border-slate-700'
+                        : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="w-7 h-7 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center shadow-xs">
@@ -1001,7 +1156,9 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                         type="button"
                         onClick={() => handleMoveOrderItem(currentQuestion.id, itemIdx, 'up')}
                         disabled={itemIdx === 0}
-                        className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 disabled:opacity-20 cursor-pointer transition"
+                        className={`p-1.5 rounded-xl disabled:opacity-20 cursor-pointer transition ${
+                          isCrimson ? 'hover:bg-red-900/50 text-red-200' : isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                        }`}
                       >
                         <ArrowUp className="w-4 h-4" />
                       </button>
@@ -1009,7 +1166,9 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                         type="button"
                         onClick={() => handleMoveOrderItem(currentQuestion.id, itemIdx, 'down')}
                         disabled={itemIdx === list.length - 1}
-                        className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 disabled:opacity-20 cursor-pointer transition"
+                        className={`p-1.5 rounded-xl disabled:opacity-20 cursor-pointer transition ${
+                          isCrimson ? 'hover:bg-red-900/50 text-red-200' : isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                        }`}
                       >
                         <ArrowDown className="w-4 h-4" />
                       </button>
@@ -1022,12 +1181,20 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             {/* Fecha */}
             {currentQuestion.type === 'date' && (
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Seleccionar Fecha</label>
+                <label className={`text-[9px] font-black uppercase tracking-widest block ${isCrimson ? 'text-red-300' : 'text-slate-400'}`}>
+                  Seleccionar Fecha
+                </label>
                 <input
                   type="date"
                   value={answers[currentQuestion.id] || ''}
                   onChange={e => handleSelectOption(currentQuestion.id, e.target.value)}
-                  className="w-full bg-white border-2 border-slate-200 focus:border-[#E4002B] rounded-2xl p-4 text-xs font-bold text-slate-800 outline-none shadow-xs transition"
+                  className={`w-full border-2 rounded-2xl p-4 text-xs font-bold outline-none shadow-xs transition ${
+                    isCrimson
+                      ? 'bg-[#3b0008] border-red-800 text-white focus:border-red-400'
+                      : isDark
+                      ? 'bg-slate-900 border-slate-800 text-white focus:border-[#E4002B]'
+                      : 'bg-white border-slate-200 text-slate-800 focus:border-[#E4002B]'
+                  }`}
                 />
               </div>
             )}
@@ -1039,7 +1206,13 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                   value={answers[currentQuestion.id] || ''}
                   onChange={e => handleSelectOption(currentQuestion.id, e.target.value)}
                   placeholder="Escribe tu respuesta aquí detalladamente..."
-                  className="w-full bg-white border-2 border-slate-200 focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 rounded-3xl p-4 text-xs font-medium text-slate-900 outline-none h-32 resize-none shadow-xs transition"
+                  className={`w-full border-2 rounded-3xl p-4 text-xs font-medium outline-none h-32 resize-none shadow-xs transition ${
+                    isCrimson
+                      ? 'bg-[#3b0008] border-red-800 text-white focus:border-red-400 placeholder:text-red-300/40'
+                      : isDark
+                      ? 'bg-slate-900 border-slate-800 text-white focus:border-[#E4002B] placeholder:text-slate-500'
+                      : 'bg-white border-slate-200 text-slate-900 focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 placeholder:text-slate-400'
+                  }`}
                 />
               </div>
             )}
@@ -1047,12 +1220,16 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
         </div>
 
         {/* Footer Navigation Bar */}
-        <div className="flex items-center justify-between pt-5 border-t border-slate-100">
+        <div className={`flex items-center justify-between pt-5 border-t ${
+          isCrimson ? 'border-red-900/60' : isDark ? 'border-slate-800' : 'border-slate-100'
+        }`}>
           <button
             type="button"
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            className="px-5 py-3 text-xs font-black uppercase tracking-wider text-slate-500 disabled:opacity-25 hover:text-slate-900 transition cursor-pointer"
+            className={`px-5 py-3 text-xs font-black uppercase tracking-wider disabled:opacity-25 transition cursor-pointer ${
+              isCrimson ? 'text-red-300 hover:text-white' : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+            }`}
           >
             ← Anterior
           </button>
@@ -1065,6 +1242,10 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             className={`px-7 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg ${
               isAnswered
                 ? 'bg-gradient-to-r from-[#E4002B] via-red-600 to-[#99001A] hover:brightness-110 text-white shadow-red-600/25 transform active:scale-[0.99] cursor-pointer'
+                : isCrimson
+                ? 'bg-red-950/40 text-red-800/60 border border-red-900/40 cursor-not-allowed shadow-none'
+                : isDark
+                ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
                 : 'bg-slate-200 text-slate-400 border border-slate-300/60 cursor-not-allowed shadow-none'
             }`}
           >

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Survey, SurveyStatus } from '@/types';
 import {
   FileSpreadsheet, Plus, Search, Edit3, Trash2, Copy, Play, BarChart2,
-  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, Share2, QrCode, Check, Eye
+  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, Share2, QrCode, Check, Eye, RefreshCw
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -18,6 +18,8 @@ interface SurveyListProps {
   onDuplicate: (survey: Survey) => void;
   onDelete: (surveyId: string) => void;
   onToggleStatus: (survey: Survey, status: SurveyStatus) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const SurveyList: React.FC<SurveyListProps> = ({
@@ -30,6 +32,8 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   onDuplicate,
   onDelete,
   onToggleStatus,
+  onRefresh,
+  isRefreshing,
 }) => {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'survey' | 'quiz'>('all');
@@ -112,9 +116,25 @@ export const SurveyList: React.FC<SurveyListProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 w-full md:w-auto">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={`p-2.5 rounded-2xl border transition flex items-center justify-center cursor-pointer ${
+                isRefreshing
+                  ? 'bg-red-50 border-red-200 text-red-600'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
+              }`}
+              title="Refrescar respuestas y encuestas"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-red-600' : ''}`} />
+            </button>
+          )}
+
           <button
             onClick={() => onCreateNew('survey')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs transition"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs transition cursor-pointer"
           >
             <Plus className="w-4 h-4 text-slate-600" />
             <span>Nueva Encuesta</span>
@@ -122,7 +142,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
 
           <button
             onClick={() => onCreateNew('quiz')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition group"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition group cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
             <span>Nueva Evaluación (Quiz)</span>

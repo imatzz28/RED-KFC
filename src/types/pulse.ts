@@ -61,6 +61,7 @@ export interface Question {
 }
 
 export interface ThemeConfig {
+  theme_style?: 'base' | 'crimson' | 'dark';
   primary_color: string;
   background_color: string;
   background_image_url?: string;

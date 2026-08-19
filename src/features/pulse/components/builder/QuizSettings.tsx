@@ -70,9 +70,6 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
               <label className="text-xs font-bold text-slate-700">
                 Umbral Mínimo de Aprobación (%)
               </label>
-              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                {survey.passing_score_percent ?? 70}%
-              </span>
             </div>
             <div className="flex items-center gap-3 mt-1.5">
               <input
@@ -98,29 +95,49 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-2">
-              Visibilidad de Resultados para el Encuestado
-            </label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+            <div>
+              <span className="text-xs font-bold text-slate-800 block">
+                Visibilidad de Resultados al Finalizar
+              </span>
+              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                Configura si el evaluado podrá ver su calificación y estado de aprobación al terminar.
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <label className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-emerald-300 transition shadow-2xs">
                 <input
                   type="checkbox"
                   checked={survey.show_results_immediately ?? true}
                   onChange={(e) => onUpdateSurvey({ show_results_immediately: e.target.checked })}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
-                <span>Mostrar resultado y puntaje al finalizar</span>
+                <div className="flex-1">
+                  <span className="text-xs font-black text-slate-900 block">
+                    Mostrar resultado y puntaje al finalizar
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                    El usuario verá su puntaje (% obtenido) y si aprobó o no la evaluación al enviar sus respuestas.
+                  </span>
+                </div>
               </label>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+              <label className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-emerald-300 transition shadow-2xs">
                 <input
                   type="checkbox"
                   checked={survey.show_results_in_reports ?? true}
                   onChange={(e) => onUpdateSurvey({ show_results_in_reports: e.target.checked })}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
-                <span>Registrar en reportes de coordinador / admin</span>
+                <div className="flex-1">
+                  <span className="text-xs font-black text-slate-900 block">
+                    Registrar en reportes de coordinador / admin
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                    Permite consolidar la nota y métricas de este intento en el panel de reportes gerenciales.
+                  </span>
+                </div>
               </label>
             </div>
           </div>
@@ -142,42 +159,24 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                 <select
-                  value={[0, 300, 600, 900, 1200, 1800, 2700, 3600].includes(survey.time_limit_seconds || 0) ? (survey.time_limit_seconds || 0) : 'custom'}
+                  value={survey.time_limit_seconds || 0}
                   onChange={(e) => {
-                    if (e.target.value !== 'custom') {
-                      onUpdateSurvey({ time_limit_seconds: Number(e.target.value) });
-                    }
+                    onUpdateSurvey({ time_limit_seconds: Number(e.target.value) });
                   }}
                   className="flex-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
                 >
                   <option value={0}>Sin límite de tiempo</option>
+                  <option value={60}>1 minuto</option>
+                  <option value={180}>3 minutos</option>
                   <option value={300}>5 minutos</option>
                   <option value={600}>10 minutos</option>
                   <option value={900}>15 minutos</option>
                   <option value={1200}>20 minutos</option>
+                  <option value={1500}>25 minutos</option>
                   <option value={1800}>30 minutos</option>
                   <option value={2700}>45 minutos</option>
                   <option value={3600}>60 minutos</option>
-                  <option value="custom">Personalizado (Minutos)...</option>
                 </select>
-              </div>
-
-              {/* Input directo de minutos */}
-              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                <span className="text-[10px] font-bold text-slate-500 flex-1">O escribe los minutos exactos:</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="180"
-                  placeholder="Ej. 15"
-                  value={survey.time_limit_seconds ? Math.round(survey.time_limit_seconds / 60) : ''}
-                  onChange={(e) => {
-                    const mins = Math.max(0, parseInt(e.target.value, 10) || 0);
-                    onUpdateSurvey({ time_limit_seconds: mins * 60 });
-                  }}
-                  className="w-20 text-xs font-black bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 text-center outline-none focus:border-emerald-500"
-                />
-                <span className="text-xs font-bold text-slate-600">min</span>
               </div>
             </div>
           </div>

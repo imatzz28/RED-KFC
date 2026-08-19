@@ -101,17 +101,12 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
   const [bulkOptionsText, setBulkOptionsText] = useState('');
   const [bulkOptionsMode, setBulkOptionsMode] = useState<'add' | 'replace'>('add');
 
-  // Si es Evaluación (quiz), solo permitir Opción Única, Opción Múltiple, Ordenar Secuencia
-  const availableQuestionTypes = QUESTION_TYPES.filter(t => {
-    if (surveyType === 'quiz') {
-      return ['single_choice', 'multiple_choice', 'ordering'].includes(t.type);
-    }
-    return true;
-  });
+  const availableQuestionTypes = QUESTION_TYPES;
 
   const currentTypeObj = QUESTION_TYPES.find((t) => t.type === question.type) || QUESTION_TYPES[0];
   const CurrentTypeIcon = currentTypeObj.icon;
   const isCollapsed = isExpanded !== undefined ? !isExpanded : question.isCollapsed;
+  const isGradable = ['single_choice', 'multiple_choice', 'ordering', 'yes_no'].includes(question.type);
 
   const handleExpand = () => {
     if (onSelectQuestion) onSelectQuestion();
@@ -123,64 +118,68 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
     else onUpdate({ ...question, isCollapsed: true });
   };
 
+  const handleUpdateOption = (optId: string, updates: Partial<QuestionOption>) => {
+    const updatedOptions = (question.options || []).map((opt) =>
+      opt.id === optId ? { ...opt, ...updates } : opt
+    );
+    onUpdate({ ...question, options: updatedOptions });
+  };
+
   const handleAddOption = () => {
-    const currentOpts = question.options || [];
+    const currentOptions = question.options || [];
+    const newIndex = currentOptions.length + 1;
     const newOpt: QuestionOption = {
       id: generateId('opt'),
       question_id: question.id,
-      text: `Opción ${currentOpts.length + 1}`,
-      value: `opcion_${currentOpts.length + 1}`,
+      text: `Opción ${newIndex}`,
+      value: `opt_${newIndex}`,
       is_correct: false,
-      weight: 1,
     };
-    onUpdate({ ...question, options: [...currentOpts, newOpt] });
+    onUpdate({ ...question, options: [...currentOptions, newOpt] });
   };
 
-  const handleApplyTemplate = (tpl: { name: string; options: string[] }) => {
-    const newGeneratedOpts: QuestionOption[] = tpl.options.map((text, idx) => ({
-      id: generateId(`opt_${idx}`),
-      question_id: question.id,
-      text,
-      value: text.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `opcion_${idx + 1}`,
-      is_correct: surveyType === 'quiz' && idx === 0 ? true : false,
-      weight: 1,
-    }));
+  const handleRemoveOption = (optId: string) => {
+    const updatedOptions = (question.options || []).filter((opt) => opt.id !== optId);
+    onUpdate({ ...question, options: updatedOptions });
+  };
 
-    onUpdate({ ...question, options: newGeneratedOpts });
+  const handleApplyTemplate = (template: typeof OPTION_TEMPLATES[0]) => {
+    const newOptions: QuestionOption[] = template.options.map((optText, idx) => ({
+      id: generateId('opt'),
+      question_id: question.id,
+      text: optText,
+      value: `opt_${idx + 1}`,
+      is_correct: surveyType === 'quiz' && idx === 0 ? true : false,
+    }));
+    onUpdate({ ...question, options: newOptions });
     setShowTemplates(false);
   };
 
   const handleApplyBulkOptions = () => {
-    const lines = bulkOptionsText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    const lines = bulkOptionsText
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
     if (lines.length === 0) return;
 
-    const newGeneratedOpts: QuestionOption[] = lines.map((text, idx) => ({
-      id: generateId(`opt_${idx}`),
+    const newOptions: QuestionOption[] = lines.map((line, idx) => ({
+      id: generateId('opt'),
       question_id: question.id,
-      text,
-      value: text.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `opcion_${idx + 1}`,
+      text: line,
+      value: `opt_${idx + 1}`,
       is_correct: false,
-      weight: 1,
     }));
 
-    let finalOpts = [...(question.options || [])];
-    if (bulkOptionsMode === 'replace') finalOpts = newGeneratedOpts;
-    else finalOpts = [...finalOpts, ...newGeneratedOpts];
+    if (bulkOptionsMode === 'replace') {
+      onUpdate({ ...question, options: newOptions });
+    } else {
+      const current = question.options || [];
+      onUpdate({ ...question, options: [...current, ...newOptions] });
+    }
 
-    onUpdate({ ...question, options: finalOpts });
     setBulkOptionsText('');
     setShowBulkOptions(false);
-  };
-
-  const handleUpdateOption = (optId: string, updates: Partial<QuestionOption>) => {
-    const currentOpts = question.options || [];
-    const updatedOpts = currentOpts.map((o) => (o.id === optId ? { ...o, ...updates } : o));
-    onUpdate({ ...question, options: updatedOpts });
-  };
-
-  const handleDeleteOption = (optId: string) => {
-    const currentOpts = question.options || [];
-    onUpdate({ ...question, options: currentOpts.filter((o) => o.id !== optId) });
   };
 
   const handleAddJumpRule = () => {
@@ -223,10 +222,16 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 {currentTypeObj.label}
               </span>
               {surveyType === 'quiz' && (
-                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                  <Award className="w-2.5 h-2.5" />
-                  {question.points ?? 10} pts
-                </span>
+                isGradable ? (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <Award className="w-2.5 h-2.5" />
+                    {question.points ?? 10} pts
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                    Informativa
+                  </span>
+                )
               )}
               {question.required && (
                 <span className="text-[9px] font-black text-[#E4002B] uppercase tracking-wider">* Obligatoria</span>
@@ -283,20 +288,29 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
           </div>
 
           {surveyType === 'quiz' && (
-            <div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Puntos</span>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={question.points ?? 10}
-                  onChange={(e) => onUpdate({ ...question, points: Math.max(1, Number(e.target.value) || 1) })}
-                  className="w-16 bg-emerald-50/70 border border-emerald-300 rounded-xl px-2.5 py-1 text-xs font-black text-emerald-900 outline-none focus:border-emerald-500 text-center"
-                />
-                <span className="text-[10px] font-black text-emerald-700">pts</span>
+            isGradable ? (
+              <div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Puntos</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={question.points ?? 10}
+                    onChange={(e) => onUpdate({ ...question, points: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-16 bg-emerald-50/70 border border-emerald-300 rounded-xl px-2.5 py-1 text-xs font-black text-emerald-900 outline-none focus:border-emerald-500 text-center"
+                  />
+                  <span className="text-[10px] font-black text-emerald-700">pts</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Calificación</span>
+                <span className="text-[10px] font-black text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl block">
+                  Campo Informativo (Sin Puntos)
+                </span>
+              </div>
+            )
           )}
         </div>
 

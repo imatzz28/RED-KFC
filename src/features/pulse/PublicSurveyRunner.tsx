@@ -140,18 +140,21 @@ export const PublicSurveyRunner: React.FC = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100 p-4 sm:p-6 md:p-8 flex flex-col justify-center items-center">
-      {/* Brand Watermark / Top Header */}
-      <div className="w-full max-w-2xl mb-6 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-[#E4002B] animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-800">
-            KFC Pulse • Plataforma Oficial de Evaluaciones
-          </span>
-        </div>
-      </div>
+  const themeStyle = survey.theme?.theme_style || 'base';
+  const bgGradient = themeStyle === 'crimson'
+    ? 'bg-gradient-to-b from-[#45000a] via-[#5c010f] to-[#260005]'
+    : themeStyle === 'dark'
+    ? 'bg-gradient-to-b from-[#090d16] via-[#0d1322] to-[#04060a]'
+    : 'bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100';
 
+  const footerColor = themeStyle === 'crimson'
+    ? 'text-red-300/60'
+    : themeStyle === 'dark'
+    ? 'text-slate-500'
+    : 'text-slate-400';
+
+  return (
+    <div className={`min-h-screen ${bgGradient} p-4 sm:p-6 md:p-8 flex flex-col justify-center items-center transition-colors duration-300`}>
       <div className="w-full max-w-2xl">
         <SurveyPlayer
           survey={survey}
@@ -163,8 +166,8 @@ export const PublicSurveyRunner: React.FC = () => {
 
       {/* Footer Branding */}
       <div className="mt-8 text-center">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-          KFC RED Sistema Operativo Integral
+        <p className={`text-[10px] font-black uppercase tracking-widest ${footerColor}`}>
+          © 2026 RED KFC - A2M LABS
         </p>
       </div>
     </div>

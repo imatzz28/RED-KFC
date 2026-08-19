@@ -16,16 +16,24 @@ export const PulseModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'builder' | 'player' | 'reports'>('list');
 
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadData = async () => {
-    // Carga inicial del caché local (rápido)
-    setSurveys(dataService.getSurveys());
-    setResponses(dataService.getResponses());
+  const loadData = async (showLoadingState = false) => {
+    if (showLoadingState) setIsRefreshing(true);
+    try {
+      // Carga inicial del caché local (rápido)
+      setSurveys(dataService.getSurveys());
+      setResponses(dataService.getResponses());
 
-    // Sincronización asíncrona con Supabase
-    const cloudData = await dataService.fetchSurveysAndResponses();
-    setSurveys(cloudData.surveys);
-    setResponses(cloudData.responses);
+      // Sincronización asíncrona con Supabase
+      const cloudData = await dataService.fetchSurveysAndResponses();
+      setSurveys(cloudData.surveys);
+      setResponses(cloudData.responses);
+    } finally {
+      if (showLoadingState) {
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
+    }
   };
 
   useEffect(() => {
@@ -148,6 +156,8 @@ export const PulseModule: React.FC = () => {
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onToggleStatus={handleToggleStatus}
+          onRefresh={() => loadData(true)}
+          isRefreshing={isRefreshing}
         />
       )}
 
