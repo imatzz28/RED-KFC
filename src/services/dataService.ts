@@ -451,6 +451,32 @@ export const dataService = {
     return dataService._cache.restaurants || [];
   },
 
+  fetchRestaurants: async (): Promise<Restaurant[]> => {
+    if (dataService._cache.restaurants && dataService._cache.restaurants.length > 0) {
+      return dataService._cache.restaurants;
+    }
+    try {
+      const stored = await localforage.getItem<Restaurant[]>('la_akademia_stores');
+      if (stored && stored.length > 0) {
+        dataService._cache.restaurants = stored;
+        return stored;
+      }
+    } catch (e) {
+      console.warn('Error reading localforage stores:', e);
+    }
+    try {
+      const cloud = await dataService.supabaseFetchAll('restaurants') as Restaurant[];
+      if (Array.isArray(cloud) && cloud.length > 0) {
+        dataService._cache.restaurants = cloud;
+        await localforage.setItem('la_akademia_stores', cloud);
+        return cloud;
+      }
+    } catch (e) {
+      console.warn('Error fetching cloud restaurants:', e);
+    }
+    return [];
+  },
+
   getGrades: (): GradeEntry[] => {
     // Retorna las notas activas del key actual (tienda+mes) si existen, o el fallback de notas locales
     const key = dataService._cache.activeStoreKey;

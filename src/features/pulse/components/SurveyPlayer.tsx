@@ -70,12 +70,26 @@ const StoreHierarchySelector: React.FC<{
 
   return (
     <div className="space-y-3 bg-gradient-to-b from-slate-50 to-white p-5 rounded-3xl border border-slate-200/80 shadow-xs">
-      <div className="flex items-center gap-2 mb-1">
-        <Store className="w-4 h-4 text-[#E4002B]" />
-        <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
-          Jerarquía de Ubicación Operativa KFC
-        </span>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <Store className="w-4 h-4 text-[#E4002B]" />
+          <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
+            Jerarquía de Ubicación Operativa KFC
+          </span>
+        </div>
+        {restaurants.length > 0 && (
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">
+            {restaurants.length} Tiendas disponibles
+          </span>
+        )}
       </div>
+
+      {restaurants.length === 0 && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-2 text-amber-800 text-xs font-bold animate-pulse">
+          <RefreshCw className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
+          <span>Cargando catálogo de tiendas y regionales KFC...</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -85,7 +99,8 @@ const StoreHierarchySelector: React.FC<{
           <select
             value={selectedRegion}
             onChange={e => handleRegionChange(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 transition cursor-pointer shadow-2xs"
+            disabled={restaurants.length === 0}
+            className="w-full bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 transition cursor-pointer disabled:opacity-50 shadow-2xs"
           >
             <option value="">-- Seleccionar Regional --</option>
             {uniqueRegions.map(reg => (
@@ -101,7 +116,7 @@ const StoreHierarchySelector: React.FC<{
           <select
             value={selectedZone}
             onChange={e => handleZoneChange(e.target.value)}
-            disabled={!selectedRegion && uniqueRegions.length > 0}
+            disabled={(!selectedRegion && uniqueRegions.length > 0) || restaurants.length === 0}
             className="w-full bg-white border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 transition cursor-pointer disabled:opacity-40 shadow-2xs"
           >
             <option value="">-- Seleccionar Zona --</option>
@@ -119,7 +134,8 @@ const StoreHierarchySelector: React.FC<{
         <select
           value={value || ''}
           onChange={e => onChange(e.target.value)}
-          className="w-full bg-white border-2 border-slate-200 focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 rounded-2xl px-4 py-3 text-xs font-black text-slate-900 outline-none transition cursor-pointer shadow-xs"
+          disabled={restaurants.length === 0}
+          className="w-full bg-white border-2 border-slate-200 focus:border-[#E4002B] focus:ring-2 focus:ring-red-100 rounded-2xl px-4 py-3 text-xs font-black text-slate-900 outline-none transition cursor-pointer disabled:opacity-50 shadow-xs"
         >
           <option value="">-- Selecciona tu Tienda KFC --</option>
           {filteredStores.map(r => (
@@ -210,30 +226,26 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   isPublic = false,
 }) => {
   const { restaurants: storeRestaurants } = useAppStore();
-  const [localRestaurants, setLocalRestaurants] = React.useState(dataService.getRestaurants());
+  const [localRestaurants, setLocalRestaurants] = React.useState<any[]>(dataService.getRestaurants());
 
   const restaurants = React.useMemo(() => {
-    return storeRestaurants?.length ? storeRestaurants : localRestaurants;
+    return (storeRestaurants && storeRestaurants.length > 0) ? storeRestaurants : localRestaurants;
   }, [storeRestaurants, localRestaurants]);
 
   useEffect(() => {
-    if (storeRestaurants?.length) return;
-    const cached = dataService.getRestaurants();
-    if (cached.length) {
-      setLocalRestaurants(cached);
-      return;
-    }
-    dataService.supabaseFetchAll('restaurants')
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          import('localforage').then(lf => {
-            void lf.default.setItem('la_akademia_stores', data);
-          });
-          dataService._cache.restaurants = data as any[];
-          setLocalRestaurants(data as any[]);
-        }
-      })
-      .catch(err => console.warn('[SurveyPlayer] No se pudieron cargar restaurantes:', err));
+    let isMounted = true;
+    const loadStores = async () => {
+      if (storeRestaurants && storeRestaurants.length > 0) {
+        if (isMounted) setLocalRestaurants(storeRestaurants);
+        return;
+      }
+      const loaded = await dataService.fetchRestaurants();
+      if (isMounted && loaded && loaded.length > 0) {
+        setLocalRestaurants(loaded);
+      }
+    };
+    void loadStores();
+    return () => { isMounted = false; };
   }, [storeRestaurants]);
 
   const [isStarted, setIsStarted] = useState(false);

@@ -16,20 +16,26 @@ export const PublicSurveyRunner: React.FC = () => {
   const [passwordError, setPasswordError] = useState(false);
 
   useEffect(() => {
-    const fetchSurvey = async () => {
+    const fetchSurveyAndStores = async () => {
       if (!surveyId) {
         setLoading(false);
         return;
       }
 
       // Security Protocol: Use isolated single-survey fetch to strictly prevent fetching/exposing responses or other surveys
-      const found = await dataService.fetchSinglePublicSurvey(surveyId);
+      const [found] = await Promise.all([
+        dataService.fetchSinglePublicSurvey(surveyId),
+        dataService.fetchRestaurants().catch(err => {
+          console.warn('[PublicSurveyRunner] Fallback al cargar tiendas:', err);
+          return [];
+        })
+      ]);
 
       setSurvey(found);
       setLoading(false);
     };
 
-    void fetchSurvey();
+    void fetchSurveyAndStores();
   }, [surveyId]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {

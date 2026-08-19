@@ -373,7 +373,8 @@ DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.employees;
 CREATE POLICY "Permitir lectura a autenticados" ON public.employees FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.restaurants;
-CREATE POLICY "Permitir lectura a autenticados" ON public.restaurants FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Permitir lectura publica de restaurantes" ON public.restaurants;
+CREATE POLICY "Permitir lectura publica de restaurantes" ON public.restaurants FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.grades;
 CREATE POLICY "Permitir lectura a autenticados" ON public.grades FOR SELECT TO authenticated USING (true);
