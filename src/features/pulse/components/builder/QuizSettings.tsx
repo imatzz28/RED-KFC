@@ -66,22 +66,35 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              Umbral Mínimo de Aprobación (%)
-            </label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-700">
+                Umbral Mínimo de Aprobación (%)
+              </label>
+              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                {survey.passing_score_percent ?? 70}%
+              </span>
+            </div>
+            <div className="flex items-center gap-3 mt-1.5">
               <input
                 type="range"
-                min="50"
+                min="0"
                 max="100"
                 step="5"
                 value={survey.passing_score_percent ?? 70}
                 onChange={(e) => onUpdateSurvey({ passing_score_percent: Number(e.target.value) })}
                 className="flex-1 accent-emerald-600 cursor-pointer"
               />
-              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                {survey.passing_score_percent ?? 70}%
-              </span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={survey.passing_score_percent ?? 70}
+                onChange={(e) => {
+                  const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                  onUpdateSurvey({ passing_score_percent: val });
+                }}
+                className="w-16 text-xs font-black text-emerald-900 bg-emerald-50/60 border border-emerald-300 rounded-xl px-2 py-1 text-center outline-none focus:border-emerald-500"
+              />
             </div>
           </div>
 
@@ -116,24 +129,56 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
         {/* Columna Derecha: Temporizador, Intentos y Aleatorización */}
         <div className="space-y-5 md:border-l md:border-slate-100 md:pl-6">
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              Tiempo Límite (Temporizador)
-            </label>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-              <select
-                value={survey.time_limit_seconds || 0}
-                onChange={(e) => onUpdateSurvey({ time_limit_seconds: Number(e.target.value) })}
-                className="flex-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
-              >
-                <option value={0}>Sin límite de tiempo</option>
-                <option value={300}>5 minutos</option>
-                <option value={600}>10 minutos</option>
-                <option value={900}>15 minutos</option>
-                <option value={1800}>30 minutos</option>
-                <option value={2700}>45 minutos</option>
-                <option value={3600}>60 minutos</option>
-              </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-700">
+                Tiempo Límite (Temporizador)
+              </label>
+              <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                {(survey.time_limit_seconds || 0) > 0 ? `${Math.round((survey.time_limit_seconds || 0) / 60)} min (${survey.time_limit_seconds}s)` : 'Sin límite'}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <select
+                  value={[0, 300, 600, 900, 1200, 1800, 2700, 3600].includes(survey.time_limit_seconds || 0) ? (survey.time_limit_seconds || 0) : 'custom'}
+                  onChange={(e) => {
+                    if (e.target.value !== 'custom') {
+                      onUpdateSurvey({ time_limit_seconds: Number(e.target.value) });
+                    }
+                  }}
+                  className="flex-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value={0}>Sin límite de tiempo</option>
+                  <option value={300}>5 minutos</option>
+                  <option value={600}>10 minutos</option>
+                  <option value={900}>15 minutos</option>
+                  <option value={1200}>20 minutos</option>
+                  <option value={1800}>30 minutos</option>
+                  <option value={2700}>45 minutos</option>
+                  <option value={3600}>60 minutos</option>
+                  <option value="custom">Personalizado (Minutos)...</option>
+                </select>
+              </div>
+
+              {/* Input directo de minutos */}
+              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <span className="text-[10px] font-bold text-slate-500 flex-1">O escribe los minutos exactos:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="180"
+                  placeholder="Ej. 15"
+                  value={survey.time_limit_seconds ? Math.round(survey.time_limit_seconds / 60) : ''}
+                  onChange={(e) => {
+                    const mins = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    onUpdateSurvey({ time_limit_seconds: mins * 60 });
+                  }}
+                  className="w-20 text-xs font-black bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 text-center outline-none focus:border-emerald-500"
+                />
+                <span className="text-xs font-bold text-slate-600">min</span>
+              </div>
             </div>
           </div>
 

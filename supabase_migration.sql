@@ -983,6 +983,12 @@ CREATE TABLE IF NOT EXISTS public.surveys (
   access_password TEXT,
   passing_score_percent INTEGER DEFAULT 70,
   scoring_type TEXT DEFAULT 'simple',
+  time_limit_seconds INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 0,
+  shuffle_questions BOOLEAN DEFAULT false,
+  shuffle_options BOOLEAN DEFAULT false,
+  show_results_immediately BOOLEAN DEFAULT true,
+  show_results_in_reports BOOLEAN DEFAULT true,
   theme JSONB NOT NULL DEFAULT '{"primary_color": "#E4002B", "background_color": "#F8FAFC", "card_style": "standard", "font_family": "jakarta"}'::jsonb,
   thank_you JSONB NOT NULL DEFAULT '{"title": "¡Muchas gracias!", "message": "Tus respuestas han sido registradas exitosamente.", "show_button": false}'::jsonb,
   questions JSONB DEFAULT '[]'::jsonb,
@@ -990,6 +996,14 @@ CREATE TABLE IF NOT EXISTS public.surveys (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Idempotent column additions for existing installations
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS time_limit_seconds INTEGER DEFAULT 0;
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS max_attempts INTEGER DEFAULT 0;
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS shuffle_questions BOOLEAN DEFAULT false;
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS shuffle_options BOOLEAN DEFAULT false;
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS show_results_immediately BOOLEAN DEFAULT true;
+ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS show_results_in_reports BOOLEAN DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS public.responses (
   id TEXT PRIMARY KEY,

@@ -257,8 +257,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
     survey.max_attempts && survey.max_attempts > 0 && attemptsCount >= survey.max_attempts
   );
 
-  const hasTimer = (survey.time_limit_seconds || 0) > 0;
-  const [timeLeft, setTimeLeft] = useState<number>(survey.time_limit_seconds || 0);
+  const timeLimit = Number(survey.time_limit_seconds) || 0;
+  const hasTimer = timeLimit > 0;
+  const [timeLeft, setTimeLeft] = useState<number>(timeLimit);
+
+  useEffect(() => {
+    if (timeLimit > 0) {
+      setTimeLeft(timeLimit);
+    }
+  }, [timeLimit, isStarted]);
 
   // Initialize questions with shuffle support if enabled
   const [questions] = useState<Question[]>(() => {
@@ -277,6 +284,9 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
 
   const currentQuestion = questions[currentIndex];
   const isQuiz = survey.type === 'quiz';
+  const passingScorePercent = typeof survey.passing_score_percent === 'number'
+    ? survey.passing_score_percent
+    : Number(survey.passing_score_percent ?? 70);
   const isAnswered = isQuestionAnswered(currentQuestion, answers);
 
   useEffect(() => {
@@ -440,7 +450,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
     });
 
     const scorePercent = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 100;
-    const passed = isQuiz ? scorePercent >= (survey.passing_score_percent || 70) : true;
+    const passed = isQuiz ? scorePercent >= passingScorePercent : true;
 
     if (survey.max_attempts && survey.max_attempts > 0) {
       try {
@@ -545,15 +555,15 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-center space-y-1 shadow-2xs">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Tiempo</span>
               <span className="text-lg sm:text-xl font-black text-slate-900">
-                {survey.time_limit_seconds ? `${Math.round(survey.time_limit_seconds / 60)} min` : 'Libre'}
+                {timeLimit > 0 ? (timeLimit >= 60 ? `${Math.round(timeLimit / 60)} min` : `${timeLimit} seg`) : 'Libre'}
               </span>
-              <span className="text-[9px] font-bold text-slate-400 block">{survey.time_limit_seconds ? 'Límite' : 'Sin límite'}</span>
+              <span className="text-[9px] font-bold text-slate-400 block">{timeLimit > 0 ? 'Límite' : 'Sin límite'}</span>
             </div>
 
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-center space-y-1 shadow-2xs">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Meta</span>
               <span className={`text-lg sm:text-xl font-black ${isQuiz ? 'text-[#E4002B]' : 'text-slate-900'}`}>
-                {isQuiz ? `${survey.passing_score_percent || 70}%` : '100%'}
+                {isQuiz ? `${passingScorePercent}%` : '100%'}
               </span>
               <span className="text-[9px] font-bold text-slate-400 block">{isQuiz ? 'Mín. Aprobación' : 'Confidencial'}</span>
             </div>
@@ -649,7 +659,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                   {finalScore?.scorePercent}%
                 </h2>
                 <p className="text-xs text-slate-500 font-bold mt-1">
-                  Puntaje mínimo de pase requerido: {survey.passing_score_percent || 70}%
+                  Puntaje mínimo de pase requerido: {passingScorePercent}%
                 </p>
               </div>
 

@@ -745,10 +745,23 @@ export const dataService = {
         const localSurveys = dataService._cache.surveys || [];
         const mergedSurveys = (cloudSurveys as Survey[]).map(cs => {
           const localMatch = localSurveys.find(ls => ls.id === cs.id);
-          if (localMatch && localMatch.updated_at && cs.updated_at) {
-            return new Date(localMatch.updated_at) >= new Date(cs.updated_at) ? localMatch : cs;
+          if (localMatch) {
+            const combined: Survey = {
+              ...localMatch,
+              ...cs,
+              time_limit_seconds: cs.time_limit_seconds ?? localMatch.time_limit_seconds ?? 0,
+              max_attempts: cs.max_attempts ?? localMatch.max_attempts ?? 0,
+              shuffle_questions: cs.shuffle_questions ?? localMatch.shuffle_questions ?? false,
+              shuffle_options: cs.shuffle_options ?? localMatch.shuffle_options ?? false,
+              passing_score_percent: cs.passing_score_percent ?? localMatch.passing_score_percent ?? 70,
+              scoring_type: cs.scoring_type ?? localMatch.scoring_type ?? 'simple',
+            };
+            if (localMatch.updated_at && cs.updated_at) {
+              return new Date(localMatch.updated_at) >= new Date(cs.updated_at) ? localMatch : combined;
+            }
+            return combined;
           }
-          return localMatch || cs;
+          return cs;
         });
 
         localSurveys.forEach(ls => {
