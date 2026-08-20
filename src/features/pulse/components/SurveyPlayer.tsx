@@ -423,6 +423,19 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
         if (foundStore) {
           valueDisplay = `${foundStore.region} > ${foundStore.zone} > ${foundStore.id} - ${foundStore.name}`;
         }
+      } else if (q.options && q.options.length > 0 && userVal !== undefined && userVal !== null) {
+        if (Array.isArray(userVal)) {
+          const labels = userVal.map(v => {
+            const foundOpt = q.options?.find(o => String(o.value || o.id || o.text) === String(v));
+            return foundOpt ? foundOpt.text : String(v);
+          });
+          valueDisplay = labels.join(', ');
+        } else {
+          const foundOpt = q.options.find(o => String(o.value || o.id || o.text) === String(userVal));
+          if (foundOpt) {
+            valueDisplay = foundOpt.text;
+          }
+        }
       }
 
       return {

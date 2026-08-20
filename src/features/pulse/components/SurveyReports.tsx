@@ -512,26 +512,52 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
   }, [filteredResponses]);
 
   const getFormattedAnswerValue = (ans: any) => {
-    if (ans.value_display) return String(ans.value_display);
-
     const rawVal = ans.value;
-    if (rawVal === undefined || rawVal === null || rawVal === '') {
-      return 'Sin respuesta';
-    }
-
     const q = (survey.questions || []).find(question => question.id === ans.question_id);
 
+    // 1. Si la pregunta tiene opciones definidas, resolver el texto exacto de la opción
     if (q && q.options && q.options.length > 0) {
+      const matchOpt = (val: any) => {
+        const strV = String(val ?? '').trim();
+        if (!strV) return null;
+
+        // Búsqueda directa por value, text o id
+        let found = q.options?.find(o => 
+          String(o.value ?? '').trim().toLowerCase() === strV.toLowerCase() ||
+          String(o.text ?? '').trim().toLowerCase() === strV.toLowerCase() ||
+          String(o.id ?? '').trim().toLowerCase() === strV.toLowerCase()
+        );
+
+        // Si no se encontró y el valor es del tipo opt_1, opt_2, opt 1, opcion_1, indexar por número de opción
+        if (!found) {
+          const matchNum = strV.match(/^(?:opt|opcion|opción)[_\s-]?(\d+)$/i) || strV.match(/^(\d+)$/);
+          if (matchNum) {
+            const idx = parseInt(matchNum[1], 10) - 1;
+            if (idx >= 0 && idx < q.options.length) {
+              found = q.options[idx];
+            }
+          }
+        }
+
+        return found ? found.text : null;
+      };
+
       if (Array.isArray(rawVal)) {
-        const labels = rawVal.map(v => {
-          const opt = q.options?.find(o => String(o.id || o.value || o.text) === String(v));
-          return opt ? opt.text : String(v);
-        });
+        const labels = rawVal.map(v => matchOpt(v) || String(v));
         return labels.join(', ');
-      } else {
-        const opt = q.options?.find(o => String(o.id || o.value || o.text) === String(rawVal));
-        if (opt) return opt.text;
+      } else if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+        const matched = matchOpt(rawVal);
+        if (matched) return matched;
       }
+    }
+
+    // 2. Si ya trae value_display y no es un ID técnico tipo opt_ o opt 1
+    if (ans.value_display && !/^(?:opt|opcion|opción)[_\s-]?\d+$/i.test(String(ans.value_display).trim())) {
+      return String(ans.value_display);
+    }
+
+    if (rawVal === undefined || rawVal === null || rawVal === '') {
+      return 'Sin respuesta';
     }
 
     if (Array.isArray(rawVal)) {
@@ -547,7 +573,16 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
       }
     }
 
-    if (strVal.includes('_')) {
+    // Si coincide con patrón opt_1 o similar y no se encontró arriba, evitar 'Opt 1'
+    if (/^(?:opt|opcion|opción)[_\s-]?\d+$/i.test(strVal)) {
+      const numMatch = strVal.match(/\d+/);
+      const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+      if (q && q.options && q.options[num - 1]) {
+        return q.options[num - 1].text;
+      }
+    }
+
+    if (strVal.includes('_') && !strVal.startsWith('opt_')) {
       return strVal.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     }
 
@@ -1230,10 +1265,19 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
             }
 
             const countsMap = new Map<string, number>();
+
+            // Inicializar las opciones oficiales de la pregunta con su texto para respetar su orden
+            if (q.options && q.options.length > 0) {
+              q.options.forEach(opt => {
+                const label = opt.text || opt.value || opt.id;
+                if (label) countsMap.set(label, 0);
+              });
+            }
+
             questionAnswers.forEach(ans => {
-              const valDisplay = String(ans.value_display || ans.value || '');
-              if (valDisplay) {
-                countsMap.set(valDisplay, (countsMap.get(valDisplay) || 0) + 1);
+              const label = getFormattedAnswerValue(ans);
+              if (label && label !== 'Sin respuesta') {
+                countsMap.set(label, (countsMap.get(label) || 0) + 1);
               }
             });
 
@@ -1257,18 +1301,18 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                   {/* Left Side: Horizontal Bar Chart */}
-                  <div className="h-44 w-full">
+                  <div className="w-full" style={{ height: Math.max(160, optionsData.length * 36) }}>
                     {optionsData.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-slate-400 text-xs italic font-medium">
                         Sin datos registrados para esta pregunta.
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={optionsData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                        <BarChart data={optionsData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                           <XAxis type="number" stroke="#94a3b8" fontSize={11} hide />
-                          <YAxis dataKey="label" type="category" stroke="#64748b" fontSize={10} width={90} tickLine={false} />
+                          <YAxis dataKey="label" type="category" stroke="#64748b" fontSize={10} width={130} tickLine={false} />
                           <Tooltip formatter={(val: any) => [`${val} respuestas`, 'Cantidad']} />
-                          <Bar dataKey="count" fill="#E4002B" radius={[0, 8, 8, 0]} barSize={20} />
+                          <Bar dataKey="count" fill="#E4002B" radius={[0, 8, 8, 0]} barSize={18} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}

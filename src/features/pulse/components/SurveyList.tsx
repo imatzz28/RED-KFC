@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Survey, SurveyStatus } from '@/types';
 import {
   FileSpreadsheet, Plus, Search, Edit3, Trash2, Copy, Play, BarChart2,
-  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, Share2, QrCode, Check, Eye, RefreshCw
+  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, ChevronLeft, Share2, QrCode, Check, Eye, RefreshCw
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -44,7 +44,15 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
+  // Paginación (10 encuestas por página)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
   const categories = useMemo(() => dataService.getSurveyCategories(), []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType, filterStatus, filterCategory]);
 
   useEffect(() => {
     if (shareModalSurvey) {
@@ -89,6 +97,13 @@ export const SurveyList: React.FC<SurveyListProps> = ({
       })
       .sort((a, b) => getSurveyTimestamp(b) - getSurveyTimestamp(a));
   }, [surveys, search, filterType, filterStatus, filterCategory]);
+
+  const totalPages = Math.ceil(filteredSurveys.length / pageSize) || 1;
+
+  const paginatedSurveys = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredSurveys.slice(start, start + pageSize);
+  }, [filteredSurveys, currentPage, pageSize]);
 
   const getShareUrl = (surveyId: string) => {
     return `${window.location.origin}/pulse/play/${surveyId}`;
@@ -228,7 +243,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredSurveys.map(survey => {
+                {paginatedSurveys.map(survey => {
                   const respCount = responsesCountMap[survey.id] || 0;
                   const isQuiz = survey.type === 'quiz';
                   const hasCustomDesc = survey.description && 
@@ -363,6 +378,59 @@ export const SurveyList: React.FC<SurveyListProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Barra de Paginación */}
+          {filteredSurveys.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-t border-slate-100 text-xs bg-slate-50/50">
+              <div className="text-slate-500 font-medium">
+                Mostrando <strong className="text-slate-800">{(currentPage - 1) * pageSize + 1}</strong> -{' '}
+                <strong className="text-slate-800">{Math.min(currentPage * pageSize, filteredSurveys.length)}</strong> de{' '}
+                <strong className="text-slate-800">{filteredSurveys.length}</strong> encuestas
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <button
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition flex items-center gap-1 text-xs font-bold shadow-2xs"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Anterior</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }).map((_, i) => {
+                      const pageNum = i + 1;
+                      const isCur = pageNum === currentPage;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-8 h-8 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center ${
+                            isCur
+                              ? 'bg-red-600 text-white shadow-xs'
+                              : 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition flex items-center gap-1 text-xs font-bold shadow-2xs"
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

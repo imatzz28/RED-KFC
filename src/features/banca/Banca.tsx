@@ -37,7 +37,8 @@ const ROLE_GROUPS: { label: string; roles: BancaRole[]; badgeBg: string; textCol
   { label: 'Subgerente', roles: ['Subgerente'], badgeBg: 'bg-purple-600/10 text-purple-700', textCol: 'text-purple-500' },
   { label: 'Líder de Turno', roles: ['Líder de turno'], badgeBg: 'bg-sky-600/10 text-sky-700', textCol: 'text-sky-500' },
   { label: 'Potencial', roles: ['Potencial'], badgeBg: 'bg-slate-600/10 text-slate-700', textCol: 'text-slate-400' },
-  { label: 'Entrenador', roles: ['Entrenador', 'Entrenador HRS'], badgeBg: 'bg-amber-600/10 text-amber-700', textCol: 'text-amber-500' },
+  { label: 'Entrenadores Operativos', roles: ['Entrenador'], badgeBg: 'bg-amber-600/10 text-amber-700', textCol: 'text-amber-500' },
+  { label: 'Entrenadores x Horas', roles: ['Entrenador HRS'], badgeBg: 'bg-orange-600/10 text-orange-700', textCol: 'text-orange-500' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,8 +74,8 @@ const StoreSettingsModal: React.FC<{
     { key: 'C', label: 'Categoría C', desc: 'Volumen estándar', activeBg: 'bg-emerald-600 text-white border-emerald-700 shadow-md' },
   ];
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
       <div
         className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
@@ -94,51 +95,51 @@ const StoreSettingsModal: React.FC<{
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition text-white">
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Formulario */}
-        <div className="p-6 space-y-6 overflow-y-auto max-h-[75vh]">
-          {/* Categorización A / B / C */}
+        <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-160px)]">
+          {/* Categoría A, B, C */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">
               Categoría de Tienda
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {categories.map(cat => {
-                const selected = ideal.category === cat.key;
+              {categories.map(c => {
+                const isSelected = ideal.category === c.key;
                 return (
                   <button
-                    key={cat.key}
+                    key={c.key}
                     type="button"
                     disabled={!canEdit}
-                    onClick={() => canEdit && setIdeal({ ...ideal, category: selected ? undefined : cat.key })}
-                    className={`p-3 rounded-2xl border text-center transition-all ${
-                      selected
-                        ? cat.activeBg
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
-                    } ${!canEdit ? 'cursor-default' : 'cursor-pointer'}`}
+                    onClick={() => setIdeal({ ...ideal, category: c.key })}
+                    className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center cursor-pointer ${
+                      isSelected
+                        ? c.activeBg
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                    } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <p className="text-sm font-black tracking-tight">{cat.label}</p>
-                    <p className={`text-[8px] font-bold mt-0.5 ${selected ? 'text-white/90' : 'text-slate-400'}`}>
-                      {cat.desc}
-                    </p>
+                    <span className="text-xs font-black uppercase tracking-tight">{c.label}</span>
+                    <span className={`text-[8px] font-bold mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                      {c.desc}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Ideales de Personal (Metas) */}
+          {/* Ideales */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">
-              Ideales de Personal (Metas de Banca)
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+              Planta Ideal Requerida
             </label>
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-center">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Gerentes</label>
                 <input
                   type="number"
@@ -146,21 +147,21 @@ const StoreSettingsModal: React.FC<{
                   disabled={!canEdit}
                   value={ideal.gerentes}
                   onChange={e => setIdeal({ ...ideal, gerentes: parseInt(e.target.value) || 0 })}
-                  className="w-full text-center text-sm font-black text-slate-900 bg-white border border-slate-200 py-1.5 rounded-xl outline-none focus:border-red-500"
+                  className="w-full text-center font-black text-base bg-white border border-slate-200 rounded-xl py-1 outline-none focus:border-red-500"
                 />
               </div>
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-center">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Líderes</label>
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Líderes Turno</label>
                 <input
                   type="number"
                   min="0"
                   disabled={!canEdit}
                   value={ideal.lideresTurno}
                   onChange={e => setIdeal({ ...ideal, lideresTurno: parseInt(e.target.value) || 0 })}
-                  className="w-full text-center text-sm font-black text-slate-900 bg-white border border-slate-200 py-1.5 rounded-xl outline-none focus:border-red-500"
+                  className="w-full text-center font-black text-base bg-white border border-slate-200 rounded-xl py-1 outline-none focus:border-red-500"
                 />
               </div>
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/70 text-center">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Entrenadores</label>
                 <input
                   type="number"
@@ -168,7 +169,7 @@ const StoreSettingsModal: React.FC<{
                   disabled={!canEdit}
                   value={ideal.entrenadores}
                   onChange={e => setIdeal({ ...ideal, entrenadores: parseInt(e.target.value) || 0 })}
-                  className="w-full text-center text-sm font-black text-slate-900 bg-white border border-slate-200 py-1.5 rounded-xl outline-none focus:border-red-500"
+                  className="w-full text-center font-black text-base bg-white border border-slate-200 rounded-xl py-1 outline-none focus:border-red-500"
                 />
               </div>
             </div>
@@ -176,15 +177,20 @@ const StoreSettingsModal: React.FC<{
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition"
+          >
             Cancelar
           </button>
           {canEdit && (
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center gap-2 shadow-md active:scale-95"
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl transition shadow-md flex items-center gap-1.5"
             >
               {saving ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{saving ? 'Guardando...' : 'Guardar Configuración'}</span>
@@ -192,7 +198,8 @@ const StoreSettingsModal: React.FC<{
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -211,8 +218,8 @@ const PersonDetailModal: React.FC<{
   onToggleCert: (cert: Certification) => void;
   onRemove: () => void;
 }> = ({ leader, employee, restaurantId, restaurantName, zoneName, canEdit, onClose, onUpdateRole, onToggleCert, onRemove }) => {
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
       <div
         className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
@@ -347,7 +354,8 @@ const PersonDetailModal: React.FC<{
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -375,8 +383,8 @@ const AssignPersonModal: React.FC<{
       .slice(0, 10);
   }, [allEmployees, excludeIds, search]);
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
       <div
         className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
@@ -492,7 +500,8 @@ const AssignPersonModal: React.FC<{
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -809,8 +818,8 @@ const BancaDashboardModal: React.FC<{
   const pctGER = Math.round((analytics.certifications.certGER / certTotal) * 100);
   const pctEEA = Math.round((analytics.certifications.certEEA / certTotal) * 100);
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 animate-fade-in" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5 animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" />
       <div
         className="relative bg-[#F8FAFC] text-slate-900 rounded-[32px] shadow-2xl border border-slate-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
@@ -1199,7 +1208,8 @@ const BancaDashboardModal: React.FC<{
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -1787,8 +1797,8 @@ const Banca: React.FC = () => {
         const tableContent = (
           <div className={
             isTableMaximized 
-              ? "fixed inset-0 z-[99999] bg-white w-screen h-screen p-4 md:p-6 flex flex-col space-y-3 overflow-hidden animate-in fade-in duration-200"
-              : "bg-white rounded-[24px] border border-slate-100 shadow-sm p-3.5 space-y-2.5"
+              ? "fixed inset-0 z-[9000] bg-white w-screen h-screen p-4 md:p-6 flex flex-col space-y-3 overflow-hidden animate-in fade-in duration-200"
+              : "bg-white rounded-[24px] border border-slate-100 shadow-sm p-3.5 space-y-2.5 max-w-full overflow-hidden"
           }>
           {/* Breadcrumb Limpio */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
@@ -1900,108 +1910,117 @@ const Banca: React.FC = () => {
             </div>
 
             {/* TABLA DE TIENDAS */}
-            <div className={`overflow-x-auto rounded-2xl border border-slate-200/80 shadow-sm ${
+            <div className={`w-full max-w-full overflow-x-auto rounded-2xl border border-slate-200 shadow-sm bg-white ${
               isTableMaximized ? "flex-1 min-h-0 overflow-y-auto" : "max-h-[calc(100vh-230px)] overflow-y-auto"
             }`}>
-            <table className="w-full text-left border-collapse min-w-[780px]">
-              <thead className="sticky top-0 z-20 shadow-md">
-                <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider divide-x divide-slate-800">
-                  <th className="py-2.5 px-2.5 w-[20%] min-w-[160px] bg-slate-950">
-                    <div className="flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      <span>Tienda / CECO</span>
-                    </div>
-                  </th>
-                  {ROLE_GROUPS.map(g => (
-                    <th key={g.label} className="py-2.5 px-2 w-[16%] min-w-[115px] bg-slate-900">
-                      <div className="flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${g.textCol.replace('text-', 'bg-')}`} />
-                        <span className="truncate">{g.label}</span>
+              <table className="w-full table-fixed text-left border-collapse min-w-[960px]">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
+                <thead className="sticky top-0 z-20 shadow-md">
+                  <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider divide-x divide-slate-800">
+                    <th className="py-2.5 px-2.5 bg-slate-950">
+                      <div className="flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        <span className="truncate">Tienda / CECO</span>
                       </div>
                     </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-200/80 text-xs">
-                {currentStores.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-slate-400">
-                      <Store className="w-7 h-7 mx-auto mb-1.5 opacity-30" />
-                      <p className="text-xs font-bold">No hay tiendas que coincidan con los filtros aplicados</p>
-                    </td>
+                    {ROLE_GROUPS.map(g => (
+                      <th key={g.label} className="py-2.5 px-2 bg-slate-900">
+                        <div className="flex items-center gap-1">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${g.textCol.replace('text-', 'bg-')}`} />
+                          <span className="truncate">{g.label}</span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  currentStores.map(({ id: restId, zoneName }) => {
-                    const rest = restaurants.find(r => r.id === restId);
-                    const assignment = bancaData.assignments.find(a => a.restaurantId === restId);
-                    const rawMembers = assignment?.members ?? [];
-                    const members = rawMembers.filter(m => activeEmployeeIds.has(m.employeeId));
+                </thead>
 
-                    const storeIdeal = bancaData.storeIdeals?.[restId];
-                    const category = storeIdeal?.category;
+                <tbody className="divide-y divide-slate-200/80 text-xs">
+                  {currentStores.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        <Store className="w-7 h-7 mx-auto mb-1.5 opacity-30" />
+                        <p className="text-xs font-bold">No hay tiendas que coincidan con los filtros aplicados</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    currentStores.map(({ id: restId, zoneName }) => {
+                      const rest = restaurants.find(r => r.id === restId);
+                      const assignment = bancaData.assignments.find(a => a.restaurantId === restId);
+                      const rawMembers = assignment?.members ?? [];
+                      const members = rawMembers.filter(m => activeEmployeeIds.has(m.employeeId));
 
-                    return (
-                      <tr key={restId} className="hover:bg-slate-50/90 transition-colors divide-x divide-slate-100">
-                        {/* Columna 1: Nombre de Tienda, CECO y Badge Único de Letra A, B, C */}
-                        <td className="py-1.5 px-2.5 align-top bg-slate-50/40 w-[20%]">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => setStoreSettingsModal({
-                                restaurantId: restId,
-                                restaurantName: rest?.name ?? restId,
-                                zoneName,
-                                initialIdeal: storeIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 }
-                              })}
-                              className="w-6 h-6 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white text-red-600 flex items-center justify-center shrink-0 font-black text-[9px] transition-colors"
-                              title="Configurar Categoría e Ideales de la Tienda"
-                            >
-                              <Store className="w-3 h-3" />
-                            </button>
+                      const storeIdeal = bancaData.storeIdeals?.[restId];
+                      const category = storeIdeal?.category;
 
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span
-                                  onClick={() => setStoreSettingsModal({
-                                    restaurantId: restId,
-                                    restaurantName: rest?.name ?? restId,
-                                    zoneName,
-                                    initialIdeal: storeIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 }
-                                  })}
-                                  className="font-black text-slate-900 uppercase italic tracking-tight text-[11px] truncate cursor-pointer hover:text-red-600 transition-colors"
-                                  title="Configurar Categoría e Ideales de la Tienda"
-                                >
-                                  {rest?.name ?? restId}
-                                </span>
+                      return (
+                        <tr key={restId} className="hover:bg-slate-50/90 transition-colors divide-x divide-slate-100">
+                          {/* Columna 1: Nombre de Tienda, CECO y Badge Único de Letra A, B, C */}
+                          <td className="py-1.5 px-2.5 align-top bg-slate-50/40">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setStoreSettingsModal({
+                                  restaurantId: restId,
+                                  restaurantName: rest?.name ?? restId,
+                                  zoneName,
+                                  initialIdeal: storeIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 }
+                                })}
+                                className="w-6 h-6 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white text-red-600 flex items-center justify-center shrink-0 font-black text-[9px] transition-colors"
+                                title="Configurar Categoría e Ideales de la Tienda"
+                              >
+                                <Store className="w-3 h-3" />
+                              </button>
 
-                                <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-slate-200/70 text-slate-600 font-black">
-                                  {restId}
-                                </span>
-
-                                {category && (
-                                  <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-tighter shadow-xs ${
-                                    category === 'A' ? 'bg-amber-500 text-white' :
-                                    category === 'B' ? 'bg-blue-600 text-white' :
-                                    'bg-emerald-600 text-white'
-                                  }`}>
-                                    {category}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span
+                                    onClick={() => setStoreSettingsModal({
+                                      restaurantId: restId,
+                                      restaurantName: rest?.name ?? restId,
+                                      zoneName,
+                                      initialIdeal: storeIdeal ?? { gerentes: 1, lideresTurno: 4, entrenadores: 4 }
+                                    })}
+                                    className="font-black text-slate-900 uppercase italic tracking-tight text-[11px] truncate cursor-pointer hover:text-red-600 transition-colors"
+                                    title="Configurar Categoría e Ideales de la Tienda"
+                                  >
+                                    {rest?.name ?? restId}
                                   </span>
-                                )}
+
+                                  <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-slate-200/70 text-slate-600 font-black">
+                                    {restId}
+                                  </span>
+
+                                  {category && (
+                                    <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-tighter shadow-xs ${
+                                      category === 'A' ? 'bg-amber-500 text-white' :
+                                      category === 'B' ? 'bg-blue-600 text-white' :
+                                      'bg-emerald-600 text-white'
+                                    }`}>
+                                      {category}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                                  {zoneName}
+                                </p>
                               </div>
-                              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                                {zoneName}
-                              </p>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Columnas de Roles */}
-                        {ROLE_GROUPS.map(group => {
-                          const matchingMembers = members.filter(m => group.roles.includes(m.role));
-                          const targetRoleForAdd = group.roles[0];
+                          {/* Columnas de Roles */}
+                          {ROLE_GROUPS.map(group => {
+                            const matchingMembers = members.filter(m => group.roles.includes(m.role));
+                            const targetRoleForAdd = group.roles[0];
 
-                          return (
-                            <td key={group.label} className="py-1.5 px-1.5 align-top w-[16%]">
+                            return (
+                              <td key={group.label} className="py-1.5 px-1.5 align-top">
                               <div className="space-y-1">
                                 {matchingMembers.map(m => {
                                   const emp = employees.find(e => e.id === m.employeeId);
