@@ -16,6 +16,13 @@ import * as XLSX from 'xlsx';
 
 const ALL_CERTS: Certification[] = ['GBR', 'GAR', 'GER', 'EEA'];
 
+const CERT_NAMES: Record<Certification, string> = {
+  GBR: 'Gerencia Básica de Restaurante',
+  GAR: 'Gerencia Avanzada de Restaurante',
+  GER: 'Gerencia Experta de Restaurante',
+  EEA: 'Entrenando al Entrenador',
+};
+
 const CERT_COLORS: Record<Certification, string> = {
   GBR: 'bg-blue-500 text-white border-blue-600',
   GAR: 'bg-red-500 text-white border-red-600',
@@ -318,10 +325,7 @@ const PersonDetailModal: React.FC<{
                     <div>
                       <p className="text-xs font-black tracking-wide">{cert}</p>
                       <p className={`text-[8px] font-medium leading-tight mt-0.5 ${active ? 'opacity-90' : 'text-slate-400'}`}>
-                        {cert === 'GBR' && 'Básica'}
-                        {cert === 'GAR' && 'Avanzada'}
-                        {cert === 'GER' && 'Experta'}
-                        {cert === 'EEA' && 'Excelencia'}
+                        {CERT_NAMES[cert]}
                       </p>
                     </div>
                     {active && <Check className="w-4 h-4 shrink-0" />}
@@ -2048,7 +2052,7 @@ const Banca: React.FC = () => {
                                       {m.certifications.length > 0 && (
                                         <div className="flex items-center gap-0.5 shrink-0">
                                           {m.certifications.map(c => (
-                                            <span key={c} className={`text-[7px] font-black px-1 py-0.2 rounded ${CERT_COLORS[c]}`}>
+                                            <span key={c} title={CERT_NAMES[c]} className={`text-[7px] font-black px-1 py-0.2 rounded ${CERT_COLORS[c]}`}>
                                               {c}
                                             </span>
                                           ))}
