@@ -36,32 +36,9 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
             <label className="text-xs font-bold text-slate-700 block mb-1">
               Modo de Calificación
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => onUpdateSurvey({ scoring_type: 'simple' })}
-                className={`p-3.5 rounded-2xl border text-left text-xs transition-all cursor-pointer ${
-                  (survey.scoring_type || 'simple') === 'simple'
-                    ? 'border-emerald-500 bg-emerald-50/60 font-bold text-emerald-950 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <p className="font-black">Simple (% Aciertos)</p>
-                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Todas las preguntas valen igual.</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onUpdateSurvey({ scoring_type: 'weighted' })}
-                className={`p-3.5 rounded-2xl border text-left text-xs transition-all cursor-pointer ${
-                  survey.scoring_type === 'weighted'
-                    ? 'border-emerald-500 bg-emerald-50/60 font-bold text-emerald-950 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <p className="font-black">Ponderado (Puntos)</p>
-                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Cada pregunta tiene sus propios puntos.</p>
-              </button>
+            <div className="p-3.5 rounded-2xl border border-emerald-500 bg-emerald-50/60 text-emerald-950 shadow-xs">
+              <p className="text-xs font-black">Simple (% Aciertos)</p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">Todas las preguntas evaluables tienen el mismo valor y peso.</p>
             </div>
           </div>
 
@@ -119,23 +96,6 @@ export const QuizSettings: React.FC<QuizSettingsProps> = ({ survey, onUpdateSurv
                   </span>
                   <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
                     El usuario verá su puntaje (% obtenido) y si aprobó o no la evaluación al enviar sus respuestas.
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-emerald-300 transition shadow-2xs">
-                <input
-                  type="checkbox"
-                  checked={survey.show_results_in_reports ?? true}
-                  onChange={(e) => onUpdateSurvey({ show_results_in_reports: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <span className="text-xs font-black text-slate-900 block">
-                    Registrar en reportes de coordinador / admin
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                    Permite consolidar la nota y métricas de este intento en el panel de reportes gerenciales.
                   </span>
                 </div>
               </label>

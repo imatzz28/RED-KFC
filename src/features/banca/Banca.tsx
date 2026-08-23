@@ -14,20 +14,20 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-const ALL_CERTS: Certification[] = ['GBR', 'GAR', 'GER', 'EEA'];
+const ALL_CERTS: Certification[] = ['GBR', 'GAR', 'GER', 'EAE'];
 
 const CERT_NAMES: Record<Certification, string> = {
   GBR: 'Gerencia Básica de Restaurante',
   GAR: 'Gerencia Avanzada de Restaurante',
   GER: 'Gerencia Experta de Restaurante',
-  EEA: 'Entrenando al Entrenador',
+  EAE: 'Entrenando al Entrenador',
 };
 
 const CERT_COLORS: Record<Certification, string> = {
   GBR: 'bg-blue-500 text-white border-blue-600',
   GAR: 'bg-red-500 text-white border-red-600',
   GER: 'bg-slate-900 text-white border-slate-950',
-  EEA: 'bg-emerald-600 text-white border-emerald-700',
+  EAE: 'bg-emerald-600 text-white border-emerald-700',
 };
 
 const ROLE_COLORS: Record<BancaRole, string> = {
@@ -44,12 +44,12 @@ const ROLE_GROUPS: { label: string; roles: BancaRole[]; badgeBg: string; textCol
   { label: 'Subgerente', roles: ['Subgerente'], badgeBg: 'bg-purple-600/10 text-purple-700', textCol: 'text-purple-500' },
   { label: 'Líder de Turno', roles: ['Líder de turno'], badgeBg: 'bg-sky-600/10 text-sky-700', textCol: 'text-sky-500' },
   { label: 'Potencial', roles: ['Potencial'], badgeBg: 'bg-slate-600/10 text-slate-700', textCol: 'text-slate-400' },
-  { label: 'Entrenadores Operativos', roles: ['Entrenador'], badgeBg: 'bg-amber-600/10 text-amber-700', textCol: 'text-amber-500' },
-  { label: 'Entrenadores x Horas', roles: ['Entrenador HRS'], badgeBg: 'bg-orange-600/10 text-orange-700', textCol: 'text-orange-500' },
+  { label: 'Entrenadores', roles: ['Entrenador'], badgeBg: 'bg-amber-600/10 text-amber-700', textCol: 'text-amber-500' },
+  { label: 'Entrenadores operativos', roles: ['Entrenador HRS'], badgeBg: 'bg-orange-600/10 text-orange-700', textCol: 'text-orange-500' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Store Settings Modal (Categorización A/B/C e Ideales de la Tienda)
+// Store Settings Modal (Categorización A/B/C/D e Ideales de la Tienda)
 // ─────────────────────────────────────────────────────────────────────────────
 const StoreSettingsModal: React.FC<{
   restaurantId: string;
@@ -79,6 +79,7 @@ const StoreSettingsModal: React.FC<{
     { key: 'A', label: 'Categoría A', desc: 'Alto volumen', activeBg: 'bg-amber-500 text-white border-amber-600 shadow-md' },
     { key: 'B', label: 'Categoría B', desc: 'Volumen medio', activeBg: 'bg-blue-600 text-white border-blue-700 shadow-md' },
     { key: 'C', label: 'Categoría C', desc: 'Volumen estándar', activeBg: 'bg-emerald-600 text-white border-emerald-700 shadow-md' },
+    { key: 'D', label: 'Categoría D', desc: 'Volumen reducido', activeBg: 'bg-purple-600 text-white border-purple-700 shadow-md' },
   ];
 
   return createPortal(
@@ -115,7 +116,7 @@ const StoreSettingsModal: React.FC<{
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">
               Categoría de Tienda
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {categories.map(c => {
                 const isSelected = ideal.category === c.key;
                 return (
@@ -581,11 +582,12 @@ const BancaDashboardModal: React.FC<{
     let certGBR = 0;
     let certGAR = 0;
     let certGER = 0;
-    let certEEA = 0;
+    let certEAE = 0;
 
     let catA = 0;
     let catB = 0;
     let catC = 0;
+    let catD = 0;
     let catNone = 0;
 
     const rankingStats: {
@@ -615,6 +617,7 @@ const BancaDashboardModal: React.FC<{
             if (ideal.category === 'A') catA++;
             else if (ideal.category === 'B') catB++;
             else if (ideal.category === 'C') catC++;
+            else if (ideal.category === 'D') catD++;
             else catNone++;
 
             const gCount = members.filter(m => m.role === 'Gerente' || m.role === 'Subgerente').length;
@@ -643,7 +646,7 @@ const BancaDashboardModal: React.FC<{
               if (m.certifications.includes('GBR')) certGBR++;
               if (m.certifications.includes('GAR')) certGAR++;
               if (m.certifications.includes('GER')) certGER++;
-              if (m.certifications.includes('EEA')) certEEA++;
+              if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
             });
 
             rankingStats.push({
@@ -676,6 +679,7 @@ const BancaDashboardModal: React.FC<{
           if (ideal.category === 'A') catA++;
           else if (ideal.category === 'B') catB++;
           else if (ideal.category === 'C') catC++;
+          else if (ideal.category === 'D') catD++;
           else catNone++;
 
           const gCount = members.filter(m => m.role === 'Gerente' || m.role === 'Subgerente').length;
@@ -704,7 +708,7 @@ const BancaDashboardModal: React.FC<{
             if (m.certifications.includes('GBR')) certGBR++;
             if (m.certifications.includes('GAR')) certGAR++;
             if (m.certifications.includes('GER')) certGER++;
-            if (m.certifications.includes('EEA')) certEEA++;
+            if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
           });
         });
 
@@ -737,6 +741,7 @@ const BancaDashboardModal: React.FC<{
           if (ideal.category === 'A') catA++;
           else if (ideal.category === 'B') catB++;
           else if (ideal.category === 'C') catC++;
+          else if (ideal.category === 'D') catD++;
           else catNone++;
 
           const gCount = members.filter(m => m.role === 'Gerente' || m.role === 'Subgerente').length;
@@ -765,7 +770,7 @@ const BancaDashboardModal: React.FC<{
             if (m.certifications.includes('GBR')) certGBR++;
             if (m.certifications.includes('GAR')) certGAR++;
             if (m.certifications.includes('GER')) certGER++;
-            if (m.certifications.includes('EEA')) certEEA++;
+            if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
           });
         });
 
@@ -786,7 +791,7 @@ const BancaDashboardModal: React.FC<{
 
     rankingStats.sort((a, b) => b.compliancePct - a.compliancePct);
 
-    const totalCerts = certGBR + certGAR + certGER + certEEA;
+    const totalCerts = certGBR + certGAR + certGER + certEAE;
 
     return {
       totalStores,
@@ -803,8 +808,8 @@ const BancaDashboardModal: React.FC<{
       rankingStats,
       rankingType,
       totalCerts,
-      certifications: { certGBR, certGAR, certGER, certEEA },
-      categories: { catA, catB, catC, catNone }
+      certifications: { certGBR, certGAR, certGER, certEAE },
+      categories: { catA, catB, catC, catD, catNone }
     };
   }, [filteredRegions, bancaData, restaurants, activeEmployeeIds, activeZone]);
 
@@ -813,6 +818,7 @@ const BancaDashboardModal: React.FC<{
   const pctCatA = Math.round((analytics.categories.catA / catTotal) * 100);
   const pctCatB = Math.round((analytics.categories.catB / catTotal) * 100);
   const pctCatC = Math.round((analytics.categories.catC / catTotal) * 100);
+  const pctCatD = Math.round((analytics.categories.catD / catTotal) * 100);
   const pctCatNone = Math.round((analytics.categories.catNone / catTotal) * 100);
 
   // Porcentajes de certificaciones (Todas las 4)
@@ -820,7 +826,7 @@ const BancaDashboardModal: React.FC<{
   const pctGBR = Math.round((analytics.certifications.certGBR / certTotal) * 100);
   const pctGAR = Math.round((analytics.certifications.certGAR / certTotal) * 100);
   const pctGER = Math.round((analytics.certifications.certGER / certTotal) * 100);
-  const pctEEA = Math.round((analytics.certifications.certEEA / certTotal) * 100);
+  const pctEAE = Math.round((analytics.certifications.certEAE / certTotal) * 100);
 
   return createPortal(
     <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5 animate-fade-in" onClick={onClose}>
@@ -1047,11 +1053,11 @@ const BancaDashboardModal: React.FC<{
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
-                      {/* EEA (Verde Esmeralda) */}
+                      {/* EAE (Verde Esmeralda) */}
                       <path
                         className="text-emerald-600"
                         strokeWidth="4.5"
-                        strokeDasharray={`${pctEEA}, 100`}
+                        strokeDasharray={`${pctEAE}, 100`}
                         strokeDashoffset={`-${pctGBR + pctGAR + pctGER}`}
                         stroke="currentColor"
                         fill="none"
@@ -1102,11 +1108,11 @@ const BancaDashboardModal: React.FC<{
                     <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" />
-                        <span className="font-black text-slate-800 text-[11px]">EEA</span>
+                        <span className="font-black text-slate-800 text-[11px]">EAE</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certEEA}</span>
-                        <span className="text-[8px] text-slate-400 font-bold block">{pctEEA}%</span>
+                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certEAE}</span>
+                        <span className="text-[8px] text-slate-400 font-bold block">{pctEAE}%</span>
                       </div>
                     </div>
                   </div>
@@ -1122,40 +1128,49 @@ const BancaDashboardModal: React.FC<{
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 pt-1">
-                  <div className="bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
                     <span className="text-[9px] font-black text-amber-600 uppercase tracking-wider">CAT. A</span>
-                    <Trophy className="w-5 h-5 text-amber-500 my-1" />
+                    <Trophy className="w-4 h-4 text-amber-500 my-1" />
                     <div>
-                      <span className="text-lg font-black text-slate-900 block leading-tight">{analytics.categories.catA}</span>
-                      <span className="text-[9px] font-bold text-slate-400 block">{pctCatA}%</span>
+                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catA}</span>
+                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatA}%</span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
+                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
                     <span className="text-[9px] font-black text-blue-600 uppercase tracking-wider">CAT. B</span>
-                    <Medal className="w-5 h-5 text-blue-600 my-1" />
+                    <Medal className="w-4 h-4 text-blue-600 my-1" />
                     <div>
-                      <span className="text-lg font-black text-slate-900 block leading-tight">{analytics.categories.catB}</span>
-                      <span className="text-[9px] font-bold text-slate-400 block">{pctCatB}%</span>
+                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catB}</span>
+                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatB}%</span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
+                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
                     <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">CAT. C</span>
-                    <Medal className="w-5 h-5 text-emerald-600 my-1" />
+                    <Medal className="w-4 h-4 text-emerald-600 my-1" />
                     <div>
-                      <span className="text-lg font-black text-slate-900 block leading-tight">{analytics.categories.catC}</span>
-                      <span className="text-[9px] font-bold text-slate-400 block">{pctCatC}%</span>
+                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catC}</span>
+                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatC}%</span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">SIN CAT.</span>
-                    <MinusCircle className="w-5 h-5 text-slate-400 my-1" />
+                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
+                    <span className="text-[9px] font-black text-purple-600 uppercase tracking-wider">CAT. D</span>
+                    <Medal className="w-4 h-4 text-purple-600 my-1" />
                     <div>
-                      <span className="text-lg font-black text-slate-900 block leading-tight">{analytics.categories.catNone}</span>
-                      <span className="text-[9px] font-bold text-slate-400 block">{pctCatNone}%</span>
+                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catD}</span>
+                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatD}%</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between col-span-2 sm:col-span-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">SIN CAT.</span>
+                    <MinusCircle className="w-4 h-4 text-slate-400 my-1" />
+                    <div>
+                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catNone}</span>
+                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatNone}%</span>
                     </div>
                   </div>
                 </div>
@@ -1648,7 +1663,7 @@ const Banca: React.FC = () => {
               'GBR': '',
               'GAR': '',
               'GER': '',
-              'EEA': '',
+              'EAE': '',
             });
           } else {
             members.forEach(m => {
@@ -1666,7 +1681,7 @@ const Banca: React.FC = () => {
                 'GBR': m.certifications.includes('GBR') ? 'SI' : 'NO',
                 'GAR': m.certifications.includes('GAR') ? 'SI' : 'NO',
                 'GER': m.certifications.includes('GER') ? 'SI' : 'NO',
-                'EEA': m.certifications.includes('EEA') ? 'SI' : 'NO',
+                'EAE': m.certifications.includes('EAE') || (m.certifications as any).includes('EEA') ? 'SI' : 'NO',
               });
             });
           }
@@ -2005,7 +2020,8 @@ const Banca: React.FC = () => {
                                     <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-tighter shadow-xs ${
                                       category === 'A' ? 'bg-amber-500 text-white' :
                                       category === 'B' ? 'bg-blue-600 text-white' :
-                                      'bg-emerald-600 text-white'
+                                      category === 'C' ? 'bg-emerald-600 text-white' :
+                                      'bg-purple-600 text-white'
                                     }`}>
                                       {category}
                                     </span>

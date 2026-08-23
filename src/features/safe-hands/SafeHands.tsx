@@ -6,11 +6,12 @@ import { UserRole } from '@/types';
 import { 
   ShieldCheck, Upload, Download, Search, 
   FileDown, Trash2, Signature,
-  CheckCircle2, AlertCircle, Clock
+  CheckCircle2, AlertCircle, Clock, FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 import { safeHandsGenerator } from './utils/safeHandsGenerator';
+import { SafeHandsReconciliationModal } from './components/SafeHandsReconciliationModal';
 
 const SafeHands: React.FC = () => {
   const { auth, restaurants, employees, showConfirmDialog } = useAppStore();
@@ -21,6 +22,7 @@ const SafeHands: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showReconciliationModal, setShowReconciliationModal] = useState(false);
 
   // Server-side pagination states
   const [page, setPage] = useState(0);
@@ -43,6 +45,7 @@ const SafeHands: React.FC = () => {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
+  const isAdmin = auth.user?.role === UserRole.ADMIN;
   const canEdit = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR;
   const canUpload = auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.COORDINATOR || auth.user?.role === UserRole.LIDER || (auth.user?.role === UserRole.GUEST && auth.user?.guestCanEdit === true);
 
@@ -568,58 +571,14 @@ const SafeHands: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tight flex items-center gap-3">
-            <ShieldCheck className="w-8 h-8 text-red-600" />
-            Safe Hands
-          </h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-            Gestión Consolidada
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <button onClick={() => setShowSettings(true)} className="p-3 bg-white border-2 border-slate-100 rounded-xl hover:border-red-500 transition-all shadow-sm">
-              <Signature className="w-5 h-5 text-slate-400" />
-            </button>
-          )}
-          {canUpload && (
-            <>
-              <button 
-                onClick={handleDownloadTemplate} 
-                className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
-                title="Descargar Plantilla Excel para cargar base de datos"
-              >
-                <Download className="w-4 h-4 text-red-600" />
-                <span>Plantilla Carga</span>
-              </button>
-              <label className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>Cargar Consolidado</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
-              </label>
-            </>
-          )}
-          {canEdit && (
-            <>
-              <button 
-                onClick={handleDownloadDeleteTemplate} 
-                className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 hover:border-red-600 text-slate-700 hover:text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer"
-                title="Descargar Plantilla Excel para eliminación masiva"
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-                <span>Plantilla Borrado</span>
-              </button>
-              <label className="flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer">
-                <Trash2 className="w-4 h-4 text-red-500" />
-                <span>Eliminación Masiva</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelDeleteUpload} />
-              </label>
-            </>
-          )}
-        </div>
+      <div className="px-2">
+        <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tight flex items-center gap-3">
+          <ShieldCheck className="w-8 h-8 text-red-600" />
+          Safe Hands
+        </h2>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+          Gestión Consolidada
+        </p>
       </div>
 
       {/* Tarjetas de Estadísticas */}
@@ -652,6 +611,67 @@ const SafeHands: React.FC = () => {
           color="vencido"
           label="Carnets Caducados"
         />
+      </div>
+
+      {/* Action Toolbar (Estilo Píldoras Unificadas) */}
+      <div className="flex flex-wrap items-center gap-2 px-2">
+        {/* Auditoría SafeHands (Admin Only) */}
+        {isAdmin && (
+          <button 
+            onClick={() => setShowReconciliationModal(true)} 
+            className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-900 text-white shadow-md hover:bg-slate-800 cursor-pointer"
+            title="Auditoría SafeHands: Conciliación de Carnets vs Colaboradores y Categorización de Huérfanos"
+          >
+            Auditoría SafeHands
+          </button>
+        )}
+
+        {/* Configuración Firma (Admin Only) */}
+        {isAdmin && (
+          <button 
+            onClick={() => setShowSettings(true)} 
+            className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+            title="Configuración de Firma y Certificados (Solo Administrador)"
+          >
+            Firma Digital
+          </button>
+        )}
+
+        {/* Carga de Datos */}
+        {canUpload && (
+          <>
+            <button 
+              onClick={handleDownloadTemplate} 
+              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+              title="Descargar Plantilla Excel para cargar base de datos"
+            >
+              Plantilla Carga
+            </button>
+            
+            <label className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer">
+              Cargar Consolidado
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
+            </label>
+          </>
+        )}
+
+        {/* Eliminación Masiva */}
+        {canEdit && (
+          <>
+            <button 
+              onClick={handleDownloadDeleteTemplate} 
+              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+              title="Descargar Plantilla Excel para eliminación masiva"
+            >
+              Plantilla Borrado
+            </button>
+
+            <label className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer">
+              Eliminación Masiva
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelDeleteUpload} />
+            </label>
+          </>
+        )}
       </div>
 
       {/* Main List Area */}
@@ -781,7 +801,7 @@ const SafeHands: React.FC = () => {
 
 
       {/* Settings Modal */}
-      {showSettings && (
+      {isAdmin && showSettings && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
           <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden">
@@ -967,6 +987,11 @@ const SafeHands: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Reconciliation Modal (Admin Only) */}
+      {isAdmin && showReconciliationModal && (
+        <SafeHandsReconciliationModal onClose={() => setShowReconciliationModal(false)} />
       )}
 
       {/* Toast Notification */}

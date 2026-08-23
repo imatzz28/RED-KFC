@@ -39,6 +39,10 @@ export const getStoreEmployeesForMonth = (
     const normStoreId = storeId.trim().toUpperCase();
     const [yVal, mVal] = month.split('-').map(Number);
     const lastDayVal = new Date(yVal, mVal, 0).getDate();
+    // Regla de Inducción: Si ingresó en los últimos 7 días del mes (última semana),
+    // goza de periodo de gracia para inducción/STAR y empieza a evaluar en el mes siguiente.
+    const cutoffDay = Math.max(1, lastDayVal - 7);
+    const graceCutoffStr = `${month}-${String(cutoffDay).padStart(2, '0')}`;
     const periodEndStr = `${month}-${String(lastDayVal).padStart(2, '0')}`;
     const periodStartStr = `${month}-01`;
 
@@ -49,8 +53,8 @@ export const getStoreEmployeesForMonth = (
         const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
         const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';
 
-        // Estaba contratado en el período: ingresó antes del fin de mes Y no salió antes del inicio
-        let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr > periodStartStr);
+        // Estaba contratado antes de la semana de corte Y no salió antes del inicio de mes
+        let isHistoricalActive = (joinDateStr <= graceCutoffStr) && (exitDateStr > periodStartStr);
 
         if (isHistoricalActive) {
             const isRetired = !e.active || (e.exit_date && e.exit_date.trim() !== '');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
-import { Survey, ResponseRecord, SurveyStatus } from '@/types';
+import { Survey, ResponseRecord, SurveyStatus, UserRole } from '@/types';
 import { SurveyList } from './components/SurveyList';
 import { SurveyBuilder } from './components/builder/SurveyBuilder';
 import { SurveyPlayer } from './components/SurveyPlayer';
@@ -110,6 +110,10 @@ export const PulseModule: React.FC = () => {
   };
 
   const handleDelete = async (surveyId: string) => {
+    if (auth.user?.role !== UserRole.ADMIN) {
+      showAlertDialog('Solo los administradores tienen permiso para eliminar encuestas.');
+      return;
+    }
     await dataService.deleteSurvey(surveyId);
     loadData();
   };

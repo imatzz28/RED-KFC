@@ -1,6 +1,6 @@
 
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, DailySchedule, ScheduleRequest, Survey, ResponseRecord } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, SafeHandsOrphanCategory, DailySchedule, ScheduleRequest, Survey, ResponseRecord } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -519,10 +519,42 @@ export const dataService = {
     });
 
     const latestMap = new Map<string, GradeEntry>();
+    const vaultEntriesByMonth = new Map<string, GradeEntry[]>();
+
     const sorted = [...empGrades].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
     sorted.forEach(g => {
-      latestMap.set(`${g.group}-${g.category}`, g);
+      if (g.group === 'E') {
+        const m = g.month ? g.month.substring(0, 7) : '';
+        if (!vaultEntriesByMonth.has(m)) {
+          vaultEntriesByMonth.set(m, []);
+        }
+        vaultEntriesByMonth.get(m)!.push(g);
+      } else {
+        latestMap.set(`${g.group}-${g.category}`, g);
+      }
     });
+
+    // Unificar calificaciones históricas de The Vault (grupo 'E')
+    if (vaultEntriesByMonth.size > 0) {
+      const sortedVaultMonths = Array.from(vaultEntriesByMonth.keys()).sort();
+      const latestMonth = sortedVaultMonths[sortedVaultMonths.length - 1];
+      const monthEntries = vaultEntriesByMonth.get(latestMonth)!;
+
+      const exactVault = monthEntries.find(e => e.category === 'The Vault');
+      if (exactVault) {
+        latestMap.set('E-The Vault', exactVault);
+      } else {
+        const first = monthEntries[0];
+        const avgScore = Math.round(
+          monthEntries.reduce((acc, curr) => acc + curr.score, 0) / monthEntries.length
+        );
+        latestMap.set('E-The Vault', {
+          ...first,
+          category: 'The Vault',
+          score: avgScore
+        });
+      }
+    }
 
     return Array.from(latestMap.values());
   },
@@ -1055,6 +1087,7 @@ export const dataService = {
       name: p.name,
       restaurantId: p.restaurant_id,
       lastIssueDate: p.last_issue_date,
+      category: p.category || undefined,
       createdAt: p.created_at
     }));
   },
@@ -1079,6 +1112,7 @@ export const dataService = {
       name: p.name,
       restaurantId: p.restaurant_id,
       lastIssueDate: p.last_issue_date,
+      category: p.category || undefined,
       createdAt: p.created_at
     }));
     return { data: parsedData, total };
@@ -1301,6 +1335,114 @@ export const dataService = {
       const query = `?id=in.(${chunk.map(id => encodeURIComponent(id)).join(',')})`;
       await dataService.supabaseFetch('safe_hands_personnel', 'DELETE', null, query);
     }
+  },
+
+  // ── Safe Hands Orphan Categories & Reconciliation ─────────────────────────
+  getSafeHandsOrphanCategories: async (): Promise<SafeHandsOrphanCategory[]> => {
+    try {
+      const result = await dataService.supabaseFetch('safe_hands_orphan_categories', 'GET', null, '?order=name.asc');
+      if (result && result.length > 0) {
+        return result as SafeHandsOrphanCategory[];
+      }
+    } catch (err) {
+      console.warn("Error fetching safe_hands_orphan_categories from Supabase:", err);
+    }
+    const defaultCategories: SafeHandsOrphanCategory[] = [
+      { id: 'sena', name: 'Aprendiz SENA', color: 'emerald' },
+      { id: 'proveedor', name: 'Proveedor / Tercero', color: 'blue' },
+      { id: 'mantenimiento', name: 'Mantenimiento / Técnico', color: 'amber' },
+      { id: 'admin', name: 'Personal Administrativo', color: 'indigo' },
+      { id: 'temporal', name: 'Temporal / Relevo', color: 'violet' },
+      { id: 'ingreso', name: 'En Proceso de Ingreso', color: 'teal' }
+    ];
+    try {
+      const local = await localforage.getItem<SafeHandsOrphanCategory[]>('safe_hands_orphan_categories_local');
+      if (local && local.length > 0) return local;
+    } catch {}
+    return defaultCategories;
+  },
+
+  saveSafeHandsOrphanCategory: async (category: SafeHandsOrphanCategory): Promise<void> => {
+    try {
+      await dataService.supabaseFetch('safe_hands_orphan_categories', 'POST', category, '?on_conflict=id');
+    } catch (err) {
+      console.warn("Error persisting category to Supabase, saving locally:", err);
+    }
+    try {
+      const current = await dataService.getSafeHandsOrphanCategories();
+      const updated = current.filter(c => c.id !== category.id).concat(category);
+      await localforage.setItem('safe_hands_orphan_categories_local', updated);
+    } catch {}
+  },
+
+  deleteSafeHandsOrphanCategory: async (id: string): Promise<void> => {
+    try {
+      await dataService.supabaseFetch('safe_hands_orphan_categories', 'DELETE', null, `?id=eq.${id}`);
+    } catch (err) {
+      console.warn("Error deleting category from Supabase:", err);
+    }
+    try {
+      const current = await dataService.getSafeHandsOrphanCategories();
+      const updated = current.filter(c => c.id !== id);
+      await localforage.setItem('safe_hands_orphan_categories_local', updated);
+    } catch {}
+  },
+
+  updateSafeHandsPersonCategory: async (personId: string, category: string | null): Promise<void> => {
+    await dataService.supabaseFetch('safe_hands_personnel', 'PATCH', { category: category || null }, `?id=eq.${personId}`);
+  },
+
+  bulkUpdateSafeHandsPersonnelCategory: async (personIds: string[], category: string | null): Promise<void> => {
+    if (!personIds || personIds.length === 0) return;
+    const chunkSize = 100;
+    for (let i = 0; i < personIds.length; i += chunkSize) {
+      const chunk = personIds.slice(i, i + chunkSize);
+      const query = `?id=in.(${chunk.map(id => encodeURIComponent(id)).join(',')})`;
+      await dataService.supabaseFetch('safe_hands_personnel', 'PATCH', { category: category || null }, query);
+    }
+  },
+
+  getAllSafeHandsPersonnelAndCertsForReconciliation: async (): Promise<{ personnel: SafeHandsPerson[], certs: SafeHandsCert[] }> => {
+    let allPersonnel: SafeHandsPerson[] = [];
+    let page = 0;
+    const limit = 1000;
+    while (true) {
+      const res = await dataService.supabaseFetch('safe_hands_personnel', 'GET', null, `?order=name.asc&limit=${limit}&offset=${page * limit}`);
+      if (!res || res.length === 0) break;
+      const mapped = res.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        restaurantId: p.restaurant_id,
+        lastIssueDate: p.last_issue_date,
+        category: p.category || undefined,
+        createdAt: p.created_at
+      }));
+      allPersonnel.push(...mapped);
+      if (res.length < limit) break;
+      page++;
+    }
+
+    let allCerts: SafeHandsCert[] = [];
+    let certPage = 0;
+    while (true) {
+      const res = await dataService.supabaseFetch('safe_hands_certs', 'GET', null, `?order=expiry_date.desc&limit=${limit}&offset=${certPage * limit}`);
+      if (!res || res.length === 0) break;
+      const mapped = res.map((c: any) => ({
+        id: c.id,
+        employeeId: c.employee_id,
+        restaurantId: c.restaurant_id,
+        issueDate: c.issue_date,
+        expiryDate: c.expiry_date,
+        certificateCode: c.certificate_code,
+        signatureUrl: c.signature_url,
+        createdAt: c.created_at
+      }));
+      allCerts.push(...mapped);
+      if (res.length < limit) break;
+      certPage++;
+    }
+
+    return { personnel: allPersonnel, certs: allCerts };
   },
 
   getSchedulesForDateRange: async (startDate: string, endDate: string): Promise<DailySchedule[]> => {

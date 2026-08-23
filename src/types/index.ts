@@ -94,12 +94,12 @@ export interface HierarchyData {
 }
 
 // ── Banca ──────────────────────────────────────────────────────────────────
-export type Certification = 'GBR' | 'GAR' | 'GER' | 'EEA';
+export type Certification = 'GBR' | 'GAR' | 'GER' | 'EAE';
 export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Entrenador HRS' | 'Potencial';
 
 export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Potencial'];
 
-export type StoreCategory = 'A' | 'B' | 'C';
+export type StoreCategory = 'A' | 'B' | 'C' | 'D';
 
 export interface StoreIdeal {
   gerentes: number;
@@ -123,13 +123,20 @@ export interface StoreAssignment {
   restaurantId: string;
   members: StoreLeader[];
 }
-// ── Safe Hands ─────────────────────────────────────────────────────────────
 export interface SafeHandsPerson {
   id: string; // Cedula
   name: string; // Nombre
   restaurantId?: string;
   lastIssueDate?: string; // Fecha
+  category?: string; // Categoría para huérfanos/personal especial (ej: sena, proveedor, etc.)
   createdAt?: string;
+}
+
+export interface SafeHandsOrphanCategory {
+  id: string;
+  name: string;
+  color?: string;
+  created_at?: string;
 }
 
 export interface SafeHandsCert {

@@ -223,6 +223,10 @@ const Dashboard: React.FC = () => {
       const year = parseInt(dashboardMonth.split('-')[0]);
       const month = parseInt(dashboardMonth.split('-')[1]);
       const lastDay = new Date(year, month, 0).getDate();
+      // Regla de Inducción: Si ingresó en los últimos 7 días del mes (última semana),
+      // goza de periodo de gracia para inducción/STAR y empieza a evaluar en el mes siguiente.
+      const cutoffDay = Math.max(1, lastDay - 7);
+      const graceCutoffStr = `${dashboardMonth}-${String(cutoffDay).padStart(2, '0')}`;
       const periodEndStr = `${dashboardMonth}-${String(lastDay).padStart(2, '0')}`;
       const periodStartStr = `${dashboardMonth}-01`;
 
@@ -233,8 +237,8 @@ const Dashboard: React.FC = () => {
         const joinDateStr = emp.join_date ? emp.join_date.substring(0, 10) : '0000-01-01';
         const exitDateStr = emp.exit_date ? emp.exit_date.substring(0, 10) : '9999-12-31';
         
-        // Estaba contratado: entró antes del fin de mes Y no se fue antes del inicio de mes
-        let isHistoricalActive = (joinDateStr <= periodEndStr) && (exitDateStr >= periodStartStr);
+        // Estaba contratado antes de la semana de corte Y no se fue antes del inicio de mes
+        let isHistoricalActive = (joinDateStr <= graceCutoffStr) && (exitDateStr >= periodStartStr);
         if (isHistoricalActive) {
           const isRetired = !emp.active || (emp.exit_date && emp.exit_date.trim() !== '');
           if (isRetired) {

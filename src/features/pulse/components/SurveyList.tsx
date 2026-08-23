@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Survey, SurveyStatus } from '@/types';
+import { Survey, SurveyStatus, UserRole } from '@/types';
+import { useAppStore } from '@/store/useAppStore';
 import {
   FileSpreadsheet, Plus, Search, Edit3, Trash2, Copy, Play, BarChart2,
   CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, ChevronLeft, Share2, QrCode, Check, Eye, RefreshCw
@@ -35,6 +36,9 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   onRefresh,
   isRefreshing,
 }) => {
+  const { auth } = useAppStore();
+  const isAdmin = auth.user?.role === UserRole.ADMIN;
+
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'survey' | 'quiz'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all');
@@ -363,13 +367,15 @@ export const SurveyList: React.FC<SurveyListProps> = ({
                             <Copy className="w-3.5 h-3.5" />
                           </button>
 
-                          <button
-                            onClick={() => setSurveyToDelete(survey)}
-                            className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition cursor-pointer shadow-2xs"
-                            title="Eliminar Formulario"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => setSurveyToDelete(survey)}
+                              className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition cursor-pointer shadow-2xs"
+                              title="Eliminar Formulario (Solo Administradores)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

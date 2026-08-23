@@ -38,7 +38,7 @@ BEGIN
   -- Categorías por grupo
   group_cats AS (
     SELECT * FROM (VALUES
-      ('AK', 1), ('A', 3), ('B', 6), ('C', 1), ('D', 1), ('E', 5), ('F', 1)
+      ('AK', 1), ('A', 3), ('B', 6), ('C', 1), ('D', 1), ('E', 1), ('F', 1)
     ) AS t(group_id, cat_count)
   ),
   -- Empleados que estaban contratados en el mes objetivo (Lógica Histórica)
@@ -52,8 +52,8 @@ BEGIN
       ) AS seniority_months
     FROM employees e
     WHERE 
-      -- Si no tiene fecha de ingreso, asumimos que es antiguo y cuenta
-      (e.join_date IS NULL OR e.join_date::DATE <= (p_month_date + INTERVAL '1 month' - INTERVAL '1 day')::DATE)
+      -- Regla de Inducción/STAR: Si ingresó en los últimos 7 días del mes, empieza a evaluar a partir del mes siguiente
+      (e.join_date IS NULL OR e.join_date::DATE <= (p_month_date + INTERVAL '1 month' - INTERVAL '8 days')::DATE)
       -- No se había ido antes de que empezara el mes
       AND (e.exit_date IS NULL OR e.exit_date::DATE >= p_month_date)
       AND e.restaurant_id IS NOT NULL
@@ -211,8 +211,12 @@ CREATE TABLE IF NOT EXISTS safe_hands_personnel (
   name              TEXT NOT NULL,    -- Nombre
   restaurant_id     TEXT,             -- Opcional para filtros
   last_issue_date   DATE,             -- Fecha
+  category          TEXT,             -- Categoría para personal externo/huérfano (ej: sena, proveedor, etc.)
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Asegurar columna category en tablas existentes
+ALTER TABLE safe_hands_personnel ADD COLUMN IF NOT EXISTS category TEXT;
 
 -- 2. TABLA DE CERTIFICACIONES (Referenciando personal independiente)
 CREATE TABLE IF NOT EXISTS safe_hands_certs (
@@ -244,10 +248,37 @@ INSERT INTO safe_hands_settings (id, responsible_name)
 VALUES (1, 'RESPONSABLE CALIDAD')
 ON CONFLICT (id) DO NOTHING;
 
--- 4. POLÍTICAS DE ACCESO (RLS)
+-- 4. TABLA DE CATEGORÍAS DE PERSONAL EXTERNO / HUÉRFANOS
+CREATE TABLE IF NOT EXISTS safe_hands_orphan_categories (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  color       TEXT DEFAULT 'purple',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insertar categorías iniciales por defecto
+INSERT INTO safe_hands_orphan_categories (id, name, color) VALUES
+  ('sena', 'Aprendiz SENA', 'emerald'),
+  ('proveedor', 'Proveedor / Tercero', 'blue'),
+  ('mantenimiento', 'Mantenimiento / Técnico', 'amber'),
+  ('admin', 'Personal Administrativo', 'indigo'),
+  ('temporal', 'Temporal / Relevo', 'violet'),
+  ('ingreso', 'En Proceso de Ingreso', 'teal')
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. POLÍTICAS DE ACCESO (RLS)
 ALTER TABLE safe_hands_certs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safe_hands_personnel ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safe_hands_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safe_hands_orphan_categories ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read for all orphan categories" ON safe_hands_orphan_categories;
+CREATE POLICY "Allow read for all orphan categories" 
+ON safe_hands_orphan_categories FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow write for orphan categories" ON safe_hands_orphan_categories;
+CREATE POLICY "Allow write for orphan categories" 
+ON safe_hands_orphan_categories FOR ALL USING (true);
 
 -- Lectura pública para validación y visualización
 DROP POLICY IF EXISTS "Public validation access" ON safe_hands_certs;

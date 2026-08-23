@@ -26,7 +26,7 @@ export const EVALUATION_GROUPS = {
   },
   'E': {
     name: 'The Vault',
-    categories: ['Fundamentos básicos', 'FOH', 'BOH', 'MOH', 'Delivery']
+    categories: ['The Vault']
   }
 };
 

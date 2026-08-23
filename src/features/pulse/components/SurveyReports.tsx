@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Survey, ResponseRecord, User, Question } from '@/types';
+import { Survey, ResponseRecord, User, Question, UserRole } from '@/types';
+import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
   BarChart,
@@ -211,7 +212,9 @@ interface SurveyReportsProps {
 }
 
 export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProps) {
-  const canManage = true;
+  const { auth } = useAppStore();
+  const isAdmin = (currentUser?.role === UserRole.ADMIN) || (auth.user?.role === UserRole.ADMIN);
+  const canManage = isAdmin;
 
   const [selectedSegmentKey, setSelectedSegmentKey] = useState<string>('all');
   const [selectedSegmentValue, setSelectedSegmentValue] = useState<string>('all');
@@ -247,6 +250,7 @@ export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProp
   }, [survey.id]);
 
   const handleResetResponses = async () => {
+    if (!isAdmin) return;
     const records = dataService.getResponses(survey.id);
     for (const r of records) {
       await dataService.deleteResponse(r.id);
@@ -256,6 +260,7 @@ export function SurveyReports({ survey, currentUser, onBack }: SurveyReportsProp
   };
 
   const handleDeleteSingleResponse = async (responseId: string) => {
+    if (!isAdmin) return;
     await dataService.deleteResponse(responseId);
     setFetchedResponses(prev => prev.filter(r => r.id !== responseId));
     setDeletingResponseRecord(null);
@@ -745,10 +750,11 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
           </div>
 
           <div className="flex items-center gap-2.5">
-            {allResponses.length > 0 && (
+            {isAdmin && allResponses.length > 0 && (
               <button
                 onClick={() => setShowConfirmReset(true)}
                 className="px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-xs shadow-xs transition flex items-center gap-2 uppercase cursor-pointer shrink-0"
+                title="Reiniciar todas las respuestas (Solo Administrador)"
               >
                 <Trash2 className="w-4 h-4 stroke-[2.5]" />
                 <span>Reiniciar Respuestas</span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { UserRole, DailySchedule, User, Restaurant, ScheduleRequest, ScheduleRequestType } from '@/types';
 import { dataService } from '@/services/dataService';
@@ -17,7 +18,9 @@ import {
   AlertCircle,
   Download,
   MessageSquare,
-  Send
+  Send,
+  Building2,
+  Briefcase
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -46,121 +49,7 @@ const normalizeTime = (time?: string): string => {
   return `${h}:${m}`;
 };
 
-interface CatalogShift {
-  id: number;
-  checkIn: string;
-  checkOut: string;
-  hours: number;
-  break: number;
-}
-
-const SHIFT_CATALOG_LIST: CatalogShift[] = [
-  { id: 6, checkIn: '08:00', checkOut: '14:00', hours: 6, break: 0 },
-  { id: 12, checkIn: '09:00', checkOut: '13:00', hours: 4, break: 0 },
-  { id: 13, checkIn: '09:00', checkOut: '14:00', hours: 5, break: 0 },
-  { id: 14, checkIn: '09:00', checkOut: '15:00', hours: 6, break: 0 },
-  { id: 20, checkIn: '10:00', checkOut: '14:00', hours: 4, break: 0 },
-  { id: 21, checkIn: '10:00', checkOut: '15:00', hours: 5, break: 0 },
-  { id: 22, checkIn: '10:00', checkOut: '16:00', hours: 6, break: 0 },
-  { id: 28, checkIn: '11:00', checkOut: '15:00', hours: 4, break: 0 },
-  { id: 29, checkIn: '11:00', checkOut: '16:00', hours: 5, break: 0 },
-  { id: 36, checkIn: '12:00', checkOut: '16:00', hours: 4, break: 0 },
-  { id: 37, checkIn: '12:00', checkOut: '17:00', hours: 5, break: 0 },
-  { id: 107, checkIn: '18:00', checkOut: '22:00', hours: 4, break: 0 },
-  { id: 145, checkIn: '17:00', checkOut: '22:00', hours: 5, break: 0 },
-  { id: 146, checkIn: '17:00', checkOut: '23:00', hours: 6, break: 0 },
-  { id: 147, checkIn: '18:00', checkOut: '23:00', hours: 5, break: 0 },
-  { id: 148, checkIn: '18:00', checkOut: '00:00', hours: 6, break: 0 },
-  { id: 174, checkIn: '06:00', checkOut: '12:00', hours: 6, break: 0 },
-  { id: 175, checkIn: '07:00', checkOut: '13:00', hours: 6, break: 0 },
-  { id: 176, checkIn: '11:00', checkOut: '17:00', hours: 6, break: 0 },
-  { id: 177, checkIn: '12:00', checkOut: '18:00', hours: 6, break: 0 },
-  { id: 178, checkIn: '16:00', checkOut: '22:00', hours: 6, break: 0 },
-  { id: 200, checkIn: '17:00', checkOut: '21:00', hours: 4, break: 0 },
-  { id: 206, checkIn: '19:00', checkOut: '23:00', hours: 4, break: 0 },
-  { id: 207, checkIn: '19:00', checkOut: '00:00', hours: 5, break: 0 },
-  { id: 208, checkIn: '19:00', checkOut: '01:00', hours: 6, break: 0 },
-  { id: 209, checkIn: '20:00', checkOut: '00:00', hours: 4, break: 0 },
-  { id: 210, checkIn: '20:00', checkOut: '01:00', hours: 5, break: 0 },
-  { id: 211, checkIn: '20:00', checkOut: '02:00', hours: 6, break: 0 },
-  { id: 212, checkIn: '15:00', checkOut: '21:00', hours: 6, break: 0 },
-  { id: 213, checkIn: '16:00', checkOut: '21:00', hours: 5, break: 0 },
-  { id: 215, checkIn: '21:00', checkOut: '01:00', hours: 4, break: 0 },
-  { id: 216, checkIn: '21:00', checkOut: '02:00', hours: 5, break: 0 },
-  { id: 218, checkIn: '23:00', checkOut: '05:00', hours: 6, break: 0 },
-  { id: 220, checkIn: '13:00', checkOut: '17:00', hours: 4, break: 0 },
-  { id: 221, checkIn: '13:00', checkOut: '18:00', hours: 5, break: 0 },
-  { id: 222, checkIn: '13:00', checkOut: '19:00', hours: 6, break: 0 },
-  { id: 224, checkIn: '16:00', checkOut: '20:00', hours: 4, break: 0 },
-  { id: 226, checkIn: '07:00', checkOut: '11:00', hours: 4, break: 0 },
-  { id: 227, checkIn: '07:00', checkOut: '12:00', hours: 5, break: 0 },
-  { id: 228, checkIn: '08:00', checkOut: '12:00', hours: 4, break: 0 },
-  { id: 229, checkIn: '08:00', checkOut: '13:00', hours: 5, break: 0 },
-  { id: 230, checkIn: '14:00', checkOut: '18:00', hours: 4, break: 0 },
-  { id: 231, checkIn: '14:00', checkOut: '19:00', hours: 5, break: 0 },
-  { id: 232, checkIn: '14:00', checkOut: '20:00', hours: 6, break: 0 },
-  { id: 233, checkIn: '15:00', checkOut: '19:00', hours: 4, break: 0 },
-  { id: 234, checkIn: '15:00', checkOut: '20:00', hours: 5, break: 0 },
-  { id: 236, checkIn: '21:00', checkOut: '03:00', hours: 6, break: 0 },
-  { id: 237, checkIn: '22:00', checkOut: '02:00', hours: 4, break: 0 },
-  { id: 238, checkIn: '22:00', checkOut: '03:00', hours: 5, break: 0 },
-  { id: 239, checkIn: '00:00', checkOut: '06:00', hours: 6, break: 0 },
-  { id: 254, checkIn: '22:00', checkOut: '04:00', hours: 6, break: 0 },
-  { id: 256, checkIn: '06:00', checkOut: '15:00', hours: 8, break: 1 },
-  { id: 257, checkIn: '07:00', checkOut: '15:00', hours: 7, break: 1 },
-  { id: 258, checkIn: '07:00', checkOut: '16:00', hours: 8, break: 1 },
-  { id: 259, checkIn: '07:00', checkOut: '17:00', hours: 9, break: 1 },
-  { id: 260, checkIn: '08:00', checkOut: '16:00', hours: 7, break: 1 },
-  { id: 261, checkIn: '08:00', checkOut: '17:00', hours: 8, break: 1 },
-  { id: 262, checkIn: '08:00', checkOut: '18:00', hours: 9, break: 1 },
-  { id: 263, checkIn: '09:00', checkOut: '17:00', hours: 7, break: 1 },
-  { id: 264, checkIn: '09:00', checkOut: '18:00', hours: 8, break: 1 },
-  { id: 265, checkIn: '09:00', checkOut: '19:00', hours: 9, break: 1 },
-  { id: 266, checkIn: '10:00', checkOut: '18:00', hours: 7, break: 1 },
-  { id: 267, checkIn: '10:00', checkOut: '19:00', hours: 8, break: 1 },
-  { id: 268, checkIn: '10:00', checkOut: '20:00', hours: 9, break: 1 },
-  { id: 269, checkIn: '11:00', checkOut: '19:00', hours: 7, break: 1 },
-  { id: 270, checkIn: '11:00', checkOut: '20:00', hours: 8, break: 1 },
-  { id: 271, checkIn: '11:00', checkOut: '21:00', hours: 9, break: 1 },
-  { id: 272, checkIn: '12:00', checkOut: '20:00', hours: 7, break: 1 },
-  { id: 273, checkIn: '12:00', checkOut: '21:00', hours: 8, break: 1 },
-  { id: 274, checkIn: '12:00', checkOut: '22:00', hours: 9, break: 1 },
-  { id: 275, checkIn: '13:00', checkOut: '21:00', hours: 7, break: 1 },
-  { id: 276, checkIn: '13:00', checkOut: '22:00', hours: 8, break: 1 },
-  { id: 277, checkIn: '13:00', checkOut: '23:00', hours: 9, break: 1 },
-  { id: 278, checkIn: '14:00', checkOut: '22:00', hours: 7, break: 1 },
-  { id: 279, checkIn: '14:00', checkOut: '23:00', hours: 8, break: 1 },
-  { id: 280, checkIn: '14:00', checkOut: '00:00', hours: 9, break: 1 },
-  { id: 281, checkIn: '15:00', checkOut: '23:00', hours: 7, break: 1 },
-  { id: 282, checkIn: '15:00', checkOut: '00:00', hours: 8, break: 1 },
-  { id: 283, checkIn: '15:00', checkOut: '01:00', hours: 9, break: 1 },
-  { id: 284, checkIn: '16:00', checkOut: '00:00', hours: 7, break: 1 },
-  { id: 285, checkIn: '16:00', checkOut: '01:00', hours: 8, break: 1 },
-  { id: 286, checkIn: '16:00', checkOut: '02:00', hours: 9, break: 1 },
-  { id: 287, checkIn: '17:00', checkOut: '01:00', hours: 7, break: 1 },
-  { id: 288, checkIn: '17:00', checkOut: '02:00', hours: 8, break: 1 },
-  { id: 289, checkIn: '17:00', checkOut: '03:00', hours: 9, break: 1 },
-  { id: 290, checkIn: '18:00', checkOut: '02:00', hours: 7, break: 1 },
-  { id: 291, checkIn: '18:00', checkOut: '03:00', hours: 8, break: 1 },
-  { id: 292, checkIn: '18:00', checkOut: '04:00', hours: 9, break: 1 },
-  { id: 293, checkIn: '19:00', checkOut: '03:00', hours: 7, break: 1 },
-  { id: 294, checkIn: '19:00', checkOut: '04:00', hours: 8, break: 1 },
-  { id: 295, checkIn: '19:00', checkOut: '05:00', hours: 9, break: 1 },
-  { id: 296, checkIn: '20:00', checkOut: '04:00', hours: 7, break: 1 },
-  { id: 297, checkIn: '20:00', checkOut: '05:00', hours: 8, break: 1 },
-  { id: 298, checkIn: '20:00', checkOut: '06:00', hours: 9, break: 1 },
-  { id: 299, checkIn: '21:00', checkOut: '05:00', hours: 7, break: 1 },
-  { id: 300, checkIn: '21:00', checkOut: '06:00', hours: 8, break: 1 },
-  { id: 301, checkIn: '22:00', checkOut: '06:00', hours: 7, break: 1 }
-];
-
-const SHIFT_CATALOG: Record<string, number> = {};
-SHIFT_CATALOG_LIST.forEach(item => {
-  SHIFT_CATALOG[`${item.checkIn}-${item.checkOut}`] = item.id;
-  if (item.checkOut === '00:00') {
-    SHIFT_CATALOG[`${item.checkIn}-24:00`] = item.id;
-  }
-});
+import { CatalogShift, SHIFT_CATALOG_LIST, SHIFT_CATALOG } from './constants/shiftCatalog';
 
 /**
  * Calcula la fecha de Pascua (algoritmo de Gauss)
@@ -319,6 +208,13 @@ const Schedules: React.FC = () => {
   const [reqShiftId, setReqShiftId] = useState<number | ''>('');
   const [reqComments, setReqComments] = useState('');
   const [isSavingRequest, setIsSavingRequest] = useState(false);
+
+  // ── Schedule Detail Floating Modal (Specialist / Read-Only View) ───────────
+  const [detailModal, setDetailModal] = useState<{
+    specialist: User;
+    day: { name: string; dateStr: string };
+    schedule: DailySchedule;
+  } | null>(null);
 
   // Compute the 7 dates of the week
   const weekDays = useMemo(() => {
@@ -689,7 +585,7 @@ const Schedules: React.FC = () => {
       setModalNoRestaurant(false);
       setModalEnableMessage(false);
       setModalCustomMessage('');
-      setSelectedShiftId(13); // Turno 13: 08:00 - 17:00
+      setSelectedShiftId(9); // Turno 9: 08:00 - 17:00 (8h trabajo + 1h descanso)
       
       // Default to the specialist's first assigned restaurant if any
       const defaultRestId = specialist.assignedRestaurants?.[0] || '';
@@ -1290,11 +1186,21 @@ const Schedules: React.FC = () => {
                       const isToday = day.dateStr === todayStr;
                       const holidayName = getColombianHoliday(day.dateObj);
                       const cellRequest = getCellRequest(spec.id, day.dateStr);
-                      // Determine click behavior by role
                       const handleCellInteraction = () => {
                         if (isReadOnly) {
-                          // Specialist: open request modal only for future weeks
-                          handleRequestCellClick(spec, day);
+                          if (s) {
+                            // Horario ya asignado: abrir ventana flotante para visualizar mejor la información
+                            setDetailModal({
+                              specialist: spec,
+                              day,
+                              schedule: s
+                            });
+                          } else if (isFutureWeek) {
+                            // Sin horario en semana futura: abrir solicitud de preferencia
+                            handleRequestCellClick(spec, day);
+                          } else {
+                            showToast(`No hay horario asignado para el ${day.name.toLowerCase()} ${day.dateStr}.`);
+                          }
                         } else {
                           handleCellClick(spec, day);
                         }
@@ -1999,6 +1905,195 @@ const Schedules: React.FC = () => {
 
           </div>
         </div>
+      )}
+      {/* ── Schedule Detail Floating Modal (Specialist View) ───────── */}
+      {detailModal && createPortal(
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={() => setDetailModal(null)}>
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+          <div
+            className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#0f1c2d] to-slate-800 p-6 text-white relative overflow-hidden">
+              <div className="flex items-start justify-between relative z-10">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white shadow-inner border border-white/20 shrink-0">
+                    <Clock className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black tracking-tight text-white flex items-center gap-2">
+                      Horario Asignado
+                    </h3>
+                    <p className="text-xs text-white/80 font-bold mt-0.5">
+                      {detailModal.day.name}, {detailModal.day.dateStr.split('-').reverse().join('/')}
+                    </p>
+                    <p className="text-[10px] text-white/60 font-semibold mt-0.5">
+                      {formatName(detailModal.specialist.username)} (CC: {detailModal.specialist.cedula || detailModal.specialist.id})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDetailModal(null)}
+                  className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[calc(85vh-160px)] overflow-y-auto">
+              {/* Shift Type Banner */}
+              <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                detailModal.schedule.shift_type === 'Laboral' ? 'bg-blue-50/80 border-blue-200/80 text-blue-900' :
+                detailModal.schedule.shift_type === 'Capacitación' ? 'bg-purple-50/80 border-purple-200/80 text-purple-900' :
+                detailModal.schedule.shift_type === 'Descanso' ? 'bg-slate-50 border-slate-200 text-slate-800' :
+                'bg-rose-50 border-rose-200 text-rose-900'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
+                    detailModal.schedule.shift_type === 'Laboral' ? 'bg-blue-600 text-white shadow-sm' :
+                    detailModal.schedule.shift_type === 'Capacitación' ? 'bg-purple-600 text-white shadow-sm' :
+                    detailModal.schedule.shift_type === 'Descanso' ? 'bg-slate-500 text-white' :
+                    'bg-rose-600 text-white'
+                  }`}>
+                    {detailModal.schedule.shift_type === 'Laboral' ? 'LAB' :
+                     detailModal.schedule.shift_type === 'Capacitación' ? 'CAP' :
+                     detailModal.schedule.shift_type === 'Descanso' ? 'LIB' : 'INC'}
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest block opacity-75">Tipo de Turno</span>
+                    <span className="text-sm font-black uppercase tracking-tight">
+                      {detailModal.schedule.shift_type === 'Laboral' ? 'Turno Laboral' : detailModal.schedule.shift_type}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-lg font-black block leading-none">
+                    {calculateHours(detailModal.schedule)}h
+                  </span>
+                  <span className="text-[8.5px] font-bold opacity-70 block mt-0.5">
+                    {detailModal.schedule.shift_type === 'Laboral' ? 'Netas calculadas' : 'Computables'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Hours Grid if Laboral */}
+              {detailModal.schedule.shift_type === 'Laboral' && detailModal.schedule.check_in && detailModal.schedule.check_out && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/70 text-center">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Hora Entrada</span>
+                    <span className="text-xl font-black text-slate-900 block mt-0.5">{detailModal.schedule.check_in}</span>
+                  </div>
+                  <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/70 text-center">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Hora Salida</span>
+                    <span className="text-xl font-black text-slate-900 block mt-0.5">{detailModal.schedule.check_out}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Restaurant / CECO */}
+              {(detailModal.schedule.shift_type === 'Laboral' || detailModal.schedule.shift_type === 'Capacitación') && (
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/70">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="w-4 h-4 text-red-600" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ubicación / Restaurante</span>
+                  </div>
+                  {detailModal.schedule.no_restaurant || !detailModal.schedule.restaurant_id ? (
+                    <div className="flex items-center gap-2 text-slate-600 text-xs font-bold">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                      <span>Sin restaurante específico asignado (Actividad de campo / oficina)</span>
+                    </div>
+                  ) : (() => {
+                    const rest = restaurants.find(r => r.id === detailModal.schedule.restaurant_id);
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-xs font-black text-slate-900 uppercase">
+                          {rest?.name ?? detailModal.schedule.restaurant_id}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold flex-wrap">
+                          <span className="font-mono bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700 font-black">
+                            CECO: {detailModal.schedule.restaurant_id}
+                          </span>
+                          {rest && (
+                            <>
+                              <span>• Zona: {rest.zone}</span>
+                              <span>• Región: {rest.region}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Activity */}
+              {(detailModal.schedule.shift_type === 'Laboral' || detailModal.schedule.shift_type === 'Capacitación') && detailModal.schedule.activity && (
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/70">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Briefcase className="w-4 h-4 text-amber-600" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Actividad Programada</span>
+                  </div>
+                  <p className="text-xs font-black text-slate-900">
+                    🎯 {detailModal.schedule.activity}
+                  </p>
+                </div>
+              )}
+
+              {/* Custom Message / Instructions */}
+              {detailModal.schedule.custom_message && (
+                <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80">
+                  <div className="flex items-center gap-2 mb-1.5 text-amber-700">
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Instrucción / Observación</span>
+                  </div>
+                  <p className="text-xs font-bold text-amber-950 italic">
+                    "{detailModal.schedule.custom_message}"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between gap-3">
+              {isFutureWeek && auth.user?.id === detailModal.specialist.id ? (
+                <>
+                  <button
+                    onClick={() => {
+                      const spec = detailModal.specialist;
+                      const day = detailModal.day;
+                      setDetailModal(null);
+                      handleRequestCellClick(spec, day);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Solicitar Cambio / Novedad</span>
+                  </button>
+                  <button
+                    onClick={() => setDetailModal(null)}
+                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                  >
+                    Entendido
+                  </button>
+                </>
+              ) : (
+                <div className="w-full flex justify-end">
+                  <button
+                    onClick={() => setDetailModal(null)}
+                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Survey, ResponseRecord, Answer, Question, QuestionOption } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Trophy, Sparkles,
   Star, Check, Clock, Store, ArrowUp, ArrowDown, Upload, Calendar,
   FileSpreadsheet, ShieldCheck, Award, XCircle, HeartHandshake, CheckCircle,
-  AlertTriangle
+  AlertTriangle, CheckSquare, RefreshCw
 } from 'lucide-react';
 
 interface SurveyPlayerProps {
@@ -28,8 +28,8 @@ const StoreHierarchySelector: React.FC<{
     if (value) {
       const found = restaurants.find(r => r.id === value || value.includes(r.id));
       if (found) {
-        setSelectedRegion(found.region);
-        setSelectedZone(found.zone);
+        setSelectedRegion(found.region || '');
+        setSelectedZone(found.zone || '');
       }
     }
   }, [value, restaurants]);
@@ -236,6 +236,12 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const [isStarted, setIsStarted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const answersRef = useRef<Record<string, any>>({});
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
   const [completed, setCompleted] = useState(false);
   const [finalScore, setFinalScore] = useState<{ scorePercent: number; passed: boolean } | null>(null);
   const [hoverRating, setHoverRating] = useState<number>(0);
@@ -274,7 +280,34 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
     });
 
     if (survey.shuffle_questions && list.length > 1) {
-      list = shuffleArray(list);
+      const isQuizType = survey.type === 'quiz';
+      
+      // Separar preguntas que generan calificación de las informativas
+      const gradableIndices: number[] = [];
+      const gradableQuestions: Question[] = [];
+
+      list.forEach((q, idx) => {
+        // En Quiz, solo generan calificación: single_choice, multiple_choice, ordering, yes_no
+        // En Encuestas generales: no son informativas (store_hierarchy, short_text, long_text, date)
+        const isGradable = isQuizType
+          ? ['single_choice', 'multiple_choice', 'ordering', 'yes_no'].includes(q.type)
+          : !['store_hierarchy', 'short_text', 'long_text', 'date'].includes(q.type);
+
+        if (isGradable) {
+          gradableIndices.push(idx);
+          gradableQuestions.push(q);
+        }
+      });
+
+      // Mezclar únicamente las preguntas calificables manteniendo fijas las informativas
+      if (gradableQuestions.length > 1) {
+        const shuffledGradable = shuffleArray(gradableQuestions);
+        const result = [...list];
+        gradableIndices.forEach((origIdx, i) => {
+          result[origIdx] = shuffledGradable[i];
+        });
+        list = result;
+      }
     }
     return list;
   });
@@ -380,17 +413,21 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
   const handleComplete = () => {
     let earnedPoints = 0;
     let totalPoints = 0;
+    const currentAnswers = answersRef.current || answers;
 
     const answerItems: Answer[] = questions.map(q => {
-      const userVal = answers[q.id];
+      const userVal = currentAnswers[q.id];
       const gradable = isQuiz && ['single_choice', 'multiple_choice', 'ordering', 'yes_no'].includes(q.type);
       let isCorrect: boolean | undefined = undefined;
       let qPoints = q.points || 10;
 
       if (gradable) {
         totalPoints += qPoints;
+        const isUnanswered = userVal === undefined || userVal === null || userVal === '' || (Array.isArray(userVal) && userVal.length === 0);
 
-        if (['single_choice', 'yes_no'].includes(q.type)) {
+        if (isUnanswered) {
+          isCorrect = false;
+        } else if (['single_choice', 'yes_no'].includes(q.type)) {
           const correctOpt = (q.options || []).find(o => o.is_correct);
           if (correctOpt) {
             isCorrect = String(userVal) === String(correctOpt.value || correctOpt.id || correctOpt.text);
@@ -895,7 +932,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-200 key={currentQuestion.id}">
           {/* Question Tag / Index */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border ${
                 isCrimson
                   ? 'bg-red-950/80 text-red-200 border-red-800/80'
@@ -905,6 +942,18 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
               }`}>
                 Pregunta {currentIndex + 1}
               </span>
+              {currentQuestion.type === 'multiple_choice' && (
+                <span className={`inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                  isCrimson
+                    ? 'bg-red-950/90 text-red-300 border-red-800'
+                    : isDark
+                    ? 'bg-slate-900 text-slate-300 border-slate-700'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
+                  <CheckSquare className="w-3 h-3 text-[#E4002B]" />
+                  Respuesta Múltiple
+                </span>
+              )}
               <span className={`text-[9px] font-bold uppercase ${isCrimson ? 'text-red-400/80' : 'text-slate-400'}`}>
                 * Obligatoria
               </span>
@@ -991,9 +1040,16 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
             {/* Opción Múltiple (Multiple Choice) */}
             {currentQuestion.type === 'multiple_choice' && (
               <div className="space-y-2.5">
-                <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCrimson ? 'text-red-300/80' : 'text-slate-400'}`}>
-                  Selecciona una o varias opciones:
-                </span>
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold mb-2 ${
+                  isCrimson
+                    ? 'bg-red-950/40 text-red-200 border-red-900/40'
+                    : isDark
+                    ? 'bg-slate-900/60 text-slate-300 border-slate-800'
+                    : 'bg-slate-50 text-slate-600 border-slate-200/80'
+                }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E4002B]" />
+                  <span>Pregunta de respuesta múltiple (puedes seleccionar una o varias opciones)</span>
+                </div>
                 {(currentQuestion.options || []).map((opt, idx) => {
                   const currentVals = Array.isArray(answers[currentQuestion.id]) ? answers[currentQuestion.id] : [];
                   const selected = currentVals.includes(opt.value);
