@@ -1458,6 +1458,16 @@ const Banca: React.FC = () => {
     initialIdeal: StoreIdeal;
   } | null>(null);
 
+  // Toast Notification en esquina inferior derecha
+  const [toast, setToast] = useState<{ message: string; submessage?: string; type?: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
   useEffect(() => {
     setBancaData(dataService.getBancaData());
     if (syncStatus !== 'syncing' || (employees.length > 0 && restaurants.length > 0)) {
@@ -1653,6 +1663,9 @@ const Banca: React.FC = () => {
     };
 
     await handleSaveBanca(newBanca);
+    setToast({
+      message: 'Colaborador Asignado'
+    });
   };
 
   const generateExcelReport = () => {
@@ -2073,8 +2086,8 @@ const Banca: React.FC = () => {
                                       })}
                                       className="px-1.5 py-0.5 bg-white rounded-lg border border-slate-200 hover:border-red-400 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-1 group/item"
                                     >
-                                      <div className="flex items-center gap-1 min-w-0">
-                                        <div className="w-4 h-4 rounded bg-slate-100 group-hover/item:bg-red-100 group-hover/item:text-red-600 text-slate-600 flex items-center justify-center text-[8px] font-black shrink-0 transition-colors">
+                                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                                        <div className="w-3.5 h-3.5 rounded bg-slate-100 group-hover/item:bg-red-100 group-hover/item:text-red-600 text-slate-600 flex items-center justify-center text-[7.5px] font-black shrink-0 transition-colors">
                                           {emp?.name?.charAt(0) ?? '?'}
                                         </div>
                                         <span className="font-bold text-slate-800 text-[10px] truncate group-hover/item:text-red-700 transition-colors">
@@ -2082,11 +2095,11 @@ const Banca: React.FC = () => {
                                         </span>
                                       </div>
 
-                                      {/* Certificaciones Badges */}
+                                      {/* Certificaciones Badges Compactas */}
                                       {m.certifications.length > 0 && (
                                         <div className="flex items-center gap-0.5 shrink-0">
                                           {normalizeCerts(m.certifications).map(c => (
-                                            <span key={c} title={CERT_NAMES[c]} className={`text-[7px] font-black px-1 py-0.2 rounded ${CERT_COLORS[c]}`}>
+                                            <span key={c} title={CERT_NAMES[c]} className={`text-[6px] font-black px-0.5 py-0 leading-tight rounded-[3px] tracking-tighter ${CERT_COLORS[c]}`}>
                                               {c}
                                             </span>
                                           ))}
@@ -2182,6 +2195,25 @@ const Banca: React.FC = () => {
           onClose={() => setAssignModal(null)}
           onAssign={(emp, role) => handleAssignPerson(assignModal.restaurantId, emp, role)}
         />
+      )}
+
+      {/* Toast Notification en la esquina inferior derecha */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[100010] flex items-center gap-2.5 px-4 py-3 bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-slate-700/60 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/20 text-emerald-400">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-black uppercase tracking-tight text-white">
+            {toast.message}
+          </span>
+          <button
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white p-0.5 ml-1 transition-colors shrink-0"
+            title="Cerrar notificación"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );
