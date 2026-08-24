@@ -384,9 +384,20 @@ DELETE FROM public.users WHERE username = 'admin' OR id = 'admin-master';
 DELETE FROM auth.users WHERE email = 'admin@kfc.co';
 
 
--- =========================================================================
--- SEGURIDAD ADICIONAL: RLS PARA TODAS LAS TABLAS CORE DEL SISTEMA
--- =========================================================================
+-- Asegurar existencia de tablas core de configuración
+CREATE TABLE IF NOT EXISTS public.banca (
+  id INT PRIMARY KEY DEFAULT 1,
+  data JSONB NOT NULL DEFAULT '{"assignments":[]}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS public.hierarchy (
+  id INT PRIMARY KEY DEFAULT 1,
+  data JSONB NOT NULL DEFAULT '{"lockedMonths":[],"regions":[]}'::jsonb
+);
+
+INSERT INTO public.banca (id, data)
+VALUES (1, '{"assignments":[]}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
@@ -520,7 +531,7 @@ WITH CHECK (
   )
 );
 
--- Tabla 'banca' (ADMIN, COORDINATOR y LIDER)
+-- Tabla 'banca' (ADMIN, COORDINATOR, LIDER y GUEST con permisos de edición)
 DROP POLICY IF EXISTS "Admin o Coordinator modifican banca" ON public.banca;
 DROP POLICY IF EXISTS "Roles autorizados modifican banca" ON public.banca;
 CREATE POLICY "Roles autorizados modifican banca" ON public.banca
@@ -529,14 +540,20 @@ USING (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+      AND (
+        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
+      )
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+      AND (
+        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
+      )
   )
 );
 

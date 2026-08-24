@@ -268,15 +268,33 @@ export const dataService = {
       await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
 
       const defaultBanca: BancaData = { assignments: [] };
-      const rawBanca: BancaData = (banca && (banca as any)[0]?.data) ? (banca as any)[0].data : defaultBanca;
-      const cloudBanca: BancaData = dataService.normalizeBancaData(rawBanca);
-      await localforage.setItem('la_akademia_banca', cloudBanca);
+      let rawBanca: BancaData = defaultBanca;
+      if (Array.isArray(banca) && banca.length > 0) {
+        rawBanca = banca[0]?.data || (banca[0]?.assignments ? (banca[0] as any) : defaultBanca);
+      } else if (banca && typeof banca === 'object') {
+        rawBanca = (banca as any)?.data || ((banca as any)?.assignments ? (banca as any) : defaultBanca);
+      }
+
+      // Si la nube viene vacía pero ya teníamos asignaciones locales guardadas, preservar las locales y resincronizar a la nube
+      const currentLocalBanca = dataService._cache.banca || (await localforage.getItem<BancaData>('la_akademia_banca'));
+      const hasLocalAssignments = (currentLocalBanca?.assignments?.length ?? 0) > 0;
+      const hasCloudAssignments = (rawBanca?.assignments?.length ?? 0) > 0;
+
+      let finalBanca: BancaData;
+      if (!hasCloudAssignments && hasLocalAssignments) {
+        finalBanca = dataService.normalizeBancaData(currentLocalBanca!);
+        // Auto-sincronizar hacia la nube para que no se pierdan
+        dataService.saveBancaData(finalBanca).catch(err => console.warn('[loadAllFromCloud] Auto-sync banca error:', err));
+      } else {
+        finalBanca = dataService.normalizeBancaData(rawBanca);
+        await localforage.setItem('la_akademia_banca', finalBanca);
+      }
 
       dataService._cache.employees = (employees as Employee[]) || [];
       dataService._cache.restaurants = (restaurants as Restaurant[]) || [];
       dataService._cache.users = (users as User[]) || [];
       dataService._cache.hierarchy = cloudHierarchy;
-      dataService._cache.banca = cloudBanca;
+      dataService._cache.banca = finalBanca;
       dataService._cache.gradeIndex = null;
       dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
 
@@ -655,9 +673,31 @@ export const dataService = {
 
   saveBancaData: async (banca: BancaData) => {
     const normalized = dataService.normalizeBancaData(banca);
+    // 1. Guardar de inmediato en localforage y cache de memoria (offline-first)
     await localforage.setItem('la_akademia_banca', normalized);
     dataService._cache.banca = normalized;
-    await dataService.supabaseFetch('banca', 'POST', { id: 1, data: normalized }, '?on_conflict=id');
+
+    // 2. Persistir en la nube de Supabase (Intento 1: REST API)
+    try {
+      await dataService.supabaseFetch('banca', 'POST', { id: 1, data: normalized }, '?on_conflict=id');
+      console.log('[saveBancaData] Asignaciones guardadas exitosamente en Supabase (REST).');
+      return;
+    } catch (restErr) {
+      console.warn('[saveBancaData] Falló supabaseFetch en tabla banca, reintentando con cliente Supabase JS:', restErr);
+    }
+
+    // 3. Fallback con cliente Supabase JS oficial
+    try {
+      const { error } = await supabase.from('banca').upsert({ id: 1, data: normalized }, { onConflict: 'id' });
+      if (error) {
+        console.error('[saveBancaData] Error en supabase.from("banca").upsert:', error);
+        throw error;
+      }
+      console.log('[saveBancaData] Asignaciones guardadas exitosamente con Supabase Client.');
+    } catch (clientErr) {
+      console.error('[saveBancaData] No se pudo sincronizar banca con Supabase:', clientErr);
+      throw clientErr;
+    }
   },
 
   saveEmployees: async (employees: Employee[]) => {

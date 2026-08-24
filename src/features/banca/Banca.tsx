@@ -1545,8 +1545,13 @@ const Banca: React.FC = () => {
   }, [currentRegion, restaurants, selectedZone, selectedStore, search, bancaData, employees, activeEmployeeIds]);
 
   const handleSaveBanca = async (newBanca: BancaData) => {
-    await dataService.saveBancaData(newBanca);
+    // Actualización optimista inmediata del estado local para fluidez de UI
     setBancaData(newBanca);
+    try {
+      await dataService.saveBancaData(newBanca);
+    } catch (err) {
+      console.error('[handleSaveBanca] Error al persistir banca en la nube:', err);
+    }
   };
 
   const handleSaveStoreIdeal = async (restaurantId: string, ideal: StoreIdeal) => {
@@ -1560,10 +1565,10 @@ const Banca: React.FC = () => {
     await handleSaveBanca(newBanca);
   };
 
-  const handleUpdateMemberRole = (restaurantId: string, employeeId: string, newRole: BancaRole) => {
+  const handleUpdateMemberRole = async (restaurantId: string, employeeId: string, newRole: BancaRole) => {
     const newBanca: BancaData = {
       ...bancaData,
-      assignments: bancaData.assignments.map(a => {
+      assignments: (bancaData.assignments || []).map(a => {
         if (a.restaurantId !== restaurantId) return a;
         return {
           ...a,
@@ -1571,19 +1576,20 @@ const Banca: React.FC = () => {
         };
       })
     };
-    handleSaveBanca(newBanca);
     if (personModal) {
       setPersonModal({
         ...personModal,
         leader: { ...personModal.leader, role: newRole }
       });
     }
+    await handleSaveBanca(newBanca);
   };
 
-  const handleToggleMemberCert = (restaurantId: string, employeeId: string, cert: Certification) => {
+  const handleToggleMemberCert = async (restaurantId: string, employeeId: string, cert: Certification) => {
+    let updatedCerts: Certification[] = [];
     const newBanca: BancaData = {
       ...bancaData,
-      assignments: bancaData.assignments.map(a => {
+      assignments: (bancaData.assignments || []).map(a => {
         if (a.restaurantId !== restaurantId) return a;
         return {
           ...a,
@@ -1593,28 +1599,25 @@ const Banca: React.FC = () => {
             const certs = currentCerts.includes(cert)
               ? currentCerts.filter(c => c !== cert)
               : [...currentCerts, cert];
+            updatedCerts = certs;
             return { ...m, certifications: certs };
           })
         };
       })
     };
-    handleSaveBanca(newBanca);
     if (personModal) {
-      const currentCerts = normalizeCerts(personModal.leader.certifications);
-      const updatedCerts = currentCerts.includes(cert)
-        ? currentCerts.filter(c => c !== cert)
-        : [...currentCerts, cert];
       setPersonModal({
         ...personModal,
         leader: { ...personModal.leader, certifications: updatedCerts }
       });
     }
+    await handleSaveBanca(newBanca);
   };
 
-  const handleRemoveMember = (restaurantId: string, employeeId: string) => {
+  const handleRemoveMember = async (restaurantId: string, employeeId: string) => {
     const newBanca: BancaData = {
       ...bancaData,
-      assignments: bancaData.assignments.map(a => {
+      assignments: (bancaData.assignments || []).map(a => {
         if (a.restaurantId !== restaurantId) return a;
         return {
           ...a,
@@ -1622,11 +1625,11 @@ const Banca: React.FC = () => {
         };
       })
     };
-    handleSaveBanca(newBanca);
+    await handleSaveBanca(newBanca);
   };
 
-  const handleAssignPerson = (restaurantId: string, emp: Employee, role: BancaRole) => {
-    const existingAssignment = bancaData.assignments.find(a => a.restaurantId === restaurantId);
+  const handleAssignPerson = async (restaurantId: string, emp: Employee, role: BancaRole) => {
+    const existingAssignment = (bancaData.assignments || []).find(a => a.restaurantId === restaurantId);
     const currentMembers = existingAssignment?.members ?? [];
     if (currentMembers.some(m => m.employeeId === emp.id)) return;
 
@@ -1644,12 +1647,12 @@ const Banca: React.FC = () => {
     const newBanca: BancaData = {
       ...bancaData,
       assignments: [
-        ...bancaData.assignments.filter(a => a.restaurantId !== restaurantId),
+        ...(bancaData.assignments || []).filter(a => a.restaurantId !== restaurantId),
         updatedAssignment
       ]
     };
 
-    handleSaveBanca(newBanca);
+    await handleSaveBanca(newBanca);
   };
 
   const generateExcelReport = () => {
