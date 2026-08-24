@@ -221,7 +221,8 @@ export const dataService = {
       dataService._cache.summary = (await localforage.getItem<any[]>('la_akademia_summary')) || [];
       dataService._cache.hierarchy = (await localforage.getItem<HierarchyData>('la_akademia_hierarchy')) || { lockedMonths: [], regions: [] };
       dataService._cache.users = (await localforage.getItem<User[]>('la_akademia_users')) || [];
-      dataService._cache.banca = (await localforage.getItem<BancaData>('la_akademia_banca')) || { assignments: [] };
+      const localBanca = await localforage.getItem<BancaData>('la_akademia_banca');
+      dataService._cache.banca = dataService.normalizeBancaData(localBanca || { assignments: [] });
       dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
       dataService._cache.responses = (await localforage.getItem<ResponseRecord[]>('la_akademia_responses')) || [];
       dataService._cache.surveyCategories = (await localforage.getItem<string[]>('la_akademia_survey_categories')) || [
@@ -267,7 +268,8 @@ export const dataService = {
       await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
 
       const defaultBanca: BancaData = { assignments: [] };
-      const cloudBanca: BancaData = (banca && (banca as any)[0]?.data) ? (banca as any)[0].data : defaultBanca;
+      const rawBanca: BancaData = (banca && (banca as any)[0]?.data) ? (banca as any)[0].data : defaultBanca;
+      const cloudBanca: BancaData = dataService.normalizeBancaData(rawBanca);
       await localforage.setItem('la_akademia_banca', cloudBanca);
 
       dataService._cache.employees = (employees as Employee[]) || [];
@@ -615,8 +617,29 @@ export const dataService = {
     }
   },
 
+  normalizeBancaData: (data: BancaData | null | undefined): BancaData => {
+    if (!data || !data.assignments) return { assignments: [] };
+    const validCerts: Certification[] = ['GER', 'GAR', 'GBR', 'EAE'];
+    return {
+      ...data,
+      assignments: (data.assignments || []).map(a => ({
+        ...a,
+        members: (a.members || []).map(m => ({
+          ...m,
+          certifications: Array.from(
+            new Set(
+              (m.certifications || [])
+                .map((c: any) => (c === 'EEA' ? 'EAE' : c))
+                .filter((c: any): c is Certification => validCerts.includes(c))
+            )
+          )
+        }))
+      }))
+    };
+  },
+
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
-  getBancaData: (): BancaData => dataService._cache.banca || { assignments: [] },
+  getBancaData: (): BancaData => dataService.normalizeBancaData(dataService._cache.banca || { assignments: [] }),
   getUsers: (): User[] => {
     const rawUsers = dataService._cache.users || [];
     return rawUsers.map((u: any) => ({
@@ -631,9 +654,10 @@ export const dataService = {
   },
 
   saveBancaData: async (banca: BancaData) => {
-    await localforage.setItem('la_akademia_banca', banca);
-    dataService._cache.banca = banca;
-    await dataService.supabaseFetch('banca', 'POST', { id: 1, data: banca }, '?on_conflict=id');
+    const normalized = dataService.normalizeBancaData(banca);
+    await localforage.setItem('la_akademia_banca', normalized);
+    dataService._cache.banca = normalized;
+    await dataService.supabaseFetch('banca', 'POST', { id: 1, data: normalized }, '?on_conflict=id');
   },
 
   saveEmployees: async (employees: Employee[]) => {

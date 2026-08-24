@@ -14,20 +14,30 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-const ALL_CERTS: Certification[] = ['GBR', 'GAR', 'GER', 'EAE'];
+const ALL_CERTS: Certification[] = ['GER', 'GAR', 'GBR', 'EAE'];
 
 const CERT_NAMES: Record<Certification, string> = {
-  GBR: 'Gerencia Básica de Restaurante',
-  GAR: 'Gerencia Avanzada de Restaurante',
   GER: 'Gerencia Experta de Restaurante',
+  GAR: 'Gerencia Avanzada de Restaurante',
+  GBR: 'Gerencia Básica de Restaurante',
   EAE: 'Entrenando al Entrenador',
 };
 
 const CERT_COLORS: Record<Certification, string> = {
-  GBR: 'bg-blue-500 text-white border-blue-600',
-  GAR: 'bg-red-500 text-white border-red-600',
   GER: 'bg-slate-900 text-white border-slate-950',
+  GAR: 'bg-red-500 text-white border-red-600',
+  GBR: 'bg-blue-500 text-white border-blue-600',
   EAE: 'bg-emerald-600 text-white border-emerald-700',
+};
+
+const normalizeCerts = (certs: (Certification | string)[] = []): Certification[] => {
+  return Array.from(
+    new Set(
+      (certs || [])
+        .map(c => (c === 'EEA' ? 'EAE' : c))
+        .filter((c): c is Certification => ALL_CERTS.includes(c as Certification))
+    )
+  );
 };
 
 const ROLE_COLORS: Record<BancaRole, string> = {
@@ -304,13 +314,13 @@ const PersonDetailModal: React.FC<{
                 <Award className="w-3.5 h-3.5 text-amber-500" /> Certificaciones Obtenidas
               </label>
               <span className="text-[10px] font-bold text-slate-400">
-                {leader.certifications.length} de {ALL_CERTS.length}
+                {normalizeCerts(leader.certifications).length} de {ALL_CERTS.length}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               {ALL_CERTS.map(cert => {
-                const active = leader.certifications.includes(cert);
+                const active = normalizeCerts(leader.certifications).includes(cert);
                 return (
                   <button
                     key={cert}
@@ -643,10 +653,11 @@ const BancaDashboardModal: React.FC<{
             const pct = sIdealSum > 0 ? Math.min(100, Math.round((sRealSum / sIdealSum) * 100)) : 0;
 
             members.forEach(m => {
-              if (m.certifications.includes('GBR')) certGBR++;
-              if (m.certifications.includes('GAR')) certGAR++;
-              if (m.certifications.includes('GER')) certGER++;
-              if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
+              const norm = normalizeCerts(m.certifications);
+              if (norm.includes('GER')) certGER++;
+              if (norm.includes('GAR')) certGAR++;
+              if (norm.includes('GBR')) certGBR++;
+              if (norm.includes('EAE')) certEAE++;
             });
 
             rankingStats.push({
@@ -705,10 +716,11 @@ const BancaDashboardModal: React.FC<{
           zRealSum += (gCount + lCount + eCount);
 
           members.forEach(m => {
-            if (m.certifications.includes('GBR')) certGBR++;
-            if (m.certifications.includes('GAR')) certGAR++;
-            if (m.certifications.includes('GER')) certGER++;
-            if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
+            const norm = normalizeCerts(m.certifications);
+            if (norm.includes('GER')) certGER++;
+            if (norm.includes('GAR')) certGAR++;
+            if (norm.includes('GBR')) certGBR++;
+            if (norm.includes('EAE')) certEAE++;
           });
         });
 
@@ -767,10 +779,11 @@ const BancaDashboardModal: React.FC<{
           regRealSum += (gCount + lCount + eCount);
 
           members.forEach(m => {
-            if (m.certifications.includes('GBR')) certGBR++;
-            if (m.certifications.includes('GAR')) certGAR++;
-            if (m.certifications.includes('GER')) certGER++;
-            if (m.certifications.includes('EAE') || (m.certifications as any).includes('EEA')) certEAE++;
+            const norm = normalizeCerts(m.certifications);
+            if (norm.includes('GER')) certGER++;
+            if (norm.includes('GAR')) certGAR++;
+            if (norm.includes('GBR')) certGBR++;
+            if (norm.includes('EAE')) certEAE++;
           });
         });
 
@@ -1074,12 +1087,12 @@ const BancaDashboardModal: React.FC<{
                   <div className="grid grid-cols-2 gap-2.5 flex-1">
                     <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-                        <span className="font-black text-slate-800 text-[11px]">GBR</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-900 shrink-0" />
+                        <span className="font-black text-slate-800 text-[11px]">GER</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certGBR}</span>
-                        <span className="text-[8px] text-slate-400 font-bold block">{pctGBR}%</span>
+                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certGER}</span>
+                        <span className="text-[8px] text-slate-400 font-bold block">{pctGER}%</span>
                       </div>
                     </div>
 
@@ -1096,12 +1109,12 @@ const BancaDashboardModal: React.FC<{
 
                     <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-900 shrink-0" />
-                        <span className="font-black text-slate-800 text-[11px]">GER</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                        <span className="font-black text-slate-800 text-[11px]">GBR</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certGER}</span>
-                        <span className="text-[8px] text-slate-400 font-bold block">{pctGER}%</span>
+                        <span className="font-black text-slate-900 text-xs block leading-none">{analytics.certifications.certGBR}</span>
+                        <span className="text-[8px] text-slate-400 font-bold block">{pctGBR}%</span>
                       </div>
                     </div>
 
@@ -1576,9 +1589,10 @@ const Banca: React.FC = () => {
           ...a,
           members: (a.members ?? []).map(m => {
             if (m.employeeId !== employeeId) return m;
-            const certs = m.certifications.includes(cert)
-              ? m.certifications.filter(c => c !== cert)
-              : [...m.certifications, cert];
+            const currentCerts = normalizeCerts(m.certifications);
+            const certs = currentCerts.includes(cert)
+              ? currentCerts.filter(c => c !== cert)
+              : [...currentCerts, cert];
             return { ...m, certifications: certs };
           })
         };
@@ -1586,7 +1600,7 @@ const Banca: React.FC = () => {
     };
     handleSaveBanca(newBanca);
     if (personModal) {
-      const currentCerts = personModal.leader.certifications;
+      const currentCerts = normalizeCerts(personModal.leader.certifications);
       const updatedCerts = currentCerts.includes(cert)
         ? currentCerts.filter(c => c !== cert)
         : [...currentCerts, cert];
@@ -1660,14 +1674,15 @@ const Banca: React.FC = () => {
               'Nombre': 'Sin asignaciones',
               'Cargo (Sistema)': '',
               'Rol en Banca': '',
-              'GBR': '',
-              'GAR': '',
               'GER': '',
+              'GAR': '',
+              'GBR': '',
               'EAE': '',
             });
           } else {
             members.forEach(m => {
               const emp = employees.find(e => e.id === m.employeeId);
+              const norm = normalizeCerts(m.certifications);
               rows.push({
                 'Región': region.name,
                 'Jefe de Área': zone.name,
@@ -1678,10 +1693,10 @@ const Banca: React.FC = () => {
                 'Nombre': emp?.name ?? m.employeeId,
                 'Cargo (Sistema)': emp?.title ?? '',
                 'Rol en Banca': m.role,
-                'GBR': m.certifications.includes('GBR') ? 'SI' : 'NO',
-                'GAR': m.certifications.includes('GAR') ? 'SI' : 'NO',
-                'GER': m.certifications.includes('GER') ? 'SI' : 'NO',
-                'EAE': m.certifications.includes('EAE') || (m.certifications as any).includes('EEA') ? 'SI' : 'NO',
+                'GER': norm.includes('GER') ? 'SI' : 'NO',
+                'GAR': norm.includes('GAR') ? 'SI' : 'NO',
+                'GBR': norm.includes('GBR') ? 'SI' : 'NO',
+                'EAE': norm.includes('EAE') ? 'SI' : 'NO',
               });
             });
           }
@@ -2067,7 +2082,7 @@ const Banca: React.FC = () => {
                                       {/* Certificaciones Badges */}
                                       {m.certifications.length > 0 && (
                                         <div className="flex items-center gap-0.5 shrink-0">
-                                          {m.certifications.map(c => (
+                                          {normalizeCerts(m.certifications).map(c => (
                                             <span key={c} title={CERT_NAMES[c]} className={`text-[7px] font-black px-1 py-0.2 rounded ${CERT_COLORS[c]}`}>
                                               {c}
                                             </span>
