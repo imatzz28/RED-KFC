@@ -1,5 +1,6 @@
-import React from 'react';
-import { Survey, ThemeConfig, ThankYouConfig, DEFAULT_SURVEY_CATEGORIES } from '@/types';
+import React, { useMemo } from 'react';
+import { Survey, ThemeConfig, ThankYouConfig } from '@/types';
+import { dataService } from '@/services/dataService';
 import { Palette, Sparkles, Check, LayoutTemplate, Award } from 'lucide-react';
 
 interface ThemeEditorProps {
@@ -98,6 +99,15 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({
   const timeLimitSecs = survey?.time_limit_seconds || 0;
   const passingScore = survey?.passing_score_percent ?? 70;
 
+  const availableCategories = useMemo(() => {
+    const adminCats = dataService.getSurveyCategories();
+    const list = [...adminCats];
+    if (category && !list.includes(category)) {
+      list.push(category);
+    }
+    return Array.from(new Set(list));
+  }, [category]);
+
   return (
     <div className="space-y-8">
       {/* 1. AJUSTES DE COLOR DE ACENTO, TIPOGRAFÍA Y PANTALLA DE AGRADECIMIENTO */}
@@ -115,11 +125,11 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({
               Categoría / Segmentación de la Encuesta
             </label>
             <select
-              value={category || 'General'}
+              value={category || (availableCategories[0] || 'General')}
               onChange={(e) => onCategoryUpdate && onCategoryUpdate(e.target.value)}
               className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:bg-white focus:border-[#E4002B] outline-none cursor-pointer"
             >
-              {DEFAULT_SURVEY_CATEGORIES.map((cat) => (
+              {availableCategories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>

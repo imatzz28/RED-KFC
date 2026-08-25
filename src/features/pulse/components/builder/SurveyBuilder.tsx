@@ -4,7 +4,8 @@ import {
   Save, ArrowLeft, Plus, Trash2, CheckCircle2, AlertCircle, Settings,
   Sparkles, Layers, Palette, Eye, HelpCircle, Check, Clock, Shuffle,
   Lock, FileText, ArrowRight, ShieldCheck, Zap, GitFork, LayoutGrid,
-  ListOrdered, Award, RefreshCw
+  ListOrdered, Award, RefreshCw, ChevronDown, CircleDot, CheckSquare,
+  ToggleLeft, Type, AlignLeft, MapPin, Calendar, Star
 } from 'lucide-react';
 import { QuestionEditor } from './QuestionEditor';
 import { LogicFlowPanel } from './LogicFlowPanel';
@@ -32,6 +33,8 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isBottomAddMenuOpen, setIsBottomAddMenuOpen] = useState(false);
 
   const isQuiz = survey.type === 'quiz';
 
@@ -146,17 +149,17 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
     setSurvey({ ...survey, questions: newQuestions });
   };
 
-  // Tipos de pregunta permitidos
+  // Tipos de pregunta permitidos con iconos y descripciones
   const availableQuestionTypes = [
-    { type: 'single_choice', label: 'Opción Única', color: 'bg-red-600' },
-    { type: 'multiple_choice', label: 'Opción Múltiple', color: 'bg-red-700' },
-    { type: 'ordering', label: 'Ordenar Secuencia', color: 'bg-slate-900' },
-    { type: 'yes_no', label: 'Sí / No', color: 'bg-slate-800' },
-    { type: 'short_text', label: 'Texto Corto', color: 'bg-slate-700' },
-    { type: 'long_text', label: 'Texto Largo', color: 'bg-slate-600' },
-    { type: 'store_hierarchy', label: 'Jerarquía KFC', color: 'bg-[#E4002B]' },
-    { type: 'date', label: 'Fecha', color: 'bg-slate-500' },
-    { type: 'rating', label: 'Escala / Estrellas', color: 'bg-[#E4002B]' },
+    { type: 'single_choice', label: 'Opción Única', description: 'Seleccionar una sola opción', color: 'bg-red-600', icon: CircleDot },
+    { type: 'multiple_choice', label: 'Opción Múltiple', description: 'Seleccionar varias opciones', color: 'bg-red-700', icon: CheckSquare },
+    { type: 'ordering', label: 'Ordenar Secuencia', description: 'Organizar las opciones en el orden secuencial correcto', color: 'bg-slate-900', icon: ListOrdered },
+    { type: 'yes_no', label: 'Sí / No', description: 'Respuesta dicotómica rápida', color: 'bg-slate-800', icon: ToggleLeft },
+    { type: 'short_text', label: 'Texto Corto', description: 'Respuestas breves de una línea', color: 'bg-slate-700', icon: Type },
+    { type: 'long_text', label: 'Texto Largo', description: 'Párrafos y comentarios abiertos', color: 'bg-slate-600', icon: AlignLeft },
+    { type: 'store_hierarchy', label: 'Jerarquía KFC', description: 'Selector de Tienda / CECO', color: 'bg-[#E4002B]', icon: MapPin },
+    { type: 'date', label: 'Fecha', description: 'Selector de fecha calendario', color: 'bg-slate-500', icon: Calendar },
+    { type: 'rating', label: 'Escala / Estrellas', description: 'Calificación numérica o estrellas', color: 'bg-[#E4002B]', icon: Star },
   ];
 
   return (
@@ -270,68 +273,203 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
 
       {/* TAB 1: PREGUNTAS */}
       {activeTab === 'questions' && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar - Añadir Preguntas */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  {isQuiz ? 'Preguntas Permitidas' : 'Agregar Pregunta'}
-                </h3>
-                {isQuiz && (
-                  <span className="text-[8px] font-black uppercase bg-red-50 text-[#E4002B] px-2 py-0.5 rounded">
-                    Quiz
+        <div className="space-y-5 max-w-5xl mx-auto">
+          {/* Header de la sección de preguntas con botón '+' desplegable */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-black shrink-0">
+                <HelpCircle className="w-5 h-5 text-slate-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-black uppercase italic tracking-tight text-slate-900">
+                    Preguntas del Formulario
+                  </h3>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {survey.questions.length} {survey.questions.length === 1 ? 'pregunta' : 'preguntas'}
                   </span>
-                )}
+                </div>
+                <p className="text-[10px] font-medium text-slate-400 truncate">
+                  {isQuiz ? 'Crea y califica las preguntas de la evaluación' : 'Configura y organiza el flujo de preguntas'}
+                </p>
               </div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {availableQuestionTypes.map(item => (
-                  <button
-                    key={item.type}
-                    onClick={() => handleAddQuestion(item.type as QuestionType)}
-                    className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 font-bold text-xs text-slate-700 transition flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </div>
+            </div>
+
+            {/* Dropdown de Añadir Pregunta */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddMenuOpen(prev => !prev)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-md shadow-red-600/20 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Agregar Pregunta</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isAddMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsAddMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-2 space-y-1 animate-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        {isQuiz ? 'Preguntas Permitidas (Quiz)' : 'Tipos de Pregunta'}
+                      </span>
+                      {isQuiz && (
+                        <span className="text-[8px] font-black uppercase bg-red-50 text-red-600 px-2 py-0.5 rounded">
+                          Quiz
+                        </span>
+                      )}
+                    </div>
+                    <div className="max-h-[380px] overflow-y-auto space-y-1 p-1">
+                      {availableQuestionTypes.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.type}
+                            type="button"
+                            onClick={() => {
+                              handleAddQuestion(item.type as QuestionType);
+                              setIsAddMenuOpen(false);
+                            }}
+                            className="w-full text-left p-2.5 rounded-2xl hover:bg-slate-50 transition flex items-center gap-3 group cursor-pointer border border-transparent hover:border-slate-200/60"
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-red-50 group-hover:text-red-600 text-slate-600 flex items-center justify-center shrink-0 transition">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-800 group-hover:text-red-600 transition truncate">
+                                {item.label}
+                              </p>
+                              <p className="text-[9.5px] font-medium text-slate-400 truncate">
+                                {item.description}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Listado de Preguntas con Drag and Drop */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="space-y-4">
             {survey.questions.length === 0 ? (
-              <div className="bg-white rounded-3xl p-10 text-center border border-slate-100 space-y-2">
-                <HelpCircle className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="text-xs font-bold text-slate-400">Selecciona un tipo de pregunta en el menú para comenzar.</p>
+              <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300 space-y-4">
+                <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-3xl flex items-center justify-center mx-auto border border-slate-200/60">
+                  <Plus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black uppercase italic tracking-tight text-slate-800">
+                    Tu formulario aún no tiene preguntas
+                  </h4>
+                  <p className="text-xs font-medium text-slate-400 max-w-sm mx-auto mt-1">
+                    Haz clic en el botón de agregar para desplegar los tipos de preguntas y comenzar a construir tu encuesta.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMenuOpen(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-md shadow-red-600/20 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar Primera Pregunta</span>
+                  </button>
+                </div>
               </div>
             ) : (
-              survey.questions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, idx)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDragEnd={handleDragEnd}
-                  className={`transition-all duration-150 ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
-                >
-                  <QuestionEditor
-                    question={q}
-                    allQuestions={survey.questions}
-                    surveyType={survey.type}
-                    onUpdate={handleUpdateQuestion}
-                    onDelete={() => handleDeleteQuestion(q.id)}
-                    onMoveUp={() => handleMoveUp(idx)}
-                    onMoveDown={() => handleMoveDown(idx)}
-                    isFirst={idx === 0}
-                    isLast={idx === survey.questions.length - 1}
-                    isExpanded={expandedQuestionId === q.id}
-                    onSelectQuestion={() => setExpandedQuestionId(q.id)}
-                    onMinimizeQuestion={() => setExpandedQuestionId(null)}
-                  />
+              <>
+                {survey.questions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    className={`transition-all duration-150 ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                  >
+                    <QuestionEditor
+                      question={q}
+                      allQuestions={survey.questions}
+                      surveyType={survey.type}
+                      onUpdate={handleUpdateQuestion}
+                      onDelete={() => handleDeleteQuestion(q.id)}
+                      onMoveUp={() => handleMoveUp(idx)}
+                      onMoveDown={() => handleMoveDown(idx)}
+                      isFirst={idx === 0}
+                      isLast={idx === survey.questions.length - 1}
+                      isExpanded={expandedQuestionId === q.id}
+                      onSelectQuestion={() => setExpandedQuestionId(q.id)}
+                      onMinimizeQuestion={() => setExpandedQuestionId(null)}
+                    />
+                  </div>
+                ))}
+
+                {/* Botón inferior para agregar más preguntas con dropdown */}
+                <div className="pt-2 flex justify-center">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsBottomAddMenuOpen(prev => !prev)}
+                      className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 hover:text-red-600 border-2 border-dashed border-slate-300 hover:border-red-400 font-bold text-xs rounded-2xl transition shadow-2xs cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 text-red-600" />
+                      <span>Agregar otra pregunta</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isBottomAddMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isBottomAddMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsBottomAddMenuOpen(false)} />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-2 space-y-1 animate-in zoom-in-95 duration-150">
+                          <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              {isQuiz ? 'Preguntas Permitidas (Quiz)' : 'Tipos de Pregunta'}
+                            </span>
+                            {isQuiz && (
+                              <span className="text-[8px] font-black uppercase bg-red-50 text-red-600 px-2 py-0.5 rounded">
+                                Quiz
+                              </span>
+                            )}
+                          </div>
+                          <div className="max-h-[380px] overflow-y-auto space-y-1 p-1">
+                            {availableQuestionTypes.map(item => {
+                              const Icon = item.icon;
+                              return (
+                                <button
+                                  key={item.type}
+                                  type="button"
+                                  onClick={() => {
+                                    handleAddQuestion(item.type as QuestionType);
+                                    setIsBottomAddMenuOpen(false);
+                                  }}
+                                  className="w-full text-left p-2.5 rounded-2xl hover:bg-slate-50 transition flex items-center gap-3 group cursor-pointer border border-transparent hover:border-slate-200/60"
+                                >
+                                  <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-red-50 group-hover:text-red-600 text-slate-600 flex items-center justify-center shrink-0 transition">
+                                    <Icon className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-slate-800 group-hover:text-red-600 transition truncate">
+                                      {item.label}
+                                    </p>
+                                    <p className="text-[9.5px] font-medium text-slate-400 truncate">
+                                      {item.description}
+                                    </p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))
+              </>
             )}
           </div>
         </div>

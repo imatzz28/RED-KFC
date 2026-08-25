@@ -4,13 +4,15 @@ import { useAppStore } from '@/store/useAppStore';
 import { dataService } from '@/services/dataService';
 import {
   BancaData, StoreAssignment, StoreLeader, Certification, BancaRole,
-  BANCA_ROLES, Employee, StoreIdeal, UserRole, StoreCategory, HierarchyData, Restaurant
+  BANCA_ROLES, Employee, StoreIdeal, UserRole, StoreCategory, HierarchyData, Restaurant,
+  BancaExternalPerson
 } from '@/types';
 import {
   Store, Building2, Users, Award, X, Save, Search, ChevronRight,
   UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp, Landmark,
   Plus, Check, Trash2, ChevronDown, AlertTriangle, Info, Calendar, BarChart3,
-  Bell, Trophy, Medal, MinusCircle, FileText, CheckCircle2, Maximize2, Minimize2
+  Bell, Trophy, Medal, MinusCircle, FileText, CheckCircle2, Maximize2, Minimize2,
+  Briefcase
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -222,11 +224,12 @@ const StoreSettingsModal: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Person Detail Floating Modal
+// Modal Flotante de Detalle de Persona
 // ─────────────────────────────────────────────────────────────────────────────
 const PersonDetailModal: React.FC<{
   leader: StoreLeader;
-  employee: Employee | undefined;
+  employee?: Employee;
+  externalPerson?: BancaExternalPerson;
   restaurantId: string;
   restaurantName: string;
   zoneName: string;
@@ -235,7 +238,10 @@ const PersonDetailModal: React.FC<{
   onUpdateRole: (newRole: BancaRole) => void;
   onToggleCert: (cert: Certification) => void;
   onRemove: () => void;
-}> = ({ leader, employee, restaurantId, restaurantName, zoneName, canEdit, onClose, onUpdateRole, onToggleCert, onRemove }) => {
+}> = ({ leader, employee, externalPerson, restaurantId, restaurantName, zoneName, canEdit, onClose, onUpdateRole, onToggleCert, onRemove }) => {
+  const displayName = externalPerson?.name || employee?.name || leader.employeeId;
+  const isExternal = Boolean(externalPerson);
+
   return createPortal(
     <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
@@ -248,13 +254,20 @@ const PersonDetailModal: React.FC<{
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
           <div className="flex items-start justify-between relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl font-black text-white shadow-inner border border-white/30">
-                {employee?.name?.charAt(0) ?? '?'}
+              <div className={`w-12 h-12 rounded-2xl ${isExternal ? 'bg-amber-400/30 text-amber-100' : 'bg-white/20 text-white'} backdrop-blur-md flex items-center justify-center text-xl font-black shadow-inner border border-white/30`}>
+                {displayName.charAt(0) || '?'}
               </div>
               <div>
-                <h3 className="text-base font-black uppercase italic tracking-tight">{employee?.name ?? leader.employeeId}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black uppercase italic tracking-tight">{displayName}</h3>
+                  {isExternal && (
+                    <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-sm">
+                      Operaciones
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest mt-0.5">
-                  Cédula: {leader.employeeId}
+                  ID / Cédula: {externalPerson?.document_id || leader.employeeId}
                 </p>
               </div>
             </div>
@@ -274,15 +287,21 @@ const PersonDetailModal: React.FC<{
             </div>
             <div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargo Sistema</p>
-              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{employee?.title ?? 'Sin definir'}</p>
+              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">
+                {isExternal ? 'Personal de Operaciones' : (employee?.title ?? 'Sin definir')}
+              </p>
             </div>
             <div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ingreso Compañía</p>
-              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{employee?.join_date ?? 'No registrada'}</p>
+              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">
+                {isExternal ? 'Operaciones' : (employee?.join_date ?? 'No registrada')}
+              </p>
             </div>
             <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CECO (Nómina Activa)</p>
-              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate font-mono">{employee?.restaurant_id ?? restaurantId}</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CECO (Asignación)</p>
+              <p className="text-xs font-bold text-slate-800 mt-0.5 truncate font-mono">
+                {employee?.restaurant_id ?? restaurantId}
+              </p>
             </div>
           </div>
 
@@ -382,15 +401,24 @@ const AssignPersonModal: React.FC<{
   restaurantName: string;
   targetRole: BancaRole;
   allEmployees: Employee[];
+  externalPersonnel: BancaExternalPerson[];
   excludeIds: string[];
   onClose: () => void;
-  onAssign: (emp: Employee, role: BancaRole) => void;
-}> = ({ restaurantName, targetRole, allEmployees, excludeIds, onClose, onAssign }) => {
+  onAssign: (emp: { id: string; name: string }, role: BancaRole) => void;
+  onSaveExternalPerson: (person: BancaExternalPerson) => Promise<void>;
+}> = ({ restaurantId, restaurantName, targetRole, allEmployees, externalPersonnel, excludeIds, onClose, onAssign, onSaveExternalPerson }) => {
+  const [activeTab, setActiveTab] = useState<'payroll' | 'operations'>('payroll');
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState<BancaRole>(targetRole);
-  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+  const [selectedEmp, setSelectedEmp] = useState<{ id: string; name: string; title?: string; isExternal?: boolean } | null>(null);
 
-  const filtered = useMemo(() => {
+  // Formulario Operaciones
+  const [opFirstName, setOpFirstName] = useState('');
+  const [opLastName, setOpLastName] = useState('');
+  const [opDocId, setOpDocId] = useState('');
+  const [isSavingOp, setIsSavingOp] = useState(false);
+
+  const filteredPayroll = useMemo(() => {
     const q = search.toLowerCase().trim();
     return allEmployees
       .filter(e => e.active && !excludeIds.includes(e.id))
@@ -398,121 +426,317 @@ const AssignPersonModal: React.FC<{
       .slice(0, 10);
   }, [allEmployees, excludeIds, search]);
 
+  const filteredOperations = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return externalPersonnel
+      .filter(p => !excludeIds.includes(p.id))
+      .filter(p => !q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q) || (p.document_id || '').includes(q));
+  }, [externalPersonnel, excludeIds, search]);
+
+  const handleCreateAndAssignExternal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fName = opFirstName.trim();
+    const lName = opLastName.trim();
+    if (!fName || !lName) return;
+
+    const docId = opDocId.trim();
+    const id = docId || `EXT-${Date.now().toString().slice(-6)}`;
+    const fullName = `${fName} ${lName}`.toUpperCase();
+
+    const newExternal: BancaExternalPerson = {
+      id,
+      first_name: fName.toUpperCase(),
+      last_name: lName.toUpperCase(),
+      name: fullName,
+      document_id: docId || undefined,
+      role_tag: 'Operaciones',
+      created_at: new Date().toISOString()
+    };
+
+    setIsSavingOp(true);
+    try {
+      await onSaveExternalPerson(newExternal);
+      onAssign(newExternal, selectedRole);
+      onClose();
+    } catch (err) {
+      console.error('Error saving external person:', err);
+    } finally {
+      setIsSavingOp(false);
+    }
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-[100000] animate-fade-in" onClick={onClose}>
       <div
-        className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-up"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        {/* Modal Header */}
+        <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="text-base font-black text-slate-900 uppercase italic">Asignar Colaborador a Banca</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              Tienda: <span className="text-slate-700">{restaurantName}</span>
+            <span className="text-[9px] font-black text-red-600 uppercase tracking-widest">
+              ASIGNAR COLABORADOR
+            </span>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase mt-0.5 tracking-tight">
+              {restaurantName}
+            </h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+              Tienda / CECO: <span className="font-bold text-slate-800">{restaurantId}</span>
             </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-200/60 rounded-xl transition-all"
+            title="Cerrar modal"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        {/* Modal Body */}
+        <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-5">
+          {/* Tipo de Colaborador (Segmented Buttons) */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Rol a Asignar</label>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Colaborador</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('payroll'); setSelectedEmp(null); }}
+                className={`px-3 py-3 rounded-xl border text-[10px] font-black uppercase text-center transition-all ${
+                  activeTab === 'payroll' 
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                    : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Colaboradores Nómina
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('operations'); setSelectedEmp(null); }}
+                className={`px-3 py-3 rounded-xl border text-[10px] font-black uppercase text-center transition-all ${
+                  activeTab === 'operations' 
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                    : 'bg-slate-50 border-slate-150 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Personal Operaciones
+              </button>
+            </div>
+          </div>
+
+          {/* Rol a Asignar */}
+          <div>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Rol en Banca</label>
             <div className="relative">
               <select
                 value={selectedRole}
                 onChange={e => setSelectedRole(e.target.value as BancaRole)}
-                className={`w-full text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl border appearance-none outline-none cursor-pointer ${ROLE_COLORS[selectedRole]}`}
+                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-[10px] font-black uppercase text-slate-700 outline-none focus:border-red-600 transition-all truncate cursor-pointer"
               >
                 {BANCA_ROLES.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-60" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-slate-400" />
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              autoFocus
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:border-red-500 focus:bg-white transition-all"
-              placeholder="Buscar colaborador por nombre, cédula o tienda..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-            {filtered.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <UserPlus className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-xs font-bold">No se encontraron colaboradores activos</p>
+          {/* TAB 1: Nómina Activa */}
+          {activeTab === 'payroll' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Buscar en Nómina</label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Nombre, cédula o CECO..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-3 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:border-red-600 transition-all"
+                  />
+                </div>
               </div>
-            ) : (
-              filtered.map(emp => {
-                const isSelected = selectedEmp?.id === emp.id;
-                return (
-                  <button
-                    key={emp.id}
-                    onClick={() => setSelectedEmp(emp)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all text-left group ${
-                      isSelected
-                        ? 'bg-red-50/90 border-red-500 shadow-sm ring-1 ring-red-500'
-                        : 'border-slate-100 hover:border-red-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-colors ${
-                        isSelected ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-red-100 group-hover:text-red-600'
-                      }`}>
-                        {emp.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className={`text-xs font-bold transition-colors ${isSelected ? 'text-red-900 font-extrabold' : 'text-slate-800'}`}>{emp.name}</p>
-                        <p className="text-[10px] text-slate-400 uppercase font-medium">{emp.title} · CECO: {emp.restaurant_id}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded-lg border border-slate-100">
-                        {emp.id}
-                      </span>
-                      {isSelected && <Check className="w-4 h-4 text-red-600 shrink-0" />}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {filteredPayroll.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    <UserPlus className="w-6 h-6 mx-auto mb-1 opacity-40 text-slate-400" />
+                    <p className="text-[11px] font-bold">No se encontraron colaboradores activos</p>
+                  </div>
+                ) : (
+                  filteredPayroll.map(emp => {
+                    const isSelected = selectedEmp?.id === emp.id;
+                    return (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        onClick={() => setSelectedEmp(emp)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left ${
+                          isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                            : 'bg-slate-50 border-slate-150 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {emp.name.charAt(0)}
+                          </div>
+                          <div className="truncate">
+                            <p className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>{emp.name}</p>
+                            <p className={`text-[9px] uppercase truncate ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>{emp.title} · CECO: {emp.restaurant_id}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md border ${
+                            isSelected ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-500 border-slate-200'
+                          }`}>
+                            {emp.id}
+                          </span>
+                          {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: Personal de Operaciones */}
+          {activeTab === 'operations' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider block">
+                  Registrar Nuevo Colaborador de Operaciones
+                </span>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest mb-1">Nombre *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Carlos"
+                      value={opFirstName}
+                      onChange={e => setOpFirstName(e.target.value)}
+                      className="w-full bg-white border-2 border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-red-600 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest mb-1">Apellido *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Gómez"
+                      value={opLastName}
+                      onChange={e => setOpLastName(e.target.value)}
+                      className="w-full bg-white border-2 border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-red-600 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest mb-1">Cédula / Documento (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 1020304050"
+                    value={opDocId}
+                    onChange={e => setOpDocId(e.target.value)}
+                    className="w-full bg-white border-2 border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-red-600 transition-all"
+                  />
+                </div>
+              </div>
+
+              {externalPersonnel.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[9px] font-black uppercase tracking-wider">O Seleccionar de Operaciones Existentes:</span>
+                    <span className="text-[9px] font-bold">{filteredOperations.length}</span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {filteredOperations.map(p => {
+                      const isSelected = selectedEmp?.id === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedEmp({ id: p.id, name: p.name, isExternal: true })}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left ${
+                            isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                              : 'bg-slate-50 border-slate-150 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {p.name.charAt(0)}
+                            </div>
+                            <div className="truncate">
+                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>{p.name}</p>
+                              <p className={`text-[9px] uppercase ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>Operaciones · ID: {p.document_id || p.id}</p>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+        {/* Modal Actions Footer */}
+        <div className="bg-slate-50 p-4 sm:p-6 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition"
+            className="px-4 sm:px-5 py-2.5 sm:py-3 border-2 border-slate-150 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all"
           >
             Cancelar
           </button>
-          <button
-            disabled={!selectedEmp}
-            onClick={() => {
-              if (selectedEmp) {
-                onAssign(selectedEmp, selectedRole);
-                onClose();
-              }
-            }}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
-              selectedEmp
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-95 cursor-pointer'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <Check className="w-4 h-4" />
-            <span>Confirmar Asignación</span>
-          </button>
+          {activeTab === 'payroll' ? (
+            <button
+              type="button"
+              disabled={!selectedEmp}
+              onClick={() => {
+                if (selectedEmp) {
+                  onAssign(selectedEmp, selectedRole);
+                  onClose();
+                }
+              }}
+              className="flex items-center gap-1.5 px-5 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:hover:bg-red-300 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Guardar</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={(!selectedEmp && (!opFirstName.trim() || !opLastName.trim())) || isSavingOp}
+              onClick={(e) => {
+                if (selectedEmp) {
+                  onAssign(selectedEmp, selectedRole);
+                  onClose();
+                } else {
+                  handleCreateAndAssignExternal(e);
+                }
+              }}
+              className="flex items-center gap-1.5 px-5 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:hover:bg-red-300 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSavingOp ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>,
@@ -848,18 +1072,27 @@ const BancaDashboardModal: React.FC<{
         className="relative bg-[#F8FAFC] text-slate-900 rounded-[32px] shadow-2xl border border-slate-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Cabecera Limpia Ejecutiva (Título dinámico según contexto) */}
-        <div className="p-6 bg-white border-b border-slate-200/80 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl md:text-2xl font-black uppercase italic tracking-tight text-slate-900">
-              {headerTitle}
-            </h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              Analítica de cobertura, distribución de cargos e indicadores de gestión
-            </p>
+        {/* Cabecera Limpia Ejecutiva (Fondo Oscuro KFC) */}
+        <div className="bg-[#0f1c2d] text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg shadow-red-600/30 text-white shrink-0">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-white uppercase italic">
+                {headerTitle}
+              </h2>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Analítica de cobertura, distribución de cargos e indicadores de gestión
+              </p>
+            </div>
           </div>
 
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400 hover:text-slate-700">
+          <button 
+            onClick={onClose} 
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="Cerrar dashboard"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -869,9 +1102,9 @@ const BancaDashboardModal: React.FC<{
           {/* Top 4 KPI Cards (Fondo Blanco) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Cumplimiento Nacional / Cobertura Filtrada */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-black">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
                   <TrendingUp className="w-5 h-5" />
                 </div>
                 <div>
@@ -880,7 +1113,7 @@ const BancaDashboardModal: React.FC<{
                   </p>
                   <div className="flex items-center gap-2 justify-end mt-1">
                     <span className="text-3xl font-black text-slate-900 tracking-tight">{analytics.globalCompliancePct}%</span>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
                       {activeZone ? activeZone : activeRegion ? activeRegion : 'Global'}
                     </span>
                   </div>
@@ -888,33 +1121,33 @@ const BancaDashboardModal: React.FC<{
               </div>
               <div className="mt-3 space-y-1">
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-red-600 rounded-full transition-all duration-700" style={{ width: `${analytics.globalCompliancePct}%` }} />
+                  <div className="h-full bg-slate-900 rounded-full transition-all duration-700" style={{ width: `${analytics.globalCompliancePct}%` }} />
                 </div>
                 <p className="text-[10px] font-bold text-slate-400">Meta: 100%</p>
               </div>
             </div>
 
             {/* Card 2: Vacantes Gerente / Sub */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center font-black">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">VACANTES GERENTE / SUB</p>
                   <div className="flex items-baseline justify-end gap-1 mt-1">
-                    <span className="text-3xl font-black text-red-600 tracking-tight">{analytics.storesWithoutManager}</span>
+                    <span className="text-3xl font-black text-rose-600 tracking-tight">{analytics.storesWithoutManager}</span>
                     <span className="text-[10px] font-medium text-slate-400">de {analytics.totalStores} tiendas</span>
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] font-bold text-red-600 mt-3">Requieren atención prioritaria</p>
+              <p className="text-[11px] font-medium text-rose-600/90 mt-3">Requieren atención prioritaria</p>
             </div>
 
             {/* Card 3: Cobertura de Gerentes */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
@@ -928,51 +1161,54 @@ const BancaDashboardModal: React.FC<{
               <div className="mt-3 space-y-1">
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-500 rounded-full transition-all duration-700"
+                    className="h-full bg-slate-900 rounded-full transition-all duration-700"
                     style={{ width: `${Math.min(100, Math.round((analytics.totalRealGerentes / (analytics.totalIdealGerentes || 1)) * 100))}%` }}
                   />
                 </div>
-                <p className="text-[10px] font-bold text-slate-500">
+                <p className="text-[10px] font-medium text-slate-400">
                   {Math.min(100, Math.round((analytics.totalRealGerentes / (analytics.totalIdealGerentes || 1)) * 100))}% del objetivo ideal
                 </p>
               </div>
             </div>
 
             {/* Card 4: Fuerza de Potenciales */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
                   <Target className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">FUERZA DE POTENCIALES</p>
                   <div className="flex items-center justify-end gap-2 mt-1">
-                    <span className="text-3xl font-black text-blue-600 tracking-tight">{analytics.totalPotenciales}</span>
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    <span className="text-3xl font-black text-slate-900 tracking-tight">{analytics.totalPotenciales}</span>
+                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
                       En preparación
                     </span>
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] font-bold text-slate-500 mt-3">Candidatos a Líderes de Turno</p>
+              <p className="text-[11px] font-medium text-slate-400 mt-3">Candidatos a Líderes de Turno</p>
             </div>
           </div>
 
           {/* Middle Section: Ranking (Left 60%) + Certificaciones y Tipología (Right 40%) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* Columna Izquierda (60%): Ranking Dinámico por Región, Jefe de Área o Tiendas */}
-            <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                      {analytics.rankingType === 'stores' ? 'RANKING POR TIENDAS (CUMPLIMIENTO)' :
-                       analytics.rankingType === 'zones' ? 'RANKING POR JEFE DE ÁREA (ZONAS)' :
-                       'RANKING DE CUMPLIMIENTO POR REGIÓN'}
-                    </h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                      PORCENTAJE DE COBERTURA VS IDEALES POR UNIDAD OPERATIVA
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-red-600" />
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                        {analytics.rankingType === 'stores' ? 'RANKING POR TIENDAS (CUMPLIMIENTO)' :
+                         analytics.rankingType === 'zones' ? 'RANKING POR JEFE DE ÁREA (ZONAS)' :
+                         'RANKING DE CUMPLIMIENTO POR REGIÓN'}
+                      </h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                        PORCENTAJE DE COBERTURA VS IDEALES POR UNIDAD OPERATIVA
+                      </p>
+                    </div>
                   </div>
                   <span className="text-[10px] font-bold text-slate-400">
                     {analytics.rankingStats.length} {analytics.rankingType === 'stores' ? 'Tiendas' : analytics.rankingType === 'zones' ? 'Jefes de Área' : 'Regiones'}
@@ -985,7 +1221,7 @@ const BancaDashboardModal: React.FC<{
                       <div key={item.name} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2.5">
-                            <span className="w-5 h-5 rounded bg-red-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">
+                            <span className="w-5 h-5 rounded-lg bg-slate-900 text-white font-black text-[10px] flex items-center justify-center shrink-0">
                               {idx + 1}
                             </span>
                             <span className="font-black text-slate-800 uppercase italic tracking-tight">
@@ -997,14 +1233,14 @@ const BancaDashboardModal: React.FC<{
                             <span className="text-[10px] font-bold text-slate-500">
                               Gerentes: <strong className="text-slate-800">{item.realGerentes}/{item.idealGerentes}</strong>
                             </span>
-                            <span className="font-black text-red-600 text-xs">{item.compliancePct}%</span>
+                            <span className="font-black text-slate-900 text-xs">{item.compliancePct}%</span>
                           </div>
                         </div>
 
-                        {/* Barra Roja de Progreso */}
+                        {/* Barra de Progreso Unificada */}
                         <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-red-600 rounded-full transition-all duration-700"
+                            className="h-full bg-slate-900 rounded-full transition-all duration-700"
                             style={{ width: `${item.compliancePct}%` }}
                           />
                         </div>
@@ -1018,7 +1254,7 @@ const BancaDashboardModal: React.FC<{
             {/* Columna Derecha (40%): Certificaciones y Tipología de Tiendas */}
             <div className="lg:col-span-5 space-y-5">
               {/* Box 1: Distribución de Certificaciones (Todas las 4) */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3">
+              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                   <FileText className="w-4 h-4 text-red-600" />
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
@@ -1037,18 +1273,18 @@ const BancaDashboardModal: React.FC<{
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
-                      {/* GBR (Azul) */}
+                      {/* GBR (Slate 500) */}
                       <path
-                        className="text-blue-600"
+                        className="text-slate-500"
                         strokeWidth="4.5"
                         strokeDasharray={`${pctGBR}, 100`}
                         stroke="currentColor"
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
-                      {/* GAR (Rojo) */}
+                      {/* GAR (Rojo KFC) */}
                       <path
-                        className="text-red-500"
+                        className="text-red-600"
                         strokeWidth="4.5"
                         strokeDasharray={`${pctGAR}, 100`}
                         strokeDashoffset={`-${pctGBR}`}
@@ -1066,7 +1302,7 @@ const BancaDashboardModal: React.FC<{
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
-                      {/* EAE (Verde Esmeralda) */}
+                      {/* EAE (Verde Esmeralda suave) */}
                       <path
                         className="text-emerald-600"
                         strokeWidth="4.5"
@@ -1084,8 +1320,8 @@ const BancaDashboardModal: React.FC<{
                   </div>
 
                   {/* Leyenda 2x2 con TODAS las 4 Certificaciones */}
-                  <div className="grid grid-cols-2 gap-2.5 flex-1">
-                    <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-slate-900 shrink-0" />
                         <span className="font-black text-slate-800 text-[11px]">GER</span>
@@ -1096,9 +1332,9 @@ const BancaDashboardModal: React.FC<{
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0" />
                         <span className="font-black text-slate-800 text-[11px]">GAR</span>
                       </div>
                       <div className="text-right">
@@ -1107,9 +1343,9 @@ const BancaDashboardModal: React.FC<{
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
                         <span className="font-black text-slate-800 text-[11px]">GBR</span>
                       </div>
                       <div className="text-right">
@@ -1118,7 +1354,7 @@ const BancaDashboardModal: React.FC<{
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg">
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" />
                         <span className="font-black text-slate-800 text-[11px]">EAE</span>
@@ -1133,7 +1369,7 @@ const BancaDashboardModal: React.FC<{
               </div>
 
               {/* Box 2: Tipología de Tiendas */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3">
+              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                   <Store className="w-4 h-4 text-red-600" />
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
@@ -1143,8 +1379,8 @@ const BancaDashboardModal: React.FC<{
 
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
                   <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-amber-600 uppercase tracking-wider">CAT. A</span>
-                    <Trophy className="w-4 h-4 text-amber-500 my-1" />
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. A</span>
+                    <Trophy className="w-4 h-4 text-slate-500 my-1" />
                     <div>
                       <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catA}</span>
                       <span className="text-[8px] font-bold text-slate-400 block">{pctCatA}%</span>
@@ -1152,8 +1388,8 @@ const BancaDashboardModal: React.FC<{
                   </div>
 
                   <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-wider">CAT. B</span>
-                    <Medal className="w-4 h-4 text-blue-600 my-1" />
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. B</span>
+                    <Medal className="w-4 h-4 text-slate-500 my-1" />
                     <div>
                       <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catB}</span>
                       <span className="text-[8px] font-bold text-slate-400 block">{pctCatB}%</span>
@@ -1161,8 +1397,8 @@ const BancaDashboardModal: React.FC<{
                   </div>
 
                   <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">CAT. C</span>
-                    <Medal className="w-4 h-4 text-emerald-600 my-1" />
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. C</span>
+                    <Medal className="w-4 h-4 text-slate-500 my-1" />
                     <div>
                       <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catC}</span>
                       <span className="text-[8px] font-bold text-slate-400 block">{pctCatC}%</span>
@@ -1170,8 +1406,8 @@ const BancaDashboardModal: React.FC<{
                   </div>
 
                   <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-purple-600 uppercase tracking-wider">CAT. D</span>
-                    <Medal className="w-4 h-4 text-purple-600 my-1" />
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. D</span>
+                    <Medal className="w-4 h-4 text-slate-500 my-1" />
                     <div>
                       <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catD}</span>
                       <span className="text-[8px] font-bold text-slate-400 block">{pctCatD}%</span>
@@ -1191,17 +1427,17 @@ const BancaDashboardModal: React.FC<{
             </div>
           </div>
 
-          {/* Bottom Banner: Alertas Prioritarias (Light Red Tinted Banner sin botón redundante) */}
-          <div className="bg-red-50/70 rounded-2xl p-4 border border-red-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          {/* Bottom Banner: Alertas Prioritarias */}
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[9px] font-black text-red-600 uppercase tracking-widest leading-tight">ALERTAS PRIORITARIAS</p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">ALERTAS PRIORITARIAS</p>
                 <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="text-2xl font-black text-red-700 tracking-tight">{analytics.storesWithoutManager}</span>
-                  <span className="text-[10px] font-bold text-red-600/80">Requieren atención</span>
+                  <span className="text-2xl font-black text-slate-900 tracking-tight">{analytics.storesWithoutManager}</span>
+                  <span className="text-[10px] font-bold text-rose-600">Requieren atención</span>
                 </div>
               </div>
             </div>
@@ -1218,7 +1454,7 @@ const BancaDashboardModal: React.FC<{
               </div>
 
               <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-600 mt-1 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-slate-400 mt-1 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-800 text-[11px] leading-tight">
                     {analytics.storesZeroAssigned} tiendas vacantes
@@ -1228,7 +1464,7 @@ const BancaDashboardModal: React.FC<{
               </div>
 
               <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-600 mt-1 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-slate-900 mt-1 shrink-0" />
                 <div>
                   <p className="font-bold text-slate-800 text-[11px] leading-tight">
                     {analytics.totalPotenciales} potenciales disponibles
@@ -1290,45 +1526,45 @@ const ComplianceSummary: React.FC<{
   const pctEntrenadores = getPercent(realEntrenadores, idealEntrenadores);
 
   const StatCard = ({ title, icon, real, ideal, pct }: any) => (
-    <div className="bg-slate-900 rounded-2xl p-3.5 relative overflow-hidden group transition-all duration-300 shadow-md hover:shadow-xl flex flex-col justify-between min-h-[100px]">
-      <div className="flex items-center justify-between relative z-10">
+    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between min-h-[95px] hover:border-slate-300 transition">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
             {icon}
           </div>
           <div>
-            <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">{title}</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-lg font-black text-white tracking-tighter leading-none">{real}</span>
-              <span className="text-xs font-bold text-white/40">/{ideal}</span>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-black text-slate-900 tracking-tight leading-none">{real}</span>
+              <span className="text-xs font-bold text-slate-400">/{ideal}</span>
             </div>
           </div>
         </div>
         <div className="text-right">
-          <span className="text-lg font-black text-white tracking-tighter leading-none">{pct}<span className="text-xs">%</span></span>
+          <span className="text-base font-black text-slate-900 tracking-tight leading-none">{pct}<span className="text-xs font-bold text-slate-400">%</span></span>
         </div>
       </div>
 
-      <div className="relative z-10 mt-2">
-        <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
-          <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+      <div className="mt-3">
+        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-slate-900 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
         </div>
       </div>
     </div>
   );
 
   const InfoCard = ({ title, icon, real }: { title: string; icon: React.ReactNode; real: number }) => (
-    <div className="bg-slate-900 rounded-2xl p-3.5 relative overflow-hidden group transition-all duration-300 shadow-md hover:shadow-xl flex items-center justify-between min-h-[100px]">
-      <div className="flex items-center gap-2 relative z-10">
-        <div className="w-7 h-7 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between min-h-[95px] hover:border-slate-300 transition">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
           {icon}
         </div>
         <div>
-          <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">{title}</p>
-          <span className="text-lg font-black text-white tracking-tighter leading-none">{real}</span>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
+          <span className="text-xl font-black text-slate-900 tracking-tight leading-none mt-0.5 block">{real}</span>
         </div>
       </div>
-      <span className="text-3xl font-black text-white/10 tracking-tighter leading-none select-none relative z-10">{real}</span>
+      <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">En lista</span>
     </div>
   );
 
@@ -1346,7 +1582,7 @@ const ComplianceSummary: React.FC<{
           {/* Botón Dashboard Banca */}
           <button
             onClick={onOpenDashboard}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-md hover:-translate-y-0.5 shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-sm active:scale-95 shrink-0 cursor-pointer"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Dashboard Banca</span>
@@ -1355,7 +1591,7 @@ const ComplianceSummary: React.FC<{
           {/* Botón Exportar Excel */}
           <button
             onClick={onExport}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-sm hover:-translate-y-0.5 shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-sm active:scale-95 shrink-0 cursor-pointer"
           >
             <FileDown className="w-3.5 h-3.5 text-red-500" />
             <span>Exportar Excel</span>
@@ -1364,10 +1600,10 @@ const ComplianceSummary: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 animate-in fade-in duration-200">
-        <StatCard title="Gerentes" icon={<Award className="w-3.5 h-3.5 text-white" />} real={realGerentes} ideal={idealGerentes} pct={pctGerentes} />
-        <StatCard title="Líderes de Turno" icon={<Users className="w-3.5 h-3.5 text-white" />} real={realLideres} ideal={idealLideres} pct={pctLideres} />
-        <InfoCard title="Potenciales" icon={<TrendingUp className="w-3.5 h-3.5 text-white" />} real={realPotenciales} />
-        <StatCard title="Entrenadores" icon={<Target className="w-3.5 h-3.5 text-white" />} real={realEntrenadores} ideal={idealEntrenadores} pct={pctEntrenadores} />
+        <StatCard title="Gerentes" icon={<Award className="w-4 h-4 text-slate-600" />} real={realGerentes} ideal={idealGerentes} pct={pctGerentes} />
+        <StatCard title="Líderes de Turno" icon={<Users className="w-4 h-4 text-slate-600" />} real={realLideres} ideal={idealLideres} pct={pctLideres} />
+        <InfoCard title="Potenciales" icon={<TrendingUp className="w-4 h-4 text-slate-600" />} real={realPotenciales} />
+        <StatCard title="Entrenadores" icon={<Target className="w-4 h-4 text-slate-600" />} real={realEntrenadores} ideal={idealEntrenadores} pct={pctEntrenadores} />
       </div>
     </div>
   );
@@ -1432,10 +1668,19 @@ const Banca: React.FC = () => {
     };
   }, [isTableMaximized]);
 
-  // Set de IDs de colaboradores activos en la nómina
+  // Personal externo de operaciones
+  const [externalPersonnel, setExternalPersonnel] = useState<BancaExternalPerson[]>(() => dataService.getBancaExternalPersonnel());
+
+  const externalMap = useMemo(() => {
+    return new Map(externalPersonnel.map(p => [p.id, p]));
+  }, [externalPersonnel]);
+
+  // Set de IDs de colaboradores activos en la nómina + Operaciones
   const activeEmployeeIds = useMemo(() => {
-    return new Set(employees.filter(e => e.active).map(e => e.id));
-  }, [employees]);
+    const set = new Set(employees.filter(e => e.active).map(e => e.id));
+    externalPersonnel.forEach(p => set.add(p.id));
+    return set;
+  }, [employees, externalPersonnel]);
 
   // Modales
   const [personModal, setPersonModal] = useState<{
@@ -1470,6 +1715,7 @@ const Banca: React.FC = () => {
 
   useEffect(() => {
     setBancaData(dataService.getBancaData());
+    setExternalPersonnel(dataService.getBancaExternalPersonnel());
     if (syncStatus !== 'syncing' || (employees.length > 0 && restaurants.length > 0)) {
       const timer = setTimeout(() => setIsLoading(false), 300);
       return () => clearTimeout(timer);
@@ -1638,7 +1884,7 @@ const Banca: React.FC = () => {
     await handleSaveBanca(newBanca);
   };
 
-  const handleAssignPerson = async (restaurantId: string, emp: Employee, role: BancaRole) => {
+  const handleAssignPerson = async (restaurantId: string, emp: { id: string; name: string }, role: BancaRole) => {
     const existingAssignment = (bancaData.assignments || []).find(a => a.restaurantId === restaurantId);
     const currentMembers = existingAssignment?.members ?? [];
     if (currentMembers.some(m => m.employeeId === emp.id)) return;
@@ -1698,6 +1944,7 @@ const Banca: React.FC = () => {
           } else {
             members.forEach(m => {
               const emp = employees.find(e => e.id === m.employeeId);
+              const ext = externalMap.get(m.employeeId);
               const norm = normalizeCerts(m.certifications);
               rows.push({
                 'Región': region.name,
@@ -1705,9 +1952,9 @@ const Banca: React.FC = () => {
                 'CECO': restId,
                 'Tienda': rest?.name ?? restId,
                 'Categoría': storeIdeal?.category ? storeIdeal.category : 'Sin Categoría',
-                'Cédula': m.employeeId,
-                'Nombre': emp?.name ?? m.employeeId,
-                'Cargo (Sistema)': emp?.title ?? '',
+                'Cédula': ext?.document_id || m.employeeId,
+                'Nombre': ext ? `${ext.name} (Operaciones)` : (emp?.name ?? m.employeeId),
+                'Cargo (Sistema)': ext ? 'Personal de Operaciones' : (emp?.title ?? 'Sin definir'),
                 'Rol en Banca': m.role,
                 'GER': norm.includes('GER') ? 'SI' : 'NO',
                 'GAR': norm.includes('GAR') ? 'SI' : 'NO',
@@ -2072,69 +2319,82 @@ const Banca: React.FC = () => {
 
                             return (
                               <td key={group.label} className="py-1.5 px-1.5 align-top">
-                              <div className="space-y-1">
-                                {matchingMembers.map(m => {
-                                  const emp = employees.find(e => e.id === m.employeeId);
-                                  return (
-                                    <div
-                                      key={m.employeeId}
-                                      onClick={() => setPersonModal({
-                                        leader: m,
+                                <div className="space-y-1">
+                                  {matchingMembers.map(m => {
+                                    const emp = employees.find(e => e.id === m.employeeId);
+                                    const isExternal = externalMap.has(m.employeeId);
+                                    const extPerson = externalMap.get(m.employeeId);
+                                    const displayName = extPerson?.name || emp?.name || m.employeeId;
+
+                                    return (
+                                      <div
+                                        key={m.employeeId}
+                                        onClick={() => setPersonModal({
+                                          leader: m,
+                                          restaurantId: restId,
+                                          restaurantName: rest?.name ?? restId,
+                                          zoneName
+                                        })}
+                                        className={`px-1.5 py-0.5 bg-white rounded-lg border ${
+                                          isExternal ? 'border-amber-300 bg-amber-50/25' : 'border-slate-200'
+                                        } hover:border-red-400 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-1 group/item`}
+                                      >
+                                        <div className="flex items-center gap-1 min-w-0 flex-1">
+                                          <div className={`w-3.5 h-3.5 rounded ${
+                                            isExternal ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 group-hover/item:bg-red-100 group-hover/item:text-red-600 text-slate-600'
+                                          } flex items-center justify-center text-[7.5px] font-black shrink-0 transition-colors`}>
+                                            {displayName.charAt(0) || '?'}
+                                          </div>
+                                          <span className="font-bold text-slate-800 text-[10px] truncate group-hover/item:text-red-700 transition-colors">
+                                            {displayName}
+                                          </span>
+                                          {isExternal && (
+                                            <span className="text-[6.5px] font-black uppercase tracking-wider px-1 py-0.2 rounded bg-amber-500 text-white shrink-0 shadow-2xs">
+                                              Operaciones
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Certificaciones Badges Compactas */}
+                                        {m.certifications.length > 0 && (
+                                          <div className="flex items-center gap-0.5 shrink-0">
+                                            {normalizeCerts(m.certifications).map(c => (
+                                              <span key={c} title={CERT_NAMES[c]} className={`text-[6px] font-black px-0.5 py-0 leading-tight rounded-[3px] tracking-tighter ${CERT_COLORS[c]}`}>
+                                                {c}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+
+                                  {/* Botón de Asignación en celda vacía */}
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => setAssignModal({
                                         restaurantId: restId,
                                         restaurantName: rest?.name ?? restId,
-                                        zoneName
+                                        targetRole: targetRoleForAdd
                                       })}
-                                      className="px-1.5 py-0.5 bg-white rounded-lg border border-slate-200 hover:border-red-400 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-1 group/item"
+                                      className="w-full flex items-center justify-center gap-1 py-1 px-1 bg-slate-50/80 hover:bg-red-50 border border-dashed border-slate-200 hover:border-red-300 rounded-lg text-[9px] font-bold text-slate-400 hover:text-red-600 transition-all"
                                     >
-                                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                                        <div className="w-3.5 h-3.5 rounded bg-slate-100 group-hover/item:bg-red-100 group-hover/item:text-red-600 text-slate-600 flex items-center justify-center text-[7.5px] font-black shrink-0 transition-colors">
-                                          {emp?.name?.charAt(0) ?? '?'}
-                                        </div>
-                                        <span className="font-bold text-slate-800 text-[10px] truncate group-hover/item:text-red-700 transition-colors">
-                                          {emp?.name ?? m.employeeId}
-                                        </span>
-                                      </div>
-
-                                      {/* Certificaciones Badges Compactas */}
-                                      {m.certifications.length > 0 && (
-                                        <div className="flex items-center gap-0.5 shrink-0">
-                                          {normalizeCerts(m.certifications).map(c => (
-                                            <span key={c} title={CERT_NAMES[c]} className={`text-[6px] font-black px-0.5 py-0 leading-tight rounded-[3px] tracking-tighter ${CERT_COLORS[c]}`}>
-                                              {c}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-
-                                {/* Botón de Asignación en celda vacía */}
-                                {canEdit && (
-                                  <button
-                                    onClick={() => setAssignModal({
-                                      restaurantId: restId,
-                                      restaurantName: rest?.name ?? restId,
-                                      targetRole: targetRoleForAdd
-                                    })}
-                                    className="w-full flex items-center justify-center gap-1 py-1 px-1 bg-slate-50/80 hover:bg-red-50 border border-dashed border-slate-200 hover:border-red-300 rounded-lg text-[9px] font-bold text-slate-400 hover:text-red-600 transition-all"
-                                  >
-                                    <Plus className="w-2.5 h-2.5" />
-                                    <span>{matchingMembers.length === 0 ? 'Asignar' : '+ Otro'}</span>
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                                      <Plus className="w-2.5 h-2.5" />
+                                      <span>{matchingMembers.length === 0 ? 'Asignar' : '+ Otro'}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
         );
 
         return isTableMaximized ? createPortal(tableContent, document.body) : tableContent;
@@ -2173,6 +2433,7 @@ const Banca: React.FC = () => {
         <PersonDetailModal
           leader={personModal.leader}
           employee={employees.find(e => e.id === personModal.leader.employeeId)}
+          externalPerson={externalMap.get(personModal.leader.employeeId)}
           restaurantId={personModal.restaurantId}
           restaurantName={personModal.restaurantName}
           zoneName={personModal.zoneName}
@@ -2191,9 +2452,14 @@ const Banca: React.FC = () => {
           restaurantName={assignModal.restaurantName}
           targetRole={assignModal.targetRole}
           allEmployees={employees}
+          externalPersonnel={externalPersonnel}
           excludeIds={(bancaData.assignments.find(a => a.restaurantId === assignModal.restaurantId)?.members ?? []).map(m => m.employeeId)}
           onClose={() => setAssignModal(null)}
           onAssign={(emp, role) => handleAssignPerson(assignModal.restaurantId, emp, role)}
+          onSaveExternalPerson={async (p) => {
+            await dataService.saveBancaExternalPerson(p);
+            setExternalPersonnel(dataService.getBancaExternalPersonnel());
+          }}
         />
       )}
 

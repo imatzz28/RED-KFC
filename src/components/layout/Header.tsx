@@ -8,7 +8,13 @@ import { useAppStore } from '@/store/useAppStore';
 import { supabase } from '@/services/dataService';
 
 const Header: React.FC = () => {
-  const { auth, selectedMonth, setIsSidebarOpen, handleLogout: onLogout, showAlertDialog } = useAppStore();
+  const { 
+    auth, 
+    selectedMonth, 
+    setIsSidebarOpen, 
+    handleLogout: onLogout, 
+    showAlertDialog 
+  } = useAppStore();
   const location = useLocation();
   const user = auth.user;
   const onMenuClick = () => setIsSidebarOpen(true);
@@ -87,9 +93,10 @@ const Header: React.FC = () => {
   return (
     <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
       <div className="flex items-center space-x-4">
+        {/* Mobile Sidebar Open */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition shadow-inner"
+          className="lg:hidden p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition shadow-inner cursor-pointer"
         >
           <Menu className="w-5 h-5" />
         </button>

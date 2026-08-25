@@ -501,69 +501,50 @@ const SafeHands: React.FC = () => {
 
   // ── UI Components ──────────────────────────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => {
-    const styles: any = {
-      'VIGENTE': 'bg-emerald-50 text-emerald-600 border-emerald-100',
-      'VENCIDO': 'bg-red-50 text-red-600 border-red-100',
-      'POR_VENCER': 'bg-amber-50 text-amber-600 border-amber-100',
-      'PENDIENTE': 'bg-slate-50 text-slate-400 border-slate-100'
+    const styles: Record<string, string> = {
+      'VIGENTE': 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+      'VENCIDO': 'bg-rose-50 text-rose-700 border-rose-200/60',
+      'POR_VENCER': 'bg-amber-50 text-amber-700 border-amber-200/60',
+      'PENDIENTE': 'bg-slate-50 text-slate-500 border-slate-200'
     };
     return (
-      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${styles[status]}`}>
+      <span className={`text-[8.5px] font-black uppercase px-2.5 py-0.5 rounded-full border ${styles[status] || styles['PENDIENTE']}`}>
         {status.replace('_', ' ')}
       </span>
     );
   };
 
   const StatCard = ({ title, icon, real, color, label }: any) => {
-    const colorStyles: any = {
+    const colorStyles: Record<string, { iconColor: string; subColor: string }> = {
       total: {
-        border: 'border-l-4 border-l-slate-400 border-white/5',
-        text: 'text-white',
-        iconBg: 'bg-white/10 text-white',
-        glow: 'bg-white/5'
+        iconColor: 'text-slate-500',
+        subColor: 'text-slate-400',
       },
       vigente: {
-        border: 'border-l-4 border-l-emerald-500 border-white/5',
-        text: 'text-emerald-400',
-        iconBg: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-        glow: 'bg-emerald-500/10'
+        iconColor: 'text-emerald-600/80',
+        subColor: 'text-emerald-600/70',
       },
       por_vencer: {
-        border: 'border-l-4 border-l-amber-500 border-white/5',
-        text: 'text-amber-400',
-        iconBg: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-        glow: 'bg-amber-500/10'
+        iconColor: 'text-amber-600/80',
+        subColor: 'text-amber-600/70',
       },
       vencido: {
-        border: 'border-l-4 border-l-red-500 border-white/5',
-        text: 'text-red-400',
-        iconBg: 'bg-red-500/20 text-red-400 border border-red-500/30',
-        glow: 'bg-red-500/10'
+        iconColor: 'text-rose-600/80',
+        subColor: 'text-rose-600/70',
       }
     };
     const style = colorStyles[color] || colorStyles.total;
     
     return (
-      <div className={`bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 shadow-[0_10px_25px_rgba(15,23,42,0.3)] hover:shadow-[0_18px_35px_rgba(15,23,42,0.45)] hover:-translate-y-0.5 flex items-center justify-between min-h-[90px] border ${style.border}`}>
-        {/* Diagonal stripe pattern */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} />
-        {/* Glow top-right */}
-        <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full ${style.glow} blur-xl pointer-events-none`} />
-
-        <div className="flex items-center gap-4 relative z-10">
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${style.iconBg}`}>
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs relative overflow-hidden transition-all duration-200 hover:border-slate-300">
+        <div className="flex items-center justify-between text-slate-400 mb-2">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{title}</span>
+          <div className={`shrink-0 ${style.iconColor}`}>
             {icon}
           </div>
-          <div className="flex flex-col">
-            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1.5">{title}</p>
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-none">{label}</p>
-          </div>
         </div>
-
-        <div className="flex items-baseline relative z-10 shrink-0 text-right">
-          <span className={`text-4xl font-black ${style.text} tracking-tighter leading-none`}>{real}</span>
-        </div>
+        <p className="text-3xl font-black text-slate-900 tracking-tight">{real}</p>
+        <p className={`text-[10px] font-medium mt-1 ${style.subColor}`}>{label}</p>
       </div>
     );
   };

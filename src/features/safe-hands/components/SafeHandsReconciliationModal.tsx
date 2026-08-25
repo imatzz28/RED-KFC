@@ -88,6 +88,7 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<ReconciliationTab>('all');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   // Bulk Selection & Categorization States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -288,7 +289,7 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
     return items;
   }, [personnel, certsMap, employeesMap, employees, restMap]);
 
-  // Apply Hierarchical and Text Filters
+  // Apply Hierarchical, Category, and Text Filters
   const filteredItems = useMemo(() => {
     return allReconciliationItems.filter(item => {
       // 1. Regional filter
@@ -307,6 +308,14 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
       // 5. Tab filter
       if (activeTab !== 'all' && item.matchType !== activeTab) return false;
 
+      // 5.1 Category filter (when on Categorizados tab)
+      if (activeTab === 'orphan_categorized' && selectedCategoryFilter !== 'all') {
+        const targetCat = categories.find(c => c.id === selectedCategoryFilter);
+        const matches = item.category === selectedCategoryFilter || 
+          (targetCat && item.category === targetCat.name);
+        if (!matches) return false;
+      }
+
       // 6. Search text
       if (search.trim()) {
         const q = search.trim().toLowerCase();
@@ -320,13 +329,44 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
 
       return true;
     });
-  }, [allReconciliationItems, selectedRegion, selectedZone, selectedRestaurant, auth.user, filteredRestaurants, activeTab, search]);
+  }, [allReconciliationItems, selectedRegion, selectedZone, selectedRestaurant, auth.user, filteredRestaurants, activeTab, selectedCategoryFilter, search, categories]);
+
+  // Reset category filter when tab changes
+  useEffect(() => {
+    setSelectedCategoryFilter('all');
+  }, [activeTab]);
 
   // Reset pagination on filter change
   useEffect(() => {
     setCurrentPage(1);
     setSelectedIds(new Set());
-  }, [selectedRegion, selectedZone, selectedRestaurant, activeTab, search]);
+  }, [selectedRegion, selectedZone, selectedRestaurant, activeTab, selectedCategoryFilter, search]);
+
+  // Breakdown of carnets per category in current scope
+  const categoryBreakdown = useMemo(() => {
+    const scopedItems = allReconciliationItems.filter(item => {
+      if (selectedRegion && item.region !== selectedRegion) return false;
+      if (selectedZone && item.zone !== selectedZone) return false;
+      if (selectedRestaurant && item.restaurantId !== selectedRestaurant) return false;
+      if (auth.user && auth.user.role !== UserRole.ADMIN) {
+        const allowedRests = filteredRestaurants.map(r => r.id);
+        if (item.restaurantId && !allowedRests.includes(item.restaurantId)) return false;
+      }
+      return item.matchType === 'orphan_categorized';
+    });
+
+    const counts: Record<string, number> = {};
+    scopedItems.forEach(item => {
+      if (item.category) {
+        counts[item.category] = (counts[item.category] || 0) + 1;
+      }
+    });
+
+    return categories.map(cat => ({
+      ...cat,
+      count: counts[cat.id] || counts[cat.name] || 0
+    })).sort((a, b) => b.count - a.count);
+  }, [allReconciliationItems, selectedRegion, selectedZone, selectedRestaurant, auth.user, filteredRestaurants, categories]);
 
   // KPI Metrics (based on current hierarchical filter, disregarding tab filter)
   const metrics = useMemo(() => {
@@ -523,25 +563,25 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 animate-fade-in">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 animate-fade-in overflow-hidden">
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
 
       <div
-        className="relative bg-white rounded-[32px] sm:rounded-[40px] shadow-2xl border border-slate-100 w-full max-w-7xl h-[94vh] max-h-[94vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative bg-white rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-200 w-full max-w-7xl h-[88vh] max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 my-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0f1c2d] via-slate-900 to-slate-800 p-5 sm:p-6 text-white shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10">
+        <div className="bg-[#0f1c2d] p-4 sm:p-5 text-white shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner shrink-0">
-              <FileSpreadsheet className="w-6 h-6 text-red-500" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-600/30 shrink-0">
+              <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black tracking-tight text-white uppercase italic">
+              <h3 className="text-base sm:text-lg font-black tracking-tight text-white uppercase italic">
                 Auditoría SafeHands
               </h3>
-              <p className="text-xs text-slate-300 font-medium mt-0.5">
-                Relación de Carnets de Manipulacion de Alimentos
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
+                Relación de Carnets de Manipulación de Alimentos
               </p>
             </div>
           </div>
@@ -557,14 +597,14 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
             </button>
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition shadow-md cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition shadow-md cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Exportar Excel</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition cursor-pointer"
+              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -648,151 +688,176 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
           <div
             onClick={() => setActiveTab('all')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'all' ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+              activeTab === 'all' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
             }`}
           >
             <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">Total Carnets</span>
             <span className="text-xl font-black block mt-0.5">{metrics.totalCarnets}</span>
-            <span className="text-[9.5px] font-bold opacity-70 block">Registrados</span>
+            <span className="text-[9.5px] font-medium opacity-70 block">Registrados</span>
           </div>
 
           <div
             onClick={() => setActiveTab('active_match')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'active_match' ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-emerald-50/70 hover:bg-emerald-100/70 border-emerald-200 text-emerald-950'
+              activeTab === 'active_match' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-emerald-50/50 hover:bg-emerald-50 border-emerald-200/60 text-emerald-950'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">🟢 Activos</span>
+            <span className="text-[9px] font-black uppercase tracking-wider block text-emerald-700">Activos</span>
             <span className="text-xl font-black block mt-0.5">{metrics.activeMatch}</span>
-            <span className="text-[9.5px] font-bold opacity-80 block">{metrics.pctActive}% del total</span>
+            <span className="text-[9.5px] font-medium text-emerald-700/80 block">{metrics.pctActive}% del total</span>
           </div>
 
           <div
             onClick={() => setActiveTab('retired_match')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'retired_match' ? 'bg-amber-600 border-amber-600 text-white shadow-md' : 'bg-amber-50/70 hover:bg-amber-100/70 border-amber-200 text-amber-950'
+              activeTab === 'retired_match' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-amber-50/50 hover:bg-amber-50 border-amber-200/60 text-amber-950'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">🟠 Retirados</span>
+            <span className="text-[9px] font-black uppercase tracking-wider block text-amber-700">Retirados</span>
             <span className="text-xl font-black block mt-0.5">{metrics.retiredMatch}</span>
-            <span className="text-[9.5px] font-bold opacity-80 block">{metrics.pctRetired}% del total</span>
+            <span className="text-[9.5px] font-medium text-amber-700/80 block">{metrics.pctRetired}% del total</span>
           </div>
 
           <div
             onClick={() => setActiveTab('orphan_categorized')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'orphan_categorized' ? 'bg-purple-600 border-purple-600 text-white shadow-md' : 'bg-purple-50/70 hover:bg-purple-100/70 border-purple-200 text-purple-950'
+              activeTab === 'orphan_categorized' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">🟣 Categorizados</span>
+            <span className="text-[9px] font-black uppercase tracking-wider block text-slate-600">Categorizados</span>
             <span className="text-xl font-black block mt-0.5">{metrics.orphanCategorized}</span>
-            <span className="text-[9.5px] font-bold opacity-80 block">{metrics.pctCategorized}% (Otros Dpts.)</span>
+            <span className="text-[9.5px] font-medium text-slate-500 block">
+              {categoryBreakdown.filter(c => c.count > 0).length} categorías activas
+            </span>
           </div>
 
           <div
             onClick={() => setActiveTab('orphan_uncategorized')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'orphan_uncategorized' ? 'bg-rose-600 border-rose-600 text-white shadow-md' : 'bg-rose-50/70 hover:bg-rose-100/70 border-rose-200 text-rose-950'
+              activeTab === 'orphan_uncategorized' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-rose-50/50 hover:bg-rose-50 border-rose-200/60 text-rose-950'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">🔴 Sin Clasificar</span>
+            <span className="text-[9px] font-black uppercase tracking-wider block text-rose-700">Sin Clasificar</span>
             <span className="text-xl font-black block mt-0.5">{metrics.orphanUncategorized}</span>
-            <span className="text-[9.5px] font-bold opacity-80 block">{metrics.pctUncategorized}% (Huérfanos)</span>
+            <span className="text-[9.5px] font-medium text-rose-700/80 block">{metrics.pctUncategorized}% (Huérfanos)</span>
           </div>
 
           <div
             onClick={() => setActiveTab('active_no_carnet')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-              activeTab === 'active_no_carnet' ? 'bg-red-700 border-red-700 text-white shadow-md' : 'bg-red-50/70 hover:bg-red-100/70 border-red-200 text-red-950'
+              activeTab === 'active_no_carnet' ? 'bg-[#0f1c2d] border-[#0f1c2d] text-white shadow-md' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">⚠️ Sin Carnet</span>
+            <span className="text-[9px] font-black uppercase tracking-wider block text-slate-600">Sin Carnet</span>
             <span className="text-xl font-black block mt-0.5">{metrics.activeNoCarnet}</span>
-            <span className="text-[9.5px] font-bold opacity-80 block">Activos en tienda</span>
+            <span className="text-[9.5px] font-medium text-slate-500 block">Activos en tienda</span>
           </div>
         </div>
 
-        {/* Tab Selection & Actions Bar */}
-        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          {/* Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {[
-              { key: 'all', label: 'Todos los Registros', count: metrics.totalCarnets + metrics.activeNoCarnet },
-              { key: 'active_match', label: 'Activos con Carnet', count: metrics.activeMatch, color: 'text-emerald-700 bg-emerald-100' },
-              { key: 'retired_match', label: 'Retirados', count: metrics.retiredMatch, color: 'text-amber-700 bg-amber-100' },
-              { key: 'orphan_categorized', label: 'Categorizados', count: metrics.orphanCategorized, color: 'text-purple-700 bg-purple-100' },
-              { key: 'orphan_uncategorized', label: 'Huérfanos', count: metrics.orphanUncategorized, color: 'text-rose-700 bg-rose-100' },
-              { key: 'active_no_carnet', label: 'Activos Sin Carnet', count: metrics.activeNoCarnet, color: 'text-red-700 bg-red-100' }
-            ].map(tab => {
-              const isActive = activeTab === tab.key;
-              return (
+        {/* ── Sub-Bar: Desglose y Filtro de Carnets por Categoría / Acciones de Categorización ─────────────── */}
+        {(activeTab === 'orphan_categorized' || activeTab === 'orphan_uncategorized' || (selectedIds.size > 0 && isAdmin)) && (
+          <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 animate-in fade-in duration-150">
+            {activeTab === 'orphan_categorized' ? (
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <div className="flex items-center gap-1.5 shrink-0 text-slate-600 text-[10px] font-black uppercase tracking-widest mr-1">
+                  <Tag className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Carnets por Categoría:</span>
+                </div>
+
                 <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key as ReconciliationTab)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/90 shadow-2xs'
+                  onClick={() => setSelectedCategoryFilter('all')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    selectedCategoryFilter === 'all'
+                      ? 'bg-[#0f1c2d] text-white shadow-xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
                   }`}
                 >
-                  <span>{tab.label}</span>
+                  <span>Todas</span>
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-white/20 text-white' : (tab.color || 'bg-slate-100 text-slate-600')
+                    selectedCategoryFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200/60'
                   }`}>
-                    {tab.count}
+                    {metrics.orphanCategorized}
                   </span>
                 </button>
-              );
-            })}
-          </div>
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <button
-                onClick={() => setShowCategoryManager(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-200 hover:border-purple-400 hover:bg-purple-50 text-purple-700 text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-2xs"
-              >
-                <Tag className="w-3.5 h-3.5" />
-                <span>Gestionar Categorías</span>
-              </button>
-            )}
+                {categoryBreakdown.map(cat => {
+                  const isSelected = selectedCategoryFilter === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategoryFilter(isSelected ? 'all' : cat.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer border ${
+                        isSelected
+                          ? 'bg-[#0f1c2d] text-white border-[#0f1c2d] shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200/90 shadow-2xs'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-slate-400'}`} />
+                      <span>{cat.name}</span>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200/60'
+                      }`}>
+                        {cat.count}
+                      </span>
+                    </button>
+                  );
+                })}
 
-            {/* Bulk Categorization if items selected */}
-            {selectedIds.size > 0 && isAdmin && (
-              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-3 py-1 rounded-xl animate-fade-in">
-                <span className="text-[10px] font-black text-purple-900 uppercase">
-                  {selectedIds.size} seleccionados:
-                </span>
-                <select
-                  value={bulkCategory}
-                  onChange={e => setBulkCategory(e.target.value)}
-                  className="text-xs font-bold bg-white border border-purple-300 rounded-lg px-2 py-1 outline-none text-purple-950"
-                >
-                  <option value="">Elegir categoría...</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                  <option value="CLEAR">Quitar Categoría (Volver Huérfano)</option>
-                </select>
-                <button
-                  onClick={handleBulkAssign}
-                  disabled={!bulkCategory || isApplyingCategory}
-                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-black uppercase rounded-lg transition cursor-pointer"
-                >
-                  {isApplyingCategory ? 'Aplicando...' : 'Aplicar'}
-                </button>
+                {categoryBreakdown.length === 0 && (
+                  <span className="text-xs text-slate-400 font-medium italic">
+                    No hay categorías registradas aún.
+                  </span>
+                )}
               </div>
-            )}
+            ) : <div />}
+
+            <div className="flex items-center gap-2 ml-auto">
+              {isAdmin && (activeTab === 'orphan_categorized' || activeTab === 'orphan_uncategorized') && (
+                <button
+                  onClick={() => setShowCategoryManager(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-2xs"
+                >
+                  <Tag className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Gestionar Categorías</span>
+                </button>
+              )}
+
+              {/* Bulk Categorization if items selected */}
+              {selectedIds.size > 0 && isAdmin && (
+                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1 rounded-xl animate-fade-in">
+                  <span className="text-[10px] font-black text-slate-700 uppercase">
+                    {selectedIds.size} seleccionados:
+                  </span>
+                  <select
+                    value={bulkCategory}
+                    onChange={e => setBulkCategory(e.target.value)}
+                    className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-900"
+                  >
+                    <option value="">Elegir categoría...</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                    <option value="CLEAR">Quitar Categoría (Volver Huérfano)</option>
+                  </select>
+                  <button
+                    onClick={handleBulkAssign}
+                    disabled={!bulkCategory || isApplyingCategory}
+                    className="px-3 py-1 bg-slate-900 hover:bg-black disabled:opacity-50 text-white text-xs font-black uppercase rounded-lg transition cursor-pointer"
+                  >
+                    {isApplyingCategory ? 'Aplicando...' : 'Aplicar'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main Table Area */}
         <div className="flex-1 overflow-auto p-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
               <RefreshCw className="w-8 h-8 animate-spin text-red-600" />
-              <p className="text-xs font-bold uppercase tracking-widest">Cruza de bases de datos en curso...</p>
+              <p className="text-xs font-bold uppercase tracking-widest">Cargando Reporte</p>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2">
@@ -884,8 +949,8 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                             </span>
                           )}
                           {item.matchType === 'active_no_carnet' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-200">
-                              <AlertTriangle className="w-3 h-3 text-red-600" />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-800 border border-rose-200">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
                               ACTIVO SIN CARNET
                             </span>
                           )}
@@ -899,23 +964,21 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                                 <select
                                   value={item.category || ''}
                                   onChange={e => handleAssignCategory(item.id, e.target.value)}
-                                  className={`text-[11px] font-bold rounded-lg px-2.5 py-1 outline-none border transition cursor-pointer ${
-                                    catObj ? `${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}` : 'bg-slate-50 border-slate-200 text-slate-600'
-                                  }`}
+                                  className="text-[11px] font-bold rounded-lg px-2.5 py-1 outline-none border transition cursor-pointer bg-slate-50 hover:bg-white border-slate-200 focus:border-slate-400 text-slate-800"
                                 >
-                                  <option value="">🔴 Sin Clasificar (Huérfano)</option>
+                                  <option value="">Sin Clasificar (Huérfano)</option>
                                   {categories.map(c => (
-                                    <option key={c.id} value={c.id}>🟣 {c.name}</option>
+                                    <option key={c.id} value={c.id}>{c.name}</option>
                                   ))}
                                 </select>
                               ) : (
                                 catObj ? (
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}`}>
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-slate-100 text-slate-800 border-slate-200">
                                     {catObj.name}
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                                    Huérfano
+                                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                    Sin Clasificar
                                   </span>
                                 )
                               )}
@@ -944,19 +1007,19 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                         {/* Estado Carnet */}
                         <td className="p-3">
                           {!item.hasCarnet ? (
-                            <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
-                              PENDIENTE
+                            <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                              SIN CARNET
                             </span>
                           ) : item.isCertExpired ? (
-                            <span className="text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
-                              CADUCADO
+                            <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                              VENCIDO
                             </span>
                           ) : item.isCertExpiringSoon ? (
-                            <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                               POR VENCER
                             </span>
                           ) : (
-                            <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                               VIGENTE
                             </span>
                           )}
@@ -1008,20 +1071,20 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
         {/* ── Category Manager Floating Modal ─────────────────────────────── */}
         {showCategoryManager && (
           <div
-            className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
             onClick={() => setShowCategoryManager(false)}
           >
             <div
-              className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+              className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-purple-600" />
-                  Catálogo de Categorías de Huérfanos
+                  <Tag className="w-4 h-4 text-slate-600" />
+                  Catálogo de Categorías
                 </h4>
                 <button onClick={() => setShowCategoryManager(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -1034,27 +1097,13 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                     placeholder="Ej. Aprendiz SENA, Proveedor..."
                     value={newCatName}
                     onChange={e => setNewCatName(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-purple-500"
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-slate-400"
                   />
-                  <select
-                    value={newCatColor}
-                    onChange={e => setNewCatColor(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-xl px-2 py-2 text-xs font-bold outline-none"
-                  >
-                    <option value="emerald">Verde</option>
-                    <option value="blue">Azul</option>
-                    <option value="amber">Ámbar</option>
-                    <option value="indigo">Índigo</option>
-                    <option value="violet">Violeta</option>
-                    <option value="teal">Turquesa</option>
-                    <option value="purple">Púrpura</option>
-                    <option value="rose">Rosa</option>
-                  </select>
                 </div>
                 <button
                   onClick={handleCreateCategory}
                   disabled={!newCatName.trim()}
-                  className="w-full mt-1.5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-xs"
+                  className="w-full mt-1.5 py-2 bg-slate-900 hover:bg-black disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-xs"
                 >
                   Agregar Categoría
                 </button>
@@ -1064,15 +1113,21 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
               <div className="space-y-1.5 max-h-56 overflow-y-auto">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Categorías Registradas</label>
                 {categories.map(cat => {
-                  const style = COLOR_MAP[cat.color || 'purple'] || COLOR_MAP['purple'];
+                  const catItem = categoryBreakdown.find(c => c.id === cat.id);
+                  const count = catItem?.count ?? 0;
                   return (
                     <div key={cat.id} className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${style.bg} ${style.text} ${style.border}`}>
-                        {cat.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-slate-100 text-slate-800 border-slate-200">
+                          {cat.name}
+                        </span>
+                        <span className="text-[10.5px] font-bold text-slate-500">
+                          {count} {count === 1 ? 'carnet' : 'carnets'}
+                        </span>
+                      </div>
                       <button
                         onClick={() => handleDeleteCategory(cat.id)}
-                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
                         title="Eliminar categoría"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1085,7 +1140,7 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
               <div className="pt-2 border-t border-slate-100 flex justify-end">
                 <button
                   onClick={() => setShowCategoryManager(false)}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase cursor-pointer"
+                  className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase cursor-pointer transition"
                 >
                   Listo
                 </button>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole } from '@/types';
 import { 
   LayoutDashboard, 
@@ -8,25 +8,33 @@ import {
   ShieldCheck, 
   Landmark, 
   Cloud, 
-  CloudOff,
-  RefreshCw,
-  ChevronRight,
-  ChevronDown,
-  Calendar,
-  FileSpreadsheet,
-  TrendingUp,
-  Users,
-  X
+  CloudOff, 
+  RefreshCw, 
+  ChevronRight, 
+  ChevronDown, 
+  ChevronLeft, 
+  Calendar, 
+  FileSpreadsheet, 
+  TrendingUp, 
+  Users, 
+  X,
+  Compass,
+  ExternalLink,
+  Globe
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
+import { ICON_MAP } from '@/features/admin/components/QuickShortcutsManager';
 
 interface SubMenuItem {
-  to: string;
+  to?: string;
+  url?: string;
   label: string;
   icon: any;
-  roles: UserRole[];
+  roles?: UserRole[];
   key: string;
+  target?: '_blank' | '_self';
+  isExternal?: boolean;
 }
 
 interface NavCategory {
@@ -49,10 +57,43 @@ interface NavSingleItem {
 type NavEntry = NavCategory | NavSingleItem;
 
 const Sidebar: React.FC = () => {
-  const { auth, isSidebarOpen: isOpen, setIsSidebarOpen: setIsOpen, syncStatus } = useAppStore();
+  const { 
+    auth, 
+    isSidebarOpen: isOpen, 
+    setIsSidebarOpen: setIsOpen, 
+    quickShortcuts,
+    loadQuickShortcuts,
+    syncStatus 
+  } = useAppStore();
   const role = auth.user!.role;
   const location = useLocation();
   const activeTab = location.pathname.substring(1) || 'dashboard';
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    loadQuickShortcuts();
+  }, [loadQuickShortcuts]);
+
+  // On mobile (< lg), the sidebar drawer is always full width and expanded.
+  // On desktop (>= lg), it collapses to icons only when not hovered.
+  const isCollapsed = isDesktop && !isHovered;
+
+  // Filtrar accesos directos activos y permitidos para el rol
+  const userShortcuts = (quickShortcuts || []).filter(sc => {
+    if (sc.isActive === false) return false;
+    if (!sc.roles || sc.roles.length === 0) return true;
+    return sc.roles.includes(role);
+  });
 
   // Navigation structure with collapsible categories
   const navigationStructure: NavEntry[] = [
@@ -124,6 +165,24 @@ const Sidebar: React.FC = () => {
       roles: [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER, UserRole.GUEST],
       key: 'encuestas'
     },
+    ...(userShortcuts.length > 0 ? [{
+      type: 'category' as const,
+      id: 'shortcuts',
+      label: 'Accesos',
+      icon: Compass,
+      items: userShortcuts.map(sc => {
+        const IconComp = (sc.icon && ICON_MAP[sc.icon]) || Globe;
+        return {
+          url: sc.url,
+          label: sc.title,
+          icon: IconComp,
+          roles: sc.roles || [],
+          key: `shortcut-${sc.id}`,
+          target: sc.target || '_blank',
+          isExternal: true
+        };
+      })
+    }] : []),
     {
       type: 'item',
       to: '/admin',
@@ -136,7 +195,8 @@ const Sidebar: React.FC = () => {
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     curvas: false,
-    gente: false
+    gente: false,
+    shortcuts: false
   });
 
   const toggleCategory = (catId: string) => {
@@ -146,7 +206,8 @@ const Sidebar: React.FC = () => {
     }));
   };
 
-  const isItemAllowed = (item: { roles: UserRole[]; key: string }) => {
+  const isItemAllowed = (item: { roles?: UserRole[]; key: string }) => {
+    if (!item.roles || item.roles.length === 0) return true;
     if (role === UserRole.GUEST) {
       const guestMods = auth.user?.allowedModules?.length ? auth.user.allowedModules : ['banca'];
       return guestMods.includes(item.key);
@@ -155,36 +216,49 @@ const Sidebar: React.FC = () => {
   };
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-50 w-64 bg-[#0b0f19] text-white flex flex-col transition-transform duration-300 ease-in-out transform
-    lg:relative lg:translate-x-0 border-r border-slate-900/60
+    fixed inset-y-0 left-0 z-50 bg-[#0b0f19] text-white flex flex-col transition-all duration-300 ease-in-out transform
+    lg:relative lg:translate-x-0 border-r border-slate-900/60 shadow-2xl lg:shadow-none
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+    w-72 max-w-[85vw] ${isCollapsed ? 'lg:w-[76px] lg:min-w-[76px]' : 'lg:w-64 lg:min-w-[16rem]'}
   `;
 
   return (
-    <aside className={sidebarClasses}>
+    <aside 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={sidebarClasses}
+    >
       {/* Header Area */}
-      <div className="px-4 pt-5 pb-4 border-b border-slate-900/50 relative">
-        <div className="w-full bg-white rounded-2xl p-3.5 flex items-center gap-3.5 relative shadow-md">
-          <img src="/Favicon.png" alt="RED Logo" className="w-12 h-12 object-contain rounded-xl shrink-0" />
-          <div className="flex flex-col min-w-0 justify-center pr-3">
-            <span className="text-2xl font-black text-red-600 tracking-tight leading-none uppercase">
+      <div className="px-3.5 pt-5 pb-2">
+        <div className="flex items-center min-h-[44px] overflow-hidden">
+          <div className="w-10 h-10 rounded-2xl bg-white p-1 flex items-center justify-center shrink-0 shadow-md">
+            <img src="/Favicon.png" alt="RED Logo" className="w-8 h-8 object-contain rounded-lg" />
+          </div>
+          
+          <div className={`overflow-hidden transition-all duration-300 ${
+            isCollapsed ? 'max-w-0 opacity-0 ml-0 -translate-x-2' : 'max-w-[150px] opacity-100 ml-3.5 translate-x-0'
+          }`}>
+            <span className="text-3xl font-black text-white tracking-tight leading-none uppercase whitespace-nowrap">
               RED
             </span>
-            <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider leading-tight mt-1">
-              RUTA DE ENTRENAMIENTO Y DESEMPEÑO
-            </span>
           </div>
+
+          {/* Close Button Mobile */}
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-100 rounded-xl transition text-slate-400"
+            className="lg:hidden p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 ml-auto shrink-0 cursor-pointer"
+            aria-label="Cerrar menú"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Subtle Divider Line */}
+        <div className="mt-3.5 h-px bg-slate-800/60 w-full rounded-full" />
       </div>
 
       {/* Navigation Links Area */}
-      <nav className="flex-1 px-3.5 py-4 space-y-2 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {navigationStructure.map(entry => {
           if (entry.type === 'category') {
             const allowedCategoryItems = entry.items.filter(isItemAllowed);
@@ -200,24 +274,31 @@ const Sidebar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => toggleCategory(entry.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all duration-200 group cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-2.5 py-2.5 rounded-2xl transition-all duration-200 group cursor-pointer overflow-hidden ${
                     hasActiveChild && !isExpanded
                       ? 'bg-red-950/30 text-red-400 border border-red-900/40'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                  <div className="flex items-center min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                       hasActiveChild ? 'bg-red-600/20 text-red-500' : 'bg-slate-800/40 text-slate-400 group-hover:text-slate-200'
                     }`}>
                       <CategoryIcon className="w-4 h-4" />
                     </div>
-                    <span className="font-black text-xs uppercase tracking-wider">
-                      {entry.label}
-                    </span>
+                    
+                    <div className={`ml-3 overflow-hidden transition-all duration-300 ${
+                      isCollapsed ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-[130px] opacity-100 translate-x-0'
+                    }`}>
+                      <span className="font-black text-xs uppercase tracking-wider whitespace-nowrap">
+                        {entry.label}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className={`flex items-center gap-1.5 transition-all duration-300 ${
+                    isCollapsed ? 'max-w-0 opacity-0 overflow-hidden' : 'max-w-[30px] opacity-100'
+                  }`}>
                     {hasActiveChild && !isExpanded && (
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                     )}
@@ -228,29 +309,52 @@ const Sidebar: React.FC = () => {
                 </button>
 
                 {/* Collapsible Sub-Items */}
-                {isExpanded && (
-                  <div className="pl-3 space-y-1 pt-0.5 border-l-2 border-slate-800/60 ml-4 animate-in fade-in slide-in-from-top-1 duration-150">
+                {isExpanded && !isCollapsed && (
+                  <div className="pl-2 space-y-1 pt-0.5 border-l-2 border-slate-800/60 ml-4 animate-in fade-in slide-in-from-top-1 duration-150">
                     {allowedCategoryItems.map(item => {
                       const isActive = activeTab === item.key || location.pathname === item.to;
                       const Icon = item.icon;
 
+                      if (item.isExternal && item.url) {
+                        return (
+                          <a
+                            key={item.key}
+                            href={item.url}
+                            target={item.target || '_blank'}
+                            rel="noopener noreferrer"
+                            onClick={() => setIsOpen(false)}
+                            className="relative w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-200 group text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all text-slate-400 group-hover:text-slate-200">
+                                <Icon className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="font-black text-[11px] uppercase tracking-wider whitespace-nowrap truncate">
+                                {item.label}
+                              </span>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-slate-300 shrink-0" />
+                          </a>
+                        );
+                      }
+
                       return (
                         <Link
                           key={item.key}
-                          to={item.to}
+                          to={item.to || '/'}
                           onClick={() => setIsOpen(false)}
-                          className={`relative w-full flex items-center gap-3 px-3.5 py-2 rounded-xl transition-all duration-200 group ${
+                          className={`relative w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-200 group ${
                             isActive
                               ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-[0_6px_20px_rgba(230,0,0,0.25)]'
                               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                           }`}
                         >
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
                             isActive ? 'bg-white/10 text-white' : 'text-slate-400 group-hover:text-slate-200'
                           }`}>
-                            <Icon className="w-4 h-4" />
+                            <Icon className="w-3.5 h-3.5" />
                           </div>
-                          <span className={`font-black text-[11px] uppercase tracking-wider ${
+                          <span className={`font-black text-[11px] uppercase tracking-wider whitespace-nowrap ${
                             isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
                           }`}>
                             {item.label}
@@ -275,7 +379,7 @@ const Sidebar: React.FC = () => {
               key={entry.key}
               to={entry.to}
               onClick={() => setIsOpen(false)}
-              className={`relative w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl transition-all duration-200 group hover:scale-[1.01] active:scale-[0.99] ${
+              className={`relative w-full flex items-center px-2.5 py-2.5 rounded-2xl transition-all duration-200 group hover:scale-[1.01] active:scale-[0.99] overflow-hidden ${
                 isActive 
                   ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-[0_8px_25px_rgba(230,0,0,0.25)]' 
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -287,54 +391,65 @@ const Sidebar: React.FC = () => {
                 <Icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </div>
 
-              <span className={`font-black text-xs uppercase tracking-wider ${
-                isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+              <div className={`ml-3 overflow-hidden transition-all duration-300 ${
+                isCollapsed ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-[160px] opacity-100 translate-x-0'
               }`}>
-                {entry.label}
-              </span>
+                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap ${
+                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                }`}>
+                  {entry.label}
+                </span>
+              </div>
             </Link>
           );
         })}
       </nav>
 
       {/* Footer Area */}
-      <div className="p-4 border-t border-slate-900/50 mt-auto bg-[#0b0f19]">
-        <div className={`rounded-2xl p-3.5 flex items-center justify-between border transition-all duration-500 ${
+      <div className="px-3.5 py-4 border-t border-slate-900/50 mt-auto bg-[#0b0f19]">
+        <div className={`rounded-2xl p-2.5 flex items-center border transition-all duration-300 overflow-hidden ${
           syncStatus === 'syncing' 
             ? 'bg-slate-900/40 border-amber-500/20' 
             : syncStatus === 'online' 
               ? 'bg-[#121824] border-slate-800/40' 
               : 'bg-red-950/20 border-red-500/20'
         }`}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center min-w-0 flex-1">
             {syncStatus === 'syncing' && (
-              <div className="relative w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
+              <div className="relative w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
                 <RefreshCw className="w-4 h-4 animate-spin" />
               </div>
             )}
             {syncStatus === 'online' && (
-              <div className="relative w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+              <div className="relative w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
                 <Cloud className="w-4 h-4" />
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#121824] rounded-full flex items-center justify-center" />
+                <span className="absolute bottom-1 right-1 w-2 h-2 bg-emerald-500 border-2 border-[#121824] rounded-full" />
               </div>
             )}
             {syncStatus !== 'syncing' && syncStatus !== 'online' && (
-              <div className="relative w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
+              <div className="relative w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
                 <CloudOff className="w-4 h-4" />
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-[#121824] rounded-full flex items-center justify-center" />
+                <span className="absolute bottom-1 right-1 w-2 h-2 bg-red-500 border-2 border-[#121824] rounded-full" />
               </div>
             )}
             
-            <div className="min-w-0">
-              <p className="text-[10px] font-black text-white uppercase tracking-wider leading-none">
+            <div className={`ml-3 overflow-hidden transition-all duration-300 ${
+              isCollapsed ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-[150px] opacity-100 translate-x-0'
+            }`}>
+              <p className="text-[10px] font-black text-white uppercase tracking-wider leading-none whitespace-nowrap">
                 {syncStatus === 'syncing' ? 'Sincronizando' : syncStatus === 'online' ? 'Nube Conectada' : 'Modo Offline'}
               </p>
-              <p className="text-[8px] text-slate-500 font-bold mt-1 leading-none">
+              <p className="text-[8px] text-slate-500 font-bold mt-1 leading-none whitespace-nowrap">
                 {syncStatus === 'syncing' ? 'Guardando en la nube' : syncStatus === 'online' ? 'Sincronizado' : 'Guardando local'}
               </p>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-600" />
+
+          <div className={`transition-all duration-300 ${
+            isCollapsed ? 'max-w-0 opacity-0 overflow-hidden' : 'max-w-[20px] opacity-100'
+          }`}>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          </div>
         </div>
       </div>
     </aside>

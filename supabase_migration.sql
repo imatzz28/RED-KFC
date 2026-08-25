@@ -390,6 +390,22 @@ CREATE TABLE IF NOT EXISTS public.banca (
   data JSONB NOT NULL DEFAULT '{"assignments":[]}'::jsonb
 );
 
+CREATE TABLE IF NOT EXISTS public.banca_external_personnel (
+  id TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  name TEXT NOT NULL,
+  document_id TEXT,
+  role_tag TEXT DEFAULT 'Operaciones',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.pulse_categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.hierarchy (
   id INT PRIMARY KEY DEFAULT 1,
   data JSONB NOT NULL DEFAULT '{"lockedMonths":[],"regions":[]}'::jsonb
@@ -404,8 +420,59 @@ ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.banca ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banca_external_personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pulse_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hierarchy ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.monthly_group_stats ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de lectura pública para usuarios autenticados
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.banca_external_personnel;
+CREATE POLICY "Permitir lectura a autenticados" ON public.banca_external_personnel FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.pulse_categories;
+CREATE POLICY "Permitir lectura a autenticados" ON public.pulse_categories FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Roles autorizados modifican banca_external_personnel" ON public.banca_external_personnel;
+CREATE POLICY "Roles autorizados modifican banca_external_personnel" ON public.banca_external_personnel
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND (
+        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
+      )
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND (
+        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
+        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "Solo admin puede modificar pulse_categories" ON public.pulse_categories;
+CREATE POLICY "Solo admin puede modificar pulse_categories" ON public.pulse_categories
+FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
+      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
+  )
+);
 
 -- Políticas de lectura pública para usuarios autenticados
 DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.users;
@@ -1086,3 +1153,29 @@ CREATE POLICY "Control total para personal autenticado en encuestas" ON public.s
 
 DROP POLICY IF EXISTS "Permitir guardar y actualizar respuestas" ON public.responses;
 CREATE POLICY "Permitir guardar y actualizar respuestas" ON public.responses FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- QUICK SHORTCUTS: Accesos Directos Personalizables
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.quick_shortcuts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  icon TEXT DEFAULT 'Globe',
+  description TEXT,
+  target TEXT DEFAULT '_blank',
+  roles JSONB,
+  "order" INTEGER DEFAULT 1,
+  "isActive" BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.quick_shortcuts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir lectura de accesos directos" ON public.quick_shortcuts;
+CREATE POLICY "Permitir lectura de accesos directos" ON public.quick_shortcuts FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir administracion de accesos directos" ON public.quick_shortcuts;
+CREATE POLICY "Permitir administracion de accesos directos" ON public.quick_shortcuts FOR ALL USING (true) WITH CHECK (true);
+

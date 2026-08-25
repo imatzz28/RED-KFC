@@ -9,12 +9,13 @@ import { HierarchyViewer } from './components/HierarchyViewer';
 import { SstConfig } from './components/SstConfig';
 import { UserManagement } from './components/UserManagement';
 import { PulseAdminCategoryManager } from './components/PulseAdminCategoryManager';
+import { QuickShortcutsManager } from './components/QuickShortcutsManager';
 import { useAppStore } from '@/store/useAppStore';
 
 const AdminPanel: React.FC = () => {
   const { auth, refreshData: onEmployeesImported } = useAppStore();
   const currentUser = auth.user!;
-  const [activeSubTab, setActiveSubTab] = useState<'import' | 'users' | 'hierarchy' | 'settlement' | 'pulse'>(
+  const [activeSubTab, setActiveSubTab] = useState<'import' | 'users' | 'hierarchy' | 'settlement' | 'pulse' | 'shortcuts'>(
     currentUser.role === UserRole.ADMIN ? 'import' : 'users'
   );
   const [importStatus, setImportStatus] = useState<{ message: string, isError: boolean } | null>(null);
@@ -42,6 +43,7 @@ const AdminPanel: React.FC = () => {
                     <button onClick={() => setActiveSubTab('settlement')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'settlement' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Asentar Notas</button>
                     <button onClick={() => setActiveSubTab('hierarchy')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'hierarchy' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Estructura</button>
                     <button onClick={() => setActiveSubTab('pulse')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'pulse' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Pulse (Categorías)</button>
+                    <button onClick={() => setActiveSubTab('shortcuts')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'shortcuts' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Accesos Directos</button>
                   </>
                 )}
                 <button onClick={() => setActiveSubTab('users')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Gestión de Usuarios</button>
@@ -68,7 +70,7 @@ const AdminPanel: React.FC = () => {
           />
         )}
 
-{/* Settlement Manager Component */}
+        {/* Settlement Manager Component */}
         {activeSubTab === 'settlement' && currentUser.role === UserRole.ADMIN && (
           <SettlementManager hierarchy={hierarchy} setHierarchy={setHierarchy} setImportStatus={setImportStatus} />
         )}
@@ -93,6 +95,11 @@ const AdminPanel: React.FC = () => {
         {/* Pulse Category Manager Component */}
         {activeSubTab === 'pulse' && currentUser.role === UserRole.ADMIN && (
           <PulseAdminCategoryManager setImportStatus={setImportStatus} />
+        )}
+
+        {/* Quick Shortcuts Manager Component */}
+        {activeSubTab === 'shortcuts' && currentUser.role === UserRole.ADMIN && (
+          <QuickShortcutsManager setImportStatus={setImportStatus} />
         )}
 
       </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, UserRole, AuthState, Employee, Restaurant } from '@/types';
+import { User, UserRole, AuthState, Employee, Restaurant, QuickShortcut } from '@/types';
 import { dataService } from '@/services/dataService';
 
 interface AppState {
@@ -12,19 +12,25 @@ interface AppState {
     employees: Employee[];
     restaurants: Restaurant[];
     filteredEmployees: Employee[];
+    quickShortcuts: QuickShortcut[];
 
     // UI & Sync
     selectedMonth: string;
     setSelectedMonth: (month: string) => void;
     isSidebarOpen: boolean;
     setIsSidebarOpen: (isOpen: boolean) => void;
+    isSidebarCollapsed: boolean;
+    setIsSidebarCollapsed: (isCollapsed: boolean) => void;
+    toggleSidebarCollapsed: () => void;
     syncStatus: 'syncing' | 'online' | 'offline';
     setSyncStatus: (status: 'syncing' | 'online' | 'offline') => void;
 
     // Actions
     refreshData: () => void;
     initData: (force?: boolean) => Promise<void>;
-    loadMonthly: () => Promise<void>;
+    loadQuickShortcuts: () => Promise<void>;
+    saveQuickShortcuts: (shortcuts: QuickShortcut[]) => Promise<void>;
+    deleteQuickShortcut: (id: string) => Promise<void>;
 
     // Global Modal Dialog
     dialog: {
@@ -95,8 +101,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     employees: [],
     restaurants: [],
     filteredEmployees: [],
+    quickShortcuts: [],
     selectedMonth: getInitialFallbackMonth(),
     isSidebarOpen: false,
+    isSidebarCollapsed: typeof window !== 'undefined' && localStorage.getItem('red_sidebar_collapsed') === 'true',
     syncStatus: 'syncing',
 
     dialog: { isOpen: false, type: 'alert', message: '' },
@@ -142,6 +150,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     setSelectedMonth: (month) => set({ selectedMonth: month }),
     setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+    setIsSidebarCollapsed: (isCollapsed) => {
+        localStorage.setItem('red_sidebar_collapsed', String(isCollapsed));
+        set({ isSidebarCollapsed: isCollapsed });
+    },
+    toggleSidebarCollapsed: () => {
+        const next = !get().isSidebarCollapsed;
+        localStorage.setItem('red_sidebar_collapsed', String(next));
+        set({ isSidebarCollapsed: next });
+    },
     setSyncStatus: (status) => set({ syncStatus: status }),
 
     refreshData: () => {
@@ -183,6 +200,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
 
         get().refreshData();
+        await get().loadQuickShortcuts();
         set({ syncStatus: success ? 'online' : 'offline' });
     },
 
@@ -193,6 +211,27 @@ export const useAppStore = create<AppState>((set, get) => ({
         await dataService.loadGradesSummary(get().selectedMonth);
         get().refreshData();
         set({ syncStatus: 'online' });
+    },
+
+    loadQuickShortcuts: async () => {
+        try {
+            const shortcuts = await dataService.getQuickShortcuts();
+            set({ quickShortcuts: shortcuts });
+        } catch (err) {
+            console.error('[loadQuickShortcuts] Error cargando accesos directos:', err);
+        }
+    },
+
+    saveQuickShortcuts: async (shortcuts: QuickShortcut[]) => {
+        set({ quickShortcuts: shortcuts });
+        await dataService.saveQuickShortcuts(shortcuts);
+    },
+
+    deleteQuickShortcut: async (id: string) => {
+        const next = get().quickShortcuts.filter(s => s.id !== id);
+        set({ quickShortcuts: next });
+        localStorage.setItem('red_quick_shortcuts', JSON.stringify(next));
+        await dataService.deleteQuickShortcut(id);
     }
 }));
 

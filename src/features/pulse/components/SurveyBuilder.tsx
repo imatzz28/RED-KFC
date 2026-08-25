@@ -465,12 +465,15 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
           {/* Categoría */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Categoría</label>
-            <input
-              type="text"
+            <select
               value={survey.category || 'General'}
               onChange={e => setSurvey({ ...survey, category: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-red-500"
-            />
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-red-500 cursor-pointer"
+            >
+              {Array.from(new Set([...dataService.getSurveyCategories(), ...(survey.category ? [survey.category] : [])])).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           {/* Reglas de Examen en Quizzes */}

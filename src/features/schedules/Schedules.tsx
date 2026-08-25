@@ -20,9 +20,11 @@ import {
   MessageSquare,
   Send,
   Building2,
-  Briefcase
+  Briefcase,
+  BarChart3
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { ScheduleReportDashboard } from './components/ScheduleReportDashboard';
 
 const getMonday = (d: Date) => {
   const date = new Date(d);
@@ -215,6 +217,9 @@ const Schedules: React.FC = () => {
     day: { name: string; dateStr: string };
     schedule: DailySchedule;
   } | null>(null);
+
+  // ── Dashboard de Reporte de Planificación ─────────────────────────────────
+  const [isReportDashboardOpen, setIsReportDashboardOpen] = useState(false);
 
   // Compute the 7 dates of the week
   const weekDays = useMemo(() => {
@@ -866,6 +871,17 @@ const Schedules: React.FC = () => {
                 <Calendar className="w-4.5 h-4.5 text-red-650 shrink-0" />
                 <span className="tracking-wide">{weekDays.length > 0 ? getWeekRangeLabel() : 'Cargando...'}</span>
               </div>
+
+              {/* Reporte planificación (Líderes y Administradores) */}
+              {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.LIDER || auth.user?.role === UserRole.COORDINATOR) && (
+                <button 
+                  onClick={() => setIsReportDashboardOpen(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-[#0f1c2d] hover:bg-black text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer h-[42px] shrink-0"
+                >
+                  <BarChart3 className="w-4 h-4 text-red-500" />
+                  <span>Reporte planificación</span>
+                </button>
+              )}
 
               {/* Export button */}
               {auth.user?.role !== UserRole.SPECIALIST && auth.user?.role !== UserRole.GUEST && (
@@ -1574,12 +1590,12 @@ const Schedules: React.FC = () => {
                         >
                           <option value="">Selecciona una actividad...</option>
                           {[
-                            'Induccion Coroporativo',
-                            'Introduccion a las plataformas',
-                            'Taller Manipulacion Mensual',
+                            'Inducción Corporativa',
+                            'Introducción a las plataformas',
+                            'Taller Manipulación Mensual',
                             'The Vault',
                             'Apoyo Comercial',
-                            'Apoyo planta',
+                            'Apoyo Planta',
                             'Entrenamiento CAR',
                             'Trabajo en Restaurante'
                           ].map(act => (
@@ -2095,6 +2111,16 @@ const Schedules: React.FC = () => {
         </div>,
         document.body
       )}
+
+      {/* Dashboard Modal de Reporte de Planificación */}
+      <ScheduleReportDashboard
+        isOpen={isReportDashboardOpen}
+        onClose={() => setIsReportDashboardOpen(false)}
+        users={dataService.getUsers()}
+        restaurants={restaurants}
+        initialStartDate={weekDays[0]?.dateStr}
+        initialEndDate={weekDays[6]?.dateStr}
+      />
     </>
   );
 };

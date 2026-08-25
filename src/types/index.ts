@@ -123,6 +123,17 @@ export interface StoreAssignment {
   restaurantId: string;
   members: StoreLeader[];
 }
+
+export interface BancaExternalPerson {
+  id: string; // Cédula o identificador único
+  first_name: string;
+  last_name: string;
+  name: string; // Nombre completo generado
+  document_id?: string;
+  role_tag?: string; // 'Operaciones'
+  created_at?: string;
+}
+
 export interface SafeHandsPerson {
   id: string; // Cedula
   name: string; // Nombre
@@ -186,3 +197,17 @@ export interface DailySchedule {
 }
 
 export * from './pulse';
+
+export interface QuickShortcut {
+  id: string;
+  title: string;
+  url: string;
+  icon?: string;
+  description?: string;
+  target?: '_blank' | '_self';
+  roles?: UserRole[];
+  order?: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}

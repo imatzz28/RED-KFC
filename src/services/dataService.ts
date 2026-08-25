@@ -1,6 +1,6 @@
 
 
-import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, SafeHandsOrphanCategory, DailySchedule, ScheduleRequest, Survey, ResponseRecord } from '@/types';
+import { Employee, GradeEntry, User, UserRole, JobTitle, Restaurant, HierarchyData, BancaData, SafeHandsPerson, SafeHandsCert, SafeHandsSettings, SafeHandsOrphanCategory, DailySchedule, ScheduleRequest, Survey, ResponseRecord, QuickShortcut } from '@/types';
 import * as XLSX from 'xlsx';
 import localforage from 'localforage';
 
@@ -199,6 +199,7 @@ export const dataService = {
     hierarchy: null as HierarchyData | null,
     users: null as User[] | null,
     banca: null as BancaData | null,
+    bancaExternalPersonnel: null as BancaExternalPerson[] | null,
     surveys: null as Survey[] | null,
     responses: null as ResponseRecord[] | null,
     surveyCategories: null as string[] | null,
@@ -223,6 +224,7 @@ export const dataService = {
       dataService._cache.users = (await localforage.getItem<User[]>('la_akademia_users')) || [];
       const localBanca = await localforage.getItem<BancaData>('la_akademia_banca');
       dataService._cache.banca = dataService.normalizeBancaData(localBanca || { assignments: [] });
+      dataService._cache.bancaExternalPersonnel = (await localforage.getItem<BancaExternalPerson[]>('la_akademia_banca_external_personnel')) || [];
       dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
       dataService._cache.responses = (await localforage.getItem<ResponseRecord[]>('la_akademia_responses')) || [];
       dataService._cache.surveyCategories = (await localforage.getItem<string[]>('la_akademia_survey_categories')) || [
@@ -249,12 +251,14 @@ export const dataService = {
       // surveys y responses NO se descargan aquí: se cargan bajo demanda cuando el usuario
       // abre el módulo Pulse (via fetchSurveysAndResponses). Esto evita 2 consultas innecesarias
       // a Supabase en cada login para usuarios que no usan Pulse.
-      const [employees, restaurants, hierarchy, users, banca] = await Promise.all([
+      const [employees, restaurants, hierarchy, users, banca, externalPersonnel, pulseCats] = await Promise.all([
         dataService.supabaseFetchAll('employees'),
         dataService.supabaseFetchAll('restaurants'),
         dataService.supabaseFetch('hierarchy').catch(() => []),
         dataService.supabaseFetchAll('users').catch(() => []),
         dataService.supabaseFetch('banca').catch(() => []),
+        dataService.supabaseFetch('banca_external_personnel').catch(() => []),
+        dataService.supabaseFetch('pulse_categories').catch(() => []),
       ]);
 
       await Promise.all([
@@ -266,6 +270,21 @@ export const dataService = {
       const defaultHierarchy = { lockedMonths: [], regions: [] };
       const cloudHierarchy = (hierarchy && (hierarchy as any)[0]?.data) ? (hierarchy as any)[0].data : defaultHierarchy;
       await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
+
+      // Sincronizar personal externo de banca
+      const cloudExternal = Array.isArray(externalPersonnel) ? (externalPersonnel as BancaExternalPerson[]) : [];
+      const currentLocalExternal = dataService._cache.bancaExternalPersonnel || (await localforage.getItem<BancaExternalPerson[]>('la_akademia_banca_external_personnel')) || [];
+      const mergedExternal = cloudExternal.length > 0 ? cloudExternal : currentLocalExternal;
+      await localforage.setItem('la_akademia_banca_external_personnel', mergedExternal);
+
+      // Sincronizar categorías de Pulse
+      if (Array.isArray(pulseCats) && pulseCats.length > 0) {
+        const catNames = pulseCats.map((c: any) => c.name || c).filter(Boolean);
+        const currentCats = dataService.getSurveyCategories();
+        const mergedCats = Array.from(new Set([...currentCats, ...catNames]));
+        dataService._cache.surveyCategories = mergedCats;
+        await localforage.setItem('la_akademia_survey_categories', mergedCats);
+      }
 
       const defaultBanca: BancaData = { assignments: [] };
       let rawBanca: BancaData = defaultBanca;
@@ -295,6 +314,7 @@ export const dataService = {
       dataService._cache.users = (users as User[]) || [];
       dataService._cache.hierarchy = cloudHierarchy;
       dataService._cache.banca = finalBanca;
+      dataService._cache.bancaExternalPersonnel = mergedExternal;
       dataService._cache.gradeIndex = null;
       dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
 
@@ -658,6 +678,47 @@ export const dataService = {
 
   getHierarchy: (): HierarchyData => dataService._cache.hierarchy || { lockedMonths: [], regions: [] },
   getBancaData: (): BancaData => dataService.normalizeBancaData(dataService._cache.banca || { assignments: [] }),
+  
+  getBancaExternalPersonnel: (): BancaExternalPerson[] => {
+    return dataService._cache.bancaExternalPersonnel || [];
+  },
+
+  saveBancaExternalPerson: async (person: BancaExternalPerson): Promise<void> => {
+    const current = dataService.getBancaExternalPersonnel();
+    const updated = [...current.filter(p => p.id !== person.id), person];
+    dataService._cache.bancaExternalPersonnel = updated;
+    await localforage.setItem('la_akademia_banca_external_personnel', updated);
+
+    // Guardar en Supabase
+    try {
+      await dataService.supabaseFetch('banca_external_personnel', 'POST', person, '?on_conflict=id');
+    } catch (err) {
+      console.warn('[saveBancaExternalPerson] Falló supabaseFetch, reintentando con cliente JS:', err);
+      try {
+        await supabase.from('banca_external_personnel').upsert(person, { onConflict: 'id' });
+      } catch (clientErr) {
+        console.error('[saveBancaExternalPerson] Error al persistir en Supabase:', clientErr);
+      }
+    }
+  },
+
+  deleteBancaExternalPerson: async (id: string): Promise<void> => {
+    const current = dataService.getBancaExternalPersonnel();
+    const updated = current.filter(p => p.id !== id);
+    dataService._cache.bancaExternalPersonnel = updated;
+    await localforage.setItem('la_akademia_banca_external_personnel', updated);
+
+    try {
+      await dataService.supabaseFetch(`banca_external_personnel?id=eq.${id}`, 'DELETE');
+    } catch (err) {
+      console.warn('[deleteBancaExternalPerson] Error borrando en Supabase:', err);
+      try {
+        await supabase.from('banca_external_personnel').delete().eq('id', id);
+      } catch (clientErr) {
+        console.error('[deleteBancaExternalPerson] Error con Supabase Client:', clientErr);
+      }
+    }
+  },
   getUsers: (): User[] => {
     const rawUsers = dataService._cache.users || [];
     return rawUsers.map((u: any) => ({
@@ -1003,6 +1064,20 @@ export const dataService = {
   saveSurveyCategories: async (categories: string[]) => {
     dataService._cache.surveyCategories = categories;
     await localforage.setItem('la_akademia_survey_categories', categories);
+
+    // Sincronizar en la nube en tabla pulse_categories
+    try {
+      const payload = categories.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
+      await dataService.supabaseFetch('pulse_categories', 'POST', payload, '?on_conflict=id');
+    } catch (err) {
+      console.warn('[saveSurveyCategories] Falló supabaseFetch en pulse_categories, reintentando con cliente JS:', err);
+      try {
+        const payload = categories.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
+        await supabase.from('pulse_categories').upsert(payload, { onConflict: 'id' });
+      } catch (clientErr) {
+        console.error('[saveSurveyCategories] Error al persistir categorías en Supabase:', clientErr);
+      }
+    }
   },
 
   deleteUser: async (userId: string) => {
@@ -1543,5 +1618,94 @@ export const dataService = {
   markScheduleRequestProcessed: async (id: string): Promise<void> => {
     const query = `?id=eq.${id}`;
     await dataService.supabaseFetch('schedule_requests', 'PATCH', { status: 'PROCESADO' }, query);
+  },
+
+  // ── Quick Shortcuts ────────────────────────────────────────────────────────
+  getQuickShortcuts: async (): Promise<QuickShortcut[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('quick_shortcuts')
+        .select('*')
+        .order('order', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        localStorage.setItem('red_quick_shortcuts', JSON.stringify(data));
+        return data as QuickShortcut[];
+      }
+    } catch {
+      // Silencioso si no existe tabla aún
+    }
+
+    const local = localStorage.getItem('red_quick_shortcuts');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch {}
+    }
+
+    const defaults: QuickShortcut[] = [
+      {
+        id: 'sc-kfc-portal',
+        title: 'Portal Corporativo',
+        url: 'https://kfc.co',
+        icon: 'Globe',
+        description: 'Sitio oficial KFC Colombia',
+        target: '_blank',
+        isActive: true,
+        order: 1
+      },
+      {
+        id: 'sc-learning',
+        title: 'Campus Virtual',
+        url: 'https://learningzone.yum.com',
+        icon: 'BookOpen',
+        description: 'Plataforma de capacitación y cursos',
+        target: '_blank',
+        isActive: true,
+        order: 2
+      }
+    ];
+    localStorage.setItem('red_quick_shortcuts', JSON.stringify(defaults));
+    return defaults;
+  },
+
+  saveQuickShortcuts: async (shortcuts: QuickShortcut[]): Promise<void> => {
+    localStorage.setItem('red_quick_shortcuts', JSON.stringify(shortcuts));
+    try {
+      // Normalizar para que cada objeto tenga exactamente las mismas claves (evita PGRST102)
+      const normalized = shortcuts.map((s, idx) => ({
+        id: s.id,
+        title: s.title || '',
+        url: s.url || '',
+        icon: s.icon || 'Globe',
+        description: s.description || null,
+        target: s.target || '_blank',
+        roles: s.roles && s.roles.length > 0 ? s.roles : null,
+        order: s.order ?? (idx + 1),
+        isActive: s.isActive ?? true,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase
+        .from('quick_shortcuts')
+        .upsert(normalized, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('[saveQuickShortcuts] Error en Supabase upsert:', error);
+      }
+    } catch (err) {
+      console.warn('[saveQuickShortcuts] Falló guardado en Supabase, persistido en localStorage:', err);
+    }
+  },
+
+  deleteQuickShortcut: async (id: string): Promise<void> => {
+    try {
+      await supabase.from('quick_shortcuts').delete().eq('id', id);
+    } catch (err) {
+      console.warn('[deleteQuickShortcut] Error al eliminar en Supabase:', err);
+    }
   }
 };

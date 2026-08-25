@@ -422,45 +422,62 @@ const EntriesExitsReport: React.FC = () => {
         </div>
 
         {/* ── Análisis y Gráfico ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="space-y-6">
-            <button onClick={() => setShowCargoModal(true)} className="w-full bg-slate-900 text-white p-8 rounded-[32px] border border-slate-800 shadow-2xl transition-all hover:bg-slate-800 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-10 translate-x-1/2 -translate-y-1/2 bg-red-600/10 rounded-full blur-3xl group-hover:bg-red-600/20 transition-all" />
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="text-left">
-                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1">Análisis</h4>
-                  <p className="text-lg font-black uppercase italic tracking-tighter leading-tight">Movimientos por Cargo</p>
-                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 flex items-center gap-1"><PieChart className="w-3 h-3" /> Desglose + rotación</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
+            <button 
+              onClick={() => setShowCargoModal(true)} 
+              className="w-full bg-[#0f1c2d] text-white p-6 rounded-3xl border border-slate-800 shadow-md transition-all hover:bg-slate-900 group relative overflow-hidden text-left cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-[9px] font-black uppercase text-red-500 tracking-widest mb-1">Análisis Detallado</h4>
+                  <p className="text-base font-black uppercase italic tracking-tight leading-tight text-white">Movimientos por Cargo</p>
+                  <p className="text-[9px] font-medium text-slate-400 mt-1.5 flex items-center gap-1.5">
+                    <PieChart className="w-3.5 h-3.5 text-red-500" /> Desglose y tasa de rotación
+                  </p>
                 </div>
-                <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-red-600 transition-all"><ChevronRight className="w-6 h-6 text-white" /></div>
+                <div className="p-3 bg-red-600 text-white rounded-2xl group-hover:bg-red-700 transition-all shrink-0 shadow-md shadow-red-600/30">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
               </div>
             </button>
-            <div className="p-8 bg-slate-50 rounded-[32px] border border-slate-100 flex flex-col items-center text-center">
-              <TrendingUp className="w-8 h-8 text-red-600 mb-4" />
+            
+            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200/80 flex flex-col items-center text-center">
+              <TrendingUp className="w-6 h-6 text-red-600 mb-2" />
               <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-1">Resumen del Período</p>
-              <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">
-                {monthStats.entries} ingresos y {monthStats.exits} retiros en {singleMonthLabel}. Rot. operativa <span className="text-amber-600">{monthStats.rotationOperative}%</span> · administrativa <span className="text-violet-600">{monthStats.rotationAdmin}%</span>.
+              <p className="text-[10px] font-medium text-slate-500 uppercase leading-relaxed">
+                {monthStats.entries} ingresos y {monthStats.exits} retiros en {singleMonthLabel}. Rot. operativa <span className="font-bold text-slate-800">{monthStats.rotationOperative}%</span> · administrativa <span className="font-bold text-slate-800">{monthStats.rotationAdmin}%</span>.
               </p>
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl border border-slate-100 min-h-[400px] shadow-inner">
-            <h4 className="text-[10px] font-black uppercase text-slate-900 tracking-[0.2em] mb-8 flex justify-between items-center">
-              <span>Tendencia Mensual {selectedYear}</span>
-              <Calendar className="w-4 h-4 text-red-600" />
+          <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200/80 min-h-[380px] shadow-2xs">
+            <h4 className="text-[10px] font-black uppercase text-slate-900 tracking-[0.2em] mb-6 flex justify-between items-center">
+              <span className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-red-600" />
+                Tendencia Mensual {selectedYear}
+              </span>
+              <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#256d19]" /> Ingresos
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Retiros
+                </span>
+              </div>
             </h4>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={yearChartData} margin={{ left: -10, bottom: 20 }}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={yearChartData} margin={{ left: -10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false}
                   tick={(props: any) => (
-                    <text x={props.x} y={props.y + 10} textAnchor="middle" fontSize={10} fontWeight={900} fill={yearChartData[props.index]?.isSelected ? '#dc2626' : '#64748b'}>{props.value}</text>
+                    <text x={props.x} y={props.y + 10} textAnchor="middle" fontSize={10} fontWeight={800} fill={yearChartData[props.index]?.isSelected ? '#dc2626' : '#64748b'}>{props.value}</text>
                   )}
                 />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
-                <Tooltip contentStyle={{ borderRadius: '16px', fontSize: '11px', fontWeight: '900', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                <Bar name="Ingresos" dataKey="ingresos" fill="#10b981" radius={[6, 6, 0, 0]} barSize={14} />
-                <Bar name="Retiros" dataKey="retiros" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={14} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }} />
+                <Tooltip contentStyle={{ borderRadius: '16px', fontSize: '11px', fontWeight: '800', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Bar name="Ingresos" dataKey="ingresos" fill="#256d19" radius={[4, 4, 0, 0]} barSize={14} />
+                <Bar name="Retiros" dataKey="retiros" fill="#dc2626" radius={[4, 4, 0, 0]} barSize={14} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -469,58 +486,65 @@ const EntriesExitsReport: React.FC = () => {
 
       {/* ── Modal Análisis por Cargo ──────────────────────────────────────────── */}
       {showCargoModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-3xl overflow-hidden">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-red-600 rounded-2xl"><PieChart className="w-6 h-6 text-white" /></div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-[#0f1c2d] text-white flex justify-between items-center border-b border-slate-800">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-600/30">
+                  <PieChart className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-black uppercase italic tracking-tighter text-xl">Análisis por Cargo</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Periodo: {singleMonthLabel}</p>
+                  <h3 className="font-black uppercase italic tracking-tight text-lg">Análisis por Cargo</h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">Periodo: {singleMonthLabel}</p>
                 </div>
               </div>
-              <button onClick={() => setShowCargoModal(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+              <button 
+                onClick={() => setShowCargoModal(false)} 
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="p-8 max-h-[60vh] overflow-y-auto no-scrollbar space-y-4">
+            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
               {statsByCargo.map((item, idx) => {
                 const rotNum = parseFloat(item.rotacion);
-                const rotColor = rotNum === 0 ? 'text-slate-400' : rotNum < 5 ? 'text-emerald-600' : rotNum < 15 ? 'text-amber-600' : 'text-red-600';
+                const rotColor = rotNum === 0 ? 'text-slate-400' : rotNum < 5 ? 'text-emerald-700' : rotNum < 15 ? 'text-amber-700' : 'text-rose-700';
                 return (
-                  <div key={idx} className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-6 hover:bg-white hover:shadow-xl hover:border-slate-200 transition-all group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors shadow-sm"><Briefcase className="w-6 h-6" /></div>
+                  <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white hover:border-slate-300 transition group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 border border-slate-200/60 shadow-2xs"><Briefcase className="w-4 h-4" /></div>
                       <div>
-                        <p className="text-sm font-black text-slate-800 uppercase italic tracking-tight">{item.cargo}</p>
-                        <p className="text-[10px] font-black text-slate-400 uppercase mt-0.5 tracking-widest">{item.ingresos + item.retiros} movimientos · {item.active} activos</p>
+                        <p className="text-xs font-bold text-slate-800 uppercase italic tracking-tight">{item.cargo}</p>
+                        <p className="text-[10px] font-medium text-slate-400 uppercase mt-0.5">{item.ingresos + item.retiros} movimientos · {item.active} activos</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-5 pr-2">
+                    <div className="flex items-center gap-4 pr-2">
                       <div className="text-center">
-                        <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Ingresos</p>
-                        <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{item.ingresos}</p>
+                        <p className="text-[9px] font-bold text-emerald-700 uppercase mb-0.5">Ingresos</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tight leading-none">{item.ingresos}</p>
                       </div>
-                      <div className="h-8 w-px bg-slate-200" />
+                      <div className="h-6 w-px bg-slate-200" />
                       <div className="text-center">
-                        <p className="text-[9px] font-black text-red-600 uppercase mb-1">Retiros</p>
-                        <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{item.retiros}</p>
+                        <p className="text-[9px] font-bold text-rose-700 uppercase mb-0.5">Retiros</p>
+                        <p className="text-lg font-black text-slate-900 tracking-tight leading-none">{item.retiros}</p>
                       </div>
-                      <div className="h-8 w-px bg-slate-200" />
+                      <div className="h-6 w-px bg-slate-200" />
                       <div className="text-center">
-                        <p className="text-[9px] font-black text-slate-500 uppercase mb-1 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" />Rotación</p>
-                        <p className={`text-2xl font-black tracking-tighter leading-none ${rotColor}`}>{item.rotacion}%</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase mb-0.5 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" />Rotación</p>
+                        <p className={`text-lg font-black tracking-tight leading-none ${rotColor}`}>{item.rotacion}%</p>
                       </div>
                     </div>
                   </div>
                 );
               })}
               {statsByCargo.length === 0 && (
-                <div className="text-center p-20 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
-                  <p className="text-xs font-black text-slate-300 uppercase italic tracking-widest">No se detectaron movimientos en este período</p>
+                <div className="text-center p-16 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                  <p className="text-xs font-bold text-slate-400 uppercase italic">No se detectaron movimientos en este período</p>
                 </div>
               )}
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Rotación = Retiros / Activos por cargo</p>
+            <div className="p-4 bg-slate-50 border-t border-slate-200/80 text-center">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Rotación = Retiros / Activos por cargo</p>
             </div>
           </div>
         </div>
@@ -528,53 +552,73 @@ const EntriesExitsReport: React.FC = () => {
 
       {/* ── Detalle de Ingresos / Retiros ─────────────────────────────────────── */}
       {viewDetail !== 'none' && (
-        <div className="bg-white rounded-[32px] shadow-2xl border-2 border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
-          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="p-5 border-b border-slate-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${viewDetail === 'entries' ? 'bg-emerald-500' : 'bg-red-500'} text-white`}>
-                {viewDetail === 'entries' ? <ArrowUpCircle className="w-5 h-5" /> : <ArrowDownCircle className="w-5 h-5" />}
+              <div className={`p-2 rounded-xl ${viewDetail === 'entries' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
+                {viewDetail === 'entries' ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
               </div>
-              <h3 className="text-sm font-black uppercase italic tracking-tight">
-                Detalle de {viewDetail === 'entries' ? 'Ingresos' : 'Retiros'} — {singleMonthLabel}
-              </h3>
+              <div>
+                <h3 className="text-sm font-black uppercase italic tracking-tight text-slate-900">
+                  Detalle de {viewDetail === 'entries' ? 'Ingresos' : 'Retiros'} — {singleMonthLabel}
+                </h3>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  {filteredHistoryEventsList.length} personas registradas
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-48">
-                <Search className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input type="text" placeholder="Buscar persona..." value={searchPerson} onChange={e => setSearchPerson(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-800 outline-none focus:border-red-500 shadow-sm" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="text" placeholder="Buscar persona..." value={searchPerson} onChange={e => setSearchPerson(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-red-500 shadow-2xs" />
               </div>
               <div className="relative flex-1 sm:w-48">
-                <Briefcase className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <select value={selectedTitleFilter} onChange={e => setSelectedTitleFilter(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-800 outline-none focus:border-red-500 shadow-sm appearance-none cursor-pointer">
+                <Briefcase className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <select value={selectedTitleFilter} onChange={e => setSelectedTitleFilter(e.target.value)} className="w-full pl-9 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-red-500 shadow-2xs appearance-none cursor-pointer">
                   <option value="all">Cargo: Todos</option>
                   {availableTitlesForList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <button onClick={() => { setViewDetail('none'); setSearchPerson(''); }} className="p-2 text-slate-400 hover:text-red-600 transition-all"><X className="w-5 h-5" /></button>
+              <button onClick={() => setViewDetail('none')} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-xl transition cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="max-h-[400px] overflow-y-auto no-scrollbar">
-            <table className="w-full text-left">
-              <thead className="sticky top-0 bg-white shadow-sm z-10">
-                <tr className="border-b border-slate-100">
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tienda / CECO</th>
-                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cargo</th>
+
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/70 text-[9px] font-black text-slate-400 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">
+                  <th className="py-3 px-6">Colaborador</th>
+                  <th className="py-3 px-6">Cargo</th>
+                  <th className="py-3 px-6">Tienda / CECO</th>
+                  <th className="py-3 px-6">Fecha del Movimiento</th>
+                  <th className="py-3 px-6 text-center">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredHistoryEventsList.map((e, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-5 text-slate-500 font-bold text-[11px]">{e.date}</td>
-                    <td className="p-5 font-black uppercase italic text-slate-900 text-[11px]">{e.employeeName}</td>
-                    <td className="p-5 text-slate-600 font-black uppercase text-[10px]">{e.restaurantName}</td>
-                    <td className="p-5"><span className="px-2 py-1 bg-slate-100 text-slate-500 text-[9px] font-black rounded-lg uppercase">{e.employeeTitle}</span></td>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredHistoryEventsList.map((e, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-6 font-bold text-slate-800">{e.employeeName}</td>
+                    <td className="py-3.5 px-6 font-medium text-slate-600">{e.employeeTitle}</td>
+                    <td className="py-3.5 px-6 font-medium text-slate-600">{e.restaurantName}</td>
+                    <td className="py-3.5 px-6 font-bold text-slate-700">{e.date}</td>
+                    <td className="py-3.5 px-6 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                        e.action === 'INGRESO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 'bg-rose-50 text-rose-700 border-rose-200/60'
+                      }`}>
+                        {e.action}
+                      </span>
+                    </td>
                   </tr>
                 ))}
                 {filteredHistoryEventsList.length === 0 && (
-                  <tr><td colSpan={4} className="p-10 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest italic">No se registraron movimientos con los filtros aplicados</td></tr>
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                      No se encontraron registros coincidentes
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -596,84 +640,65 @@ const MetricCard: React.FC<{
 }> = ({ icon, label, sublabel, value, color, onClick }) => {
   const colorMap = {
     emerald: {
-      text: 'text-emerald-400',
-      bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-      glow: 'bg-emerald-500/5',
-      activeBorder: 'hover:border-emerald-500/50'
+      iconColor: 'text-emerald-600/80',
+      badge: 'text-emerald-700 bg-emerald-50 border-emerald-200/60',
     },
     red: {
-      text: 'text-red-400',
-      bg: 'bg-red-500/10 border-red-500/20 text-red-400',
-      glow: 'bg-red-500/5',
-      activeBorder: 'hover:border-red-500/50'
+      iconColor: 'text-rose-600/80',
+      badge: 'text-rose-700 bg-rose-50 border-rose-200/60',
     },
     amber: {
-      text: 'text-amber-400',
-      bg: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
-      glow: 'bg-amber-500/5',
-      activeBorder: 'hover:border-amber-500/50'
+      iconColor: 'text-amber-600/80',
+      badge: 'text-amber-700 bg-amber-50 border-amber-200/60',
     },
     blue: {
-      text: 'text-blue-400',
-      bg: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-      glow: 'bg-blue-500/5',
-      activeBorder: 'hover:border-blue-500/50'
+      iconColor: 'text-slate-600',
+      badge: 'text-slate-700 bg-slate-100 border-slate-200',
     },
     violet: {
-      text: 'text-violet-400',
-      bg: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
-      glow: 'bg-violet-500/5',
-      activeBorder: 'hover:border-violet-500/50'
+      iconColor: 'text-slate-600',
+      badge: 'text-slate-700 bg-slate-100 border-slate-200',
     }
   };
 
-  const currentColors = colorMap[color];
+  const currentColors = colorMap[color] || colorMap.blue;
 
   return (
-    <button 
+    <div 
       onClick={onClick} 
-      disabled={!onClick} 
-      className={`bg-slate-900 rounded-3xl p-5 relative overflow-hidden group transition-all duration-300 border-2 border-slate-800/80 flex flex-col justify-between min-h-[135px] text-left w-full shadow-[0_15px_35px_rgba(15,23,42,0.4)] hover:shadow-[0_22px_45px_rgba(15,23,42,0.55)] ${
-        onClick ? 'cursor-pointer hover:-translate-y-0.5 active:scale-95 ' + currentColors.activeBorder : 'cursor-default'
+      className={`bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs relative overflow-hidden transition-all duration-200 flex flex-col justify-between min-h-[130px] ${
+        onClick ? 'cursor-pointer hover:border-slate-300 hover:shadow-xs active:scale-[0.99]' : 'cursor-default'
       }`}
     >
-      {/* Diagonal stripe pattern */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0px, white 1px, transparent 1px, transparent 14px)' }} 
-      />
-      
-      {/* Glow top-right based on color */}
-      <div className={`absolute -top-6 -right-6 w-28 h-28 rounded-full ${currentColors.glow} blur-2xl pointer-events-none`} />
-
-      {/* Top: icon + title */}
-      <div className="flex items-start gap-3 relative z-10 w-full">
-        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border ${currentColors.bg}`}>
+      <div className="flex items-center justify-between text-slate-400 mb-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{label}</span>
+        <div className={`shrink-0 ${currentColors.iconColor}`}>
           {icon}
         </div>
-        <div className="flex flex-col min-w-0 flex-1">
-          <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none truncate">{label}</p>
-          {sublabel && (
-            <p className="text-[8px] font-bold text-white/30 uppercase tracking-wide mt-1 leading-tight truncate">
-              {sublabel}
-            </p>
-          )}
-          <span className={`text-3xl font-black ${currentColors.text} tracking-tighter leading-none mt-2`}>
-            {value}
-          </span>
-        </div>
       </div>
 
-      {/* Bottom: label + ghost value */}
-      <div className="relative z-10 mt-2 flex items-end justify-between w-full">
-        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">
-          {onClick ? 'Ver Detalles' : 'Porcentaje'}
-        </p>
-        <span className="text-4xl font-black text-white/5 tracking-tighter leading-none select-none">
+      <div>
+        <span className="text-3xl font-black text-slate-900 tracking-tight leading-none">
           {value}
         </span>
+        {sublabel && (
+          <p className="text-[9px] font-medium text-slate-400 mt-1 truncate">
+            {sublabel}
+          </p>
+        )}
       </div>
-    </button>
+
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+          {onClick ? 'Ver Detalles' : 'Indicador'}
+        </span>
+        {onClick && (
+          <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full border ${currentColors.badge}`}>
+            Explorar
+          </span>
+        )}
+      </div>
+    </div>
   );
 };
 
