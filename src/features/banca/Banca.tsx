@@ -2037,12 +2037,6 @@ const Banca: React.FC = () => {
       {/* NIVEL 1: Tarjetas de Selección de Región */}
       {view.level === 'regions' && (
         <div>
-          <div className="flex items-center justify-between mb-2.5 px-1">
-            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-red-600" /> Selecciona una Región para ver la Matriz de Tiendas
-            </h4>
-            <span className="text-[10px] font-bold text-slate-400">{regionsList.length} Regiones configuradas</span>
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {regionsList.map(region => {
