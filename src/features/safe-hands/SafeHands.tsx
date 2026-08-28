@@ -551,17 +551,6 @@ const SafeHands: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Area */}
-      <div className="px-2">
-        <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tight flex items-center gap-3">
-          <ShieldCheck className="w-8 h-8 text-red-600" />
-          Safe Hands
-        </h2>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-          Gestión Consolidada
-        </p>
-      </div>
-
       {/* Tarjetas de Estadísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-2 animate-in fade-in duration-300">
         <StatCard 
@@ -594,16 +583,17 @@ const SafeHands: React.FC = () => {
         />
       </div>
 
-      {/* Action Toolbar (Estilo Píldoras Unificadas) */}
-      <div className="flex flex-wrap items-center gap-2 px-2">
+      {/* Action Toolbar */}
+      <div className="flex flex-wrap items-center gap-2.5 px-2">
         {/* Auditoría SafeHands (Admin Only) */}
         {isAdmin && (
           <button 
             onClick={() => setShowReconciliationModal(true)} 
-            className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-900 text-white shadow-md hover:bg-slate-800 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
             title="Auditoría SafeHands: Conciliación de Carnets vs Colaboradores y Categorización de Huérfanos"
           >
-            Auditoría SafeHands
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Auditoría SafeHands</span>
           </button>
         )}
 
@@ -611,10 +601,11 @@ const SafeHands: React.FC = () => {
         {isAdmin && (
           <button 
             onClick={() => setShowSettings(true)} 
-            className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
             title="Configuración de Firma y Certificados (Solo Administrador)"
           >
-            Firma Digital
+            <Signature className="w-4 h-4" />
+            <span>Firma Digital</span>
           </button>
         )}
 
@@ -623,14 +614,16 @@ const SafeHands: React.FC = () => {
           <>
             <button 
               onClick={handleDownloadTemplate} 
-              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
               title="Descargar Plantilla Excel para cargar base de datos"
             >
-              Plantilla Carga
+              <Download className="w-4 h-4" />
+              <span>Plantilla Carga</span>
             </button>
             
-            <label className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer">
-              Cargar Consolidado
+            <label className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer">
+              <Upload className="w-4 h-4" />
+              <span>Cargar Consolidado</span>
               <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
             </label>
           </>
@@ -641,14 +634,16 @@ const SafeHands: React.FC = () => {
           <>
             <button 
               onClick={handleDownloadDeleteTemplate} 
-              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
               title="Descargar Plantilla Excel para eliminación masiva"
             >
-              Plantilla Borrado
+              <Download className="w-4 h-4" />
+              <span>Plantilla Borrado</span>
             </button>
 
-            <label className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 cursor-pointer">
-              Eliminación Masiva
+            <label className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer">
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminación Masiva</span>
               <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelDeleteUpload} />
             </label>
           </>

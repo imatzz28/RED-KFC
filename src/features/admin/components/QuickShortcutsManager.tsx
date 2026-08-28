@@ -211,23 +211,23 @@ export const QuickShortcutsManager: React.FC<Props> = ({ setImportStatus }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm border border-slate-700/50">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-50/70 border border-slate-200/80 shadow-xs">
         <div>
-          <h3 className="text-base font-black uppercase tracking-wider flex items-center gap-2.5">
-            <Compass className="w-5 h-5 text-red-500" />
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+            <Compass className="w-4 h-4 text-slate-700" />
             Configuración de Accesos Directos
           </h3>
-          <p className="text-xs text-slate-300 mt-1 font-medium">
+          <p className="text-[10.5px] text-slate-500 mt-1 font-medium">
             Agrega enlaces externos o internos para que los usuarios puedan acceder rápidamente desde la barra lateral.
           </p>
         </div>
 
         <button
           onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-[10.5px] uppercase tracking-widest rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
-          Nuevo Acceso Directo
+          <span>Nuevo Acceso Directo</span>
         </button>
       </div>
 
@@ -239,7 +239,7 @@ export const QuickShortcutsManager: React.FC<Props> = ({ setImportStatus }) => {
           <p className="text-xs text-slate-400 mt-1">Haz clic en &quot;Nuevo Acceso Directo&quot; para agregar el primero.</p>
           <button
             onClick={openAddModal}
-            className="mt-4 px-4 py-2 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-black transition cursor-pointer"
+            className="mt-4 px-4 py-2 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer"
           >
             Agregar Acceso
           </button>
@@ -260,7 +260,7 @@ export const QuickShortcutsManager: React.FC<Props> = ({ setImportStatus }) => {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100 shadow-2xs">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200 shadow-2xs">
                         <IconComp className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">

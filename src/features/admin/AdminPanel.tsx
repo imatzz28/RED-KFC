@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { dataService } from '@/services/dataService';
 import { UserRole, User, HierarchyData, Restaurant } from '@/types';
-import { Shield, AlertCircle, CheckCircle2, X, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle2, X } from 'lucide-react';
 
 import { DataUploader } from './components/DataUploader';
 import { SettlementManager } from './components/SettlementManager';
@@ -26,30 +26,73 @@ const AdminPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-red-600 text-white rounded-2xl shadow-lg">
-              {currentUser.role === UserRole.ADMIN ? <Shield className="w-6 h-6" /> : <Users className="w-6 h-6" />}
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase italic leading-none">
-                {currentUser.role === UserRole.ADMIN ? 'Panel Configuración' : 'Gestión de Equipo'}
-              </h2>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {currentUser.role === UserRole.ADMIN && (
-                  <>
-                    <button onClick={() => setActiveSubTab('import')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'import' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Carga Excel</button>
-                    <button onClick={() => setActiveSubTab('settlement')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'settlement' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Asentar Notas</button>
-                    <button onClick={() => setActiveSubTab('hierarchy')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'hierarchy' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Estructura</button>
-                    <button onClick={() => setActiveSubTab('pulse')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'pulse' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Pulse (Categorías)</button>
-                    <button onClick={() => setActiveSubTab('shortcuts')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'shortcuts' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Accesos Directos</button>
-                  </>
-                )}
-                <button onClick={() => setActiveSubTab('users')} className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>Gestión de Usuarios</button>
-              </div>
-            </div>
-          </div>
+      <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-6">
+        {/* Pestañas alineadas a la izquierda */}
+        <div className="flex flex-wrap items-center gap-2.5 pb-6 border-b border-slate-100">
+          {currentUser.role === UserRole.ADMIN && (
+            <>
+              <button
+                onClick={() => setActiveSubTab('import')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+                  activeSubTab === 'import'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+                }`}
+              >
+                Carga Excel
+              </button>
+              <button
+                onClick={() => setActiveSubTab('settlement')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+                  activeSubTab === 'settlement'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+                }`}
+              >
+                Asentar Notas
+              </button>
+              <button
+                onClick={() => setActiveSubTab('hierarchy')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+                  activeSubTab === 'hierarchy'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+                }`}
+              >
+                Estructura
+              </button>
+              <button
+                onClick={() => setActiveSubTab('pulse')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+                  activeSubTab === 'pulse'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+                }`}
+              >
+                Pulse (Categorías)
+              </button>
+              <button
+                onClick={() => setActiveSubTab('shortcuts')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+                  activeSubTab === 'shortcuts'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+                }`}
+              >
+                Accesos Directos
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setActiveSubTab('users')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
+              activeSubTab === 'users'
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border-slate-200 hover:border-slate-800 hover:shadow-md'
+            }`}
+          >
+            Gestión de Usuarios
+          </button>
         </div>
 
         {importStatus && (

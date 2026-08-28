@@ -43,18 +43,18 @@ export const PulseAdminCategoryManager: React.FC<PulseAdminCategoryManagerProps>
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-4">
+      <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/80 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <Tag className="w-5 h-5 text-[#E4002B]" />
+            <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2 uppercase">
+              <Tag className="w-4 h-4 text-slate-700" />
               Gestión de Categorías - RED Pulse
             </h3>
-            <p className="text-xs font-medium text-slate-500 mt-0.5">
+            <p className="text-[10.5px] font-medium text-slate-500 mt-0.5">
               Administra las categorías oficiales para clasificar encuestas y evaluaciones.
             </p>
           </div>
-          <span className="text-xs font-black text-slate-600 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-2xs">
+          <span className="text-[10.5px] font-black text-slate-600 bg-white border border-slate-200 px-3 py-1 rounded-xl shadow-xs">
             {categories.length} categorías activas
           </span>
         </div>
@@ -68,16 +68,16 @@ export const PulseAdminCategoryManager: React.FC<PulseAdminCategoryManagerProps>
               value={newCatName}
               onChange={e => setNewCatName(e.target.value)}
               placeholder="Nueva categoría (ej. Auditorías de Calidad)..."
-              className="w-full bg-white border border-slate-200 focus:border-[#E4002B] focus:ring-4 focus:ring-red-500/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 outline-none transition"
+              className="w-full bg-white border border-slate-200 focus:border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs font-bold text-slate-900 outline-none transition"
             />
           </div>
 
           <button
             type="submit"
             disabled={!newCatName.trim()}
-            className="px-5 py-2.5 rounded-2xl bg-[#E4002B] hover:bg-red-700 disabled:opacity-40 text-white font-black text-xs shadow-md shadow-red-600/20 transition flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
+            <Plus className="w-4 h-4" />
             <span>Agregar Categoría</span>
           </button>
         </form>
@@ -88,10 +88,10 @@ export const PulseAdminCategoryManager: React.FC<PulseAdminCategoryManagerProps>
         {categories.map((cat, idx) => (
           <div
             key={idx}
-            className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition flex items-center justify-between gap-3 group"
+            className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition flex items-center justify-between gap-3 group"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-red-50 text-[#E4002B] font-black text-xs flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-black text-xs flex items-center justify-center shrink-0 border border-slate-200">
                 <Tag className="w-4 h-4" />
               </div>
               <span className="text-xs font-black text-slate-900 truncate">
@@ -102,7 +102,7 @@ export const PulseAdminCategoryManager: React.FC<PulseAdminCategoryManagerProps>
             <button
               type="button"
               onClick={() => handleDeleteCategory(cat)}
-              className="p-1.5 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
               title="Eliminar categoría"
             >
               <Trash2 className="w-4 h-4" />

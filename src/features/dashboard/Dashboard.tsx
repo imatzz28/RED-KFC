@@ -419,51 +419,58 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 bg-slate-50/50 -m-8 p-8 min-h-screen">
-      <div className={`bg-white p-6 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-${(user.role === UserRole.ADMIN || user.role === UserRole.LIDER || user.role === UserRole.COORDINATOR || user.role === UserRole.GUEST) ? '5' : '4'} gap-6 items-end`}>
-        <div className="space-y-2 col-span-1 md:col-span-2 lg:col-span-1">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Calendar className="w-3 h-3 mr-1 inline" /> Periodo</label>
-          <div className="flex gap-2">
-            <select value={dashboardMonth.split('-')[0]} onChange={(e) => {
-              hasManuallyChangedMonth.current = true;
-              setDashboardMonth(`${e.target.value}-${dashboardMonth.split('-')[1]}`);
-            }} className={selectClasses}>
-              {['2023', '2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-4 flex-1 min-w-0">
+          <div className="space-y-2 min-w-[200px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Calendar className="w-3 h-3 mr-1 inline" /> Periodo</label>
+            <div className="flex gap-2">
+              <select value={dashboardMonth.split('-')[0]} onChange={(e) => {
+                hasManuallyChangedMonth.current = true;
+                setDashboardMonth(`${e.target.value}-${dashboardMonth.split('-')[1]}`);
+              }} className={selectClasses}>
+                {['2023', '2024', '2025', '2026'].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={dashboardMonth.split('-')[1]} onChange={(e) => {
+                hasManuallyChangedMonth.current = true;
+                setDashboardMonth(`${dashboardMonth.split('-')[0]}-${e.target.value}`);
+              }} className={selectClasses}>
+                {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((m, idx) => (
+                  <option key={m} value={m}>{['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][idx]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {(user.role === UserRole.ADMIN || user.role === UserRole.LIDER || user.role === UserRole.COORDINATOR || user.role === UserRole.GUEST) && (
+            <div className="space-y-2 flex-1 min-w-[150px]">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><MapPin className="w-3 h-3 mr-1 inline" /> Región</label>
+              <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className={selectClasses}>
+                <option value="all">{(user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) ? 'Mis Regiones' : 'Todas'}</option>
+                {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="space-y-2 flex-1 min-w-[150px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Filter className="w-3 h-3 mr-1 inline" /> Zona</label>
+            <select value={filterZone} onChange={(e) => setFilterZone(e.target.value)} className={selectClasses}>
+              <option value="all">Todas</option>
+              {dynamicZones.map(z => <option key={z} value={z}>{z}</option>)}
             </select>
-            <select value={dashboardMonth.split('-')[1]} onChange={(e) => {
-              hasManuallyChangedMonth.current = true;
-              setDashboardMonth(`${dashboardMonth.split('-')[0]}-${e.target.value}`);
-            }} className={selectClasses}>
-              {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((m, idx) => (
-                <option key={m} value={m}>{['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][idx]}</option>
-              ))}
+          </div>
+          <div className="space-y-2 flex-1 min-w-[150px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Filter className="w-3 h-3 mr-1 inline" /> Tienda</label>
+            <select value={filterStore} onChange={(e) => setFilterStore(e.target.value)} className={selectClasses}>
+              <option value="all">Todas</option>
+              {dynamicStores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
         </div>
-        {(user.role === UserRole.ADMIN || user.role === UserRole.LIDER || user.role === UserRole.COORDINATOR || user.role === UserRole.GUEST) && (
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><MapPin className="w-3 h-3 mr-1 inline" /> Región</label>
-            <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className={selectClasses}>
-              <option value="all">{(user.role === UserRole.COORDINATOR || user.role === UserRole.LIDER || user.role === UserRole.GUEST) ? 'Mis Regiones' : 'Todas'}</option>
-              {dynamicRegions.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-        )}
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Filter className="w-3 h-3 mr-1 inline" /> Zona</label>
-          <select value={filterZone} onChange={(e) => setFilterZone(e.target.value)} className={selectClasses}>
-            <option value="all">Todas</option>
-            {dynamicZones.map(z => <option key={z} value={z}>{z}</option>)}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1"><Filter className="w-3 h-3 mr-1 inline" /> Tienda</label>
-          <select value={filterStore} onChange={(e) => setFilterStore(e.target.value)} className={selectClasses}>
-            <option value="all">Todas</option>
-            {dynamicStores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-        </div>
-        <button onClick={() => setShowExportModal(true)} className="w-full flex items-center justify-center space-x-2 px-4 py-3.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">
-          <Download className="w-4 h-4" /> <span>Generar Reporte</span>
+
+        <button 
+          onClick={() => setShowExportModal(true)} 
+          className="p-3.5 bg-white hover:bg-slate-900 text-slate-600 hover:text-white border-2 border-slate-200/80 hover:border-slate-900 rounded-xl transition-all duration-200 shadow-2xs flex items-center justify-center cursor-pointer active:scale-95 shrink-0 h-[46px] w-[46px]"
+          title="Generar Reporte"
+        >
+          <Download className="w-4 h-4" />
         </button>
       </div>
 
@@ -520,23 +527,24 @@ const Dashboard: React.FC = () => {
 
 
       {showExportModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden border border-white/20">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-red-600 rounded-2xl shadow-lg">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-black uppercase italic tracking-tighter text-xl leading-none">Configurar Exportación</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{selectedMonth}</p>
-                </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl sm:rounded-[36px] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header Principal */}
+            <div className="bg-white px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+                  Configurar Exportación
+                </h2>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                  {selectedMonth}
+                </span>
               </div>
               <button
                 onClick={() => setShowExportModal(false)}
-                className="p-2 hover:bg-white/10 rounded-xl transition-all"
+                className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                title="Cerrar"
               >
-                <X className="w-6 h-6" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 

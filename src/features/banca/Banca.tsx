@@ -8,8 +8,8 @@ import {
   BancaExternalPerson
 } from '@/types';
 import {
-  Store, Building2, Users, Award, X, Save, Search, ChevronRight,
-  UserPlus, MapPin, ArrowLeft, FileDown, Target, TrendingUp, Landmark,
+  Store, Building2, Users, Award, X, Save, Search, ChevronRight, ChevronLeft,
+  UserPlus, MapPin, ArrowLeft, FileDown, Download, Target, TrendingUp, Landmark,
   Plus, Check, Trash2, ChevronDown, AlertTriangle, Info, Calendar, BarChart3,
   Bell, Trophy, Medal, MinusCircle, FileText, CheckCircle2, Maximize2, Minimize2,
   Briefcase
@@ -1072,28 +1072,21 @@ const BancaDashboardModal: React.FC<{
         className="relative bg-[#F8FAFC] text-slate-900 rounded-[32px] shadow-2xl border border-slate-200 w-full max-w-6xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Cabecera Limpia Ejecutiva (Fondo Oscuro KFC) */}
-        <div className="bg-[#0f1c2d] text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg shadow-red-600/30 text-white shrink-0">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-white uppercase italic">
-                {headerTitle}
-              </h2>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Analítica de cobertura, distribución de cargos e indicadores de gestión
-              </p>
-            </div>
+        {/* Header Principal */}
+        <div className="bg-white px-6 py-3.5 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+          {/* Título Limpio */}
+          <div>
+            <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+              {headerTitle}
+            </h2>
           </div>
 
           <button 
             onClick={onClose} 
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
-            title="Cerrar dashboard"
+            className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+            title="Cerrar"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -1486,13 +1479,14 @@ const BancaDashboardModal: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 const ComplianceSummary: React.FC<{
   title: string;
-  subtitle: string;
+  subtitle?: string;
   restaurantIds: string[];
   bancaData: BancaData;
   activeEmployeeIds: Set<string>;
   onExport: () => void;
   onOpenDashboard: () => void;
-}> = ({ title, subtitle, restaurantIds, bancaData, activeEmployeeIds, onExport, onOpenDashboard }) => {
+  onBack?: () => void;
+}> = ({ title, subtitle, restaurantIds, bancaData, activeEmployeeIds, onExport, onOpenDashboard, onBack }) => {
   let idealGerentes = 0;
   let realGerentes = 0;
   let idealLideres = 0;
@@ -1571,30 +1565,45 @@ const ComplianceSummary: React.FC<{
   return (
     <div className="mb-3 space-y-2.5">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 px-1">
-        <div>
-          <h3 className="text-base font-black text-slate-800 uppercase italic tracking-tight">{title}</h3>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            {subtitle} <span className="w-1 h-1 bg-slate-300 rounded-full" /> {restaurantIds.length} tiendas en total
-          </p>
+        <div className="flex items-center gap-2.5">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shrink-0"
+              title="Volver a Regiones"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div>
+            <h3 className="text-base font-black text-slate-800 uppercase italic tracking-tight">{title}</h3>
+            {subtitle && (
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Botón Dashboard Banca */}
           <button
             onClick={onOpenDashboard}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-sm active:scale-95 shrink-0 cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 shrink-0 cursor-pointer"
+            title="Dashboard Banca"
           >
-            <BarChart3 className="w-3.5 h-3.5" />
+            <BarChart3 className="w-4 h-4" />
             <span>Dashboard Banca</span>
           </button>
 
           {/* Botón Exportar Excel */}
           <button
             onClick={onExport}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition shadow-sm active:scale-95 shrink-0 cursor-pointer"
+            className="p-2.5 bg-white hover:bg-slate-900 text-slate-600 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 shrink-0 cursor-pointer"
+            title="Exportar a Excel"
           >
-            <FileDown className="w-3.5 h-3.5 text-red-500" />
-            <span>Exportar Excel</span>
+            <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -1976,7 +1985,7 @@ const Banca: React.FC = () => {
   };
 
   let summaryTitle = "Cumplimiento Nacional";
-  let summarySubtitle = "Resumen de todas las regiones";
+  let summarySubtitle = "";
   let summaryIds: string[] = [];
 
   if (view.level === 'regions') {
@@ -1984,10 +1993,10 @@ const Banca: React.FC = () => {
   } else {
     if (selectedZone !== 'all') {
       summaryTitle = `Cumplimiento Jefe de Área: ${selectedZone}`;
-      summarySubtitle = `Región ${view.region}`;
+      summarySubtitle = "";
     } else {
       summaryTitle = `Cumplimiento Región: ${view.region}`;
-      summarySubtitle = "Resumen de cumplimiento regional";
+      summarySubtitle = "";
     }
     summaryIds = currentStores.map(s => s.id);
   }
@@ -2019,6 +2028,10 @@ const Banca: React.FC = () => {
         activeEmployeeIds={activeEmployeeIds}
         onExport={generateExcelReport}
         onOpenDashboard={() => setIsDashboardOpen(true)}
+        onBack={view.level === 'table' ? () => {
+          setIsTableMaximized(false);
+          setView({ level: 'regions' });
+        } : undefined}
       />
 
       {/* NIVEL 1: Tarjetas de Selección de Región */}
@@ -2097,44 +2110,34 @@ const Banca: React.FC = () => {
               ? "fixed inset-0 z-[9000] bg-white w-screen h-screen p-4 md:p-6 flex flex-col space-y-3 overflow-hidden animate-in fade-in duration-200"
               : "bg-white rounded-[24px] border border-slate-100 shadow-sm p-3.5 space-y-2.5 max-w-full overflow-hidden"
           }>
-          {/* Breadcrumb Limpio */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
-            {isTableMaximized ? (
+          {/* Header de la Tabla */}
+          {isTableMaximized ? (
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-tight">
                 <Store className="w-4 h-4 text-red-600" />
                 <span>Región: {currentRegion.name}</span>
               </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setIsTableMaximized(false);
-                  setView({ level: 'regions' });
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition"
-              >
-                <ArrowLeft className="w-4 h-4 text-red-600" />
-                <span>Volver a Regiones ({currentRegion.name})</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-lg">
-                Mostrando {currentStores.length} Tiendas
-              </span>
               <button
                 type="button"
                 onClick={toggleTableMaximize}
                 className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-red-600 transition cursor-pointer shadow-xs border border-slate-200/60"
-                title={isTableMaximized ? "Restaurar pantalla normal" : "Maximizar tabla a pantalla completa"}
+                title="Restaurar pantalla normal"
               >
-                {isTableMaximized ? (
-                  <Minimize2 className="w-4 h-4 text-red-600" />
-                ) : (
-                  <Maximize2 className="w-4 h-4 text-slate-700" />
-                )}
+                <Minimize2 className="w-4 h-4 text-red-600" />
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-end pb-1">
+              <button
+                type="button"
+                onClick={toggleTableMaximize}
+                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-red-600 transition cursor-pointer shadow-xs border border-slate-200/60"
+                title="Maximizar tabla a pantalla completa"
+              >
+                <Maximize2 className="w-4 h-4 text-slate-700" />
+              </button>
+            </div>
+          )}
 
             {/* Barra de Filtros Compacta */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50/80 p-2 rounded-2xl border border-slate-100">

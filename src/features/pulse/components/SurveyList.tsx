@@ -123,50 +123,34 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   return (
     <div className="space-y-6">
       {/* Action Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-red-600" />
-            Pulse
-          </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Crea, administra y califica formularios operativos para equipos de KFC.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className={`p-2.5 rounded-2xl border transition flex items-center justify-center cursor-pointer ${
-                isRefreshing
-                  ? 'bg-red-50 border-red-200 text-red-600'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
-              title="Refrescar respuestas y encuestas"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-red-600' : ''}`} />
-            </button>
-          )}
-
+      <div className="flex flex-wrap items-center gap-2.5">
+        {onRefresh && (
           <button
-            onClick={() => onCreateNew('survey')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs transition cursor-pointer"
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="p-2.5 bg-white hover:bg-slate-900 text-slate-600 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 flex items-center justify-center cursor-pointer disabled:opacity-50"
+            title="Refrescar encuestas y respuestas"
           >
-            <Plus className="w-4 h-4 text-slate-600" />
-            <span>Nueva Encuesta</span>
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
+        )}
 
-          <button
-            onClick={() => onCreateNew('quiz')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition group cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Nueva Evaluación (Quiz)</span>
-          </button>
-        </div>
+        <button
+          onClick={() => onCreateNew('survey')}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Nueva Encuesta</span>
+        </button>
+
+        <button
+          onClick={() => onCreateNew('quiz')}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>Nueva Evaluación (Quiz)</span>
+        </button>
       </div>
 
       {/* Filters Bar */}

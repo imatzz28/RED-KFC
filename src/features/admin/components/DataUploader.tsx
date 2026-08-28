@@ -64,8 +64,8 @@ export const DataUploader: React.FC<Props> = ({ setImportStatus, onEmployeesImpo
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="flex justify-end">
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-start">
         <button
           onClick={() => {
             const templateData = [{ "Documento": "12345678", "Nombre completo": "JUAN PEREZ", "Fecha de ingreso": "2023-01-15", "Cargo": "Miembro de equipo", "Nombre_Ceco": "CECO001", "Fecha fin": "" }];
@@ -74,26 +74,28 @@ export const DataUploader: React.FC<Props> = ({ setImportStatus, onEmployeesImpo
             XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
             XLSX.writeFile(wb, "Plantilla_Nomina_KFC.xlsx");
           }}
-          className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
         >
           <FileDown className="w-4 h-4" />
-          Descargar Plantilla
+          <span>Descargar Plantilla</span>
         </button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-8 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center text-center space-y-4">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-red-600"><FileSpreadsheet className="w-8 h-8" /></div>
-          <h3 className="text-sm font-black uppercase italic tracking-tight">Plantilla Personal Mensual</h3>
-          <label className="cursor-pointer bg-red-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg flex items-center gap-2">
-            <UploadCloud className="w-4 h-4" /> Cargar Nómina
+        <div className="p-8 bg-slate-50/70 rounded-3xl border border-slate-200/80 flex flex-col items-center text-center space-y-4 shadow-xs">
+          <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-200/60 flex items-center justify-center text-slate-700"><FileSpreadsheet className="w-7 h-7" /></div>
+          <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Plantilla Personal Mensual</h3>
+          <label className="cursor-pointer bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 px-5 py-2.5 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2 active:scale-95">
+            <UploadCloud className="w-4 h-4" />
+            <span>Cargar Nómina</span>
             <input type="file" accept=".xlsx, .xls" className="hidden" onChange={(e) => handleFileUpload(e, 'employees')} />
           </label>
         </div>
-        <div className="p-8 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center text-center space-y-4">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-600"><Network className="w-8 h-8" /></div>
-          <h3 className="text-sm font-black uppercase italic tracking-tight">Maestro Estructura (CECOs)</h3>
-          <label className="cursor-pointer bg-slate-900 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center gap-2">
-            <UploadCloud className="w-4 h-4" /> Cargar Estructura
+        <div className="p-8 bg-slate-50/70 rounded-3xl border border-slate-200/80 flex flex-col items-center text-center space-y-4 shadow-xs">
+          <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-200/60 flex items-center justify-center text-slate-700"><Network className="w-7 h-7" /></div>
+          <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Maestro Estructura (CECOs)</h3>
+          <label className="cursor-pointer bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 px-5 py-2.5 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2 active:scale-95">
+            <UploadCloud className="w-4 h-4" />
+            <span>Cargar Estructura</span>
             <input type="file" accept=".xlsx, .xls" className="hidden" onChange={(e) => handleFileUpload(e, 'hierarchy')} />
           </label>
         </div>

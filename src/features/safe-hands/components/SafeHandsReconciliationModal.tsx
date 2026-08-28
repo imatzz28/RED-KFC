@@ -570,43 +570,37 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
         className="relative bg-white rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-200 w-full max-w-7xl h-[88vh] max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 my-auto"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-[#0f1c2d] p-4 sm:p-5 text-white shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-600/30 shrink-0">
-              <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black tracking-tight text-white uppercase italic">
-                Auditoría SafeHands
-              </h3>
-              <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
-                Relación de Carnets de Manipulación de Alimentos
-              </p>
-            </div>
+        {/* Header Principal */}
+        <div className="bg-white px-6 py-3.5 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+          {/* Título Limpio */}
+          <div>
+            <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+              Auditoría SafeHands
+            </h2>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => loadData(true)}
               disabled={isRefreshing}
-              className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition cursor-pointer disabled:opacity-50"
+              className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
               title="Recargar datos"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition shadow-md cursor-pointer"
+              className="p-2 rounded-xl bg-slate-900 hover:bg-black text-white transition shadow-xs cursor-pointer"
+              title="Exportar a Excel"
             >
               <Download className="w-4 h-4" />
-              <span>Exportar Excel</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              title="Cerrar"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -12,22 +12,22 @@ export const HierarchyViewer: React.FC<Props> = ({ hierarchy, restaurants }) => 
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {hierarchy.regions.map(region => (
-          <div key={region.name} className="bg-slate-50 rounded-[32px] border border-slate-100 overflow-hidden flex flex-col">
-            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+          <div key={region.name} className="bg-slate-50/70 rounded-3xl border border-slate-200/80 overflow-hidden flex flex-col shadow-xs">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-600 rounded-xl shadow-lg">
+                <div className="p-2 bg-white/10 text-white rounded-xl border border-white/10">
                   <Globe className="w-4 h-4" />
                 </div>
-                <h4 className="text-sm font-black uppercase italic tracking-tight">{region.name}</h4>
+                <h4 className="text-sm font-black uppercase tracking-tight">{region.name}</h4>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{region.zones.length} Zonas</span>
+              <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">{region.zones.length} Zonas</span>
             </div>
             <div className="p-4 space-y-3 flex-1">
               {region.zones.map(zone => (
-                <div key={zone.name} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-red-200">
+                <div key={zone.name} className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-xs transition-all hover:border-slate-400">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black text-slate-800 uppercase italic">{zone.name}</span>
-                    <span className="text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                    <span className="text-[10.5px] font-black text-slate-800 uppercase tracking-tight">{zone.name}</span>
+                    <span className="text-[9px] font-black text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
                       {zone.restaurantIds.filter(rid => restaurants.some(r => r.id === rid)).length} Tiendas
                     </span>
                   </div>

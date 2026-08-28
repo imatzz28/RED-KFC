@@ -199,6 +199,17 @@ const Sidebar: React.FC = () => {
     shortcuts: false
   });
 
+  // Si la barra lateral se minimiza o se cierra, replegar automáticamente los menús desplegables
+  useEffect(() => {
+    if (isCollapsed || (!isDesktop && !isOpen)) {
+      setExpandedCategories({
+        curvas: false,
+        gente: false,
+        shortcuts: false
+      });
+    }
+  }, [isCollapsed, isDesktop, isOpen]);
+
   const toggleCategory = (catId: string) => {
     setExpandedCategories(prev => ({
       ...prev,

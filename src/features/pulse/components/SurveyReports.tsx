@@ -719,7 +719,7 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold transition-all cursor-pointer flex items-center justify-center"
+              className="p-2.5 bg-white hover:bg-slate-900 text-slate-600 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 flex items-center justify-center cursor-pointer"
               title="Volver a encuestas"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -753,10 +753,10 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
             {isAdmin && allResponses.length > 0 && (
               <button
                 onClick={() => setShowConfirmReset(true)}
-                className="px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-xs shadow-xs transition flex items-center gap-2 uppercase cursor-pointer shrink-0"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer shrink-0"
                 title="Reiniciar todas las respuestas (Solo Administrador)"
               >
-                <Trash2 className="w-4 h-4 stroke-[2.5]" />
+                <Trash2 className="w-4 h-4" />
                 <span>Reiniciar Respuestas</span>
               </button>
             )}
@@ -764,10 +764,10 @@ function parseResponseTimestamp(dateVal?: string | number | null): number | null
             <button
               onClick={handleExportExcel}
               disabled={filteredResponses.length === 0}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-2 uppercase cursor-pointer shrink-0"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
             >
-              <Download className="w-4 h-4 stroke-[2.5]" />
-              <span>Exportar Excel (.xlsx)</span>
+              <Download className="w-4 h-4" />
+              <span>Exportar Excel</span>
             </button>
           </div>
         </div>

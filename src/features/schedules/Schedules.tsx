@@ -876,10 +876,10 @@ const Schedules: React.FC = () => {
               {(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.LIDER || auth.user?.role === UserRole.COORDINATOR) && (
                 <button 
                   onClick={() => setIsReportDashboardOpen(true)}
-                  className="flex items-center gap-2 px-5 py-3 bg-[#0f1c2d] hover:bg-black text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer h-[42px] shrink-0"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer h-[42px] shrink-0"
                 >
-                  <BarChart3 className="w-4 h-4 text-red-500" />
-                  <span>Reporte planificación</span>
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Reporte Planificación</span>
                 </button>
               )}
 
@@ -887,10 +887,10 @@ const Schedules: React.FC = () => {
               {auth.user?.role !== UserRole.SPECIALIST && auth.user?.role !== UserRole.GUEST && (
                 <button 
                   onClick={exportExcelTemplate}
-                  className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer h-[42px] shrink-0"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer h-[42px] shrink-0"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Exportar Plantilla</span>
+                  <span>Exportar Planificación</span>
                 </button>
               )}
             </div>

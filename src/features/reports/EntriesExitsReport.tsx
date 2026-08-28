@@ -426,18 +426,20 @@ const EntriesExitsReport: React.FC = () => {
           <div className="space-y-4">
             <button 
               onClick={() => setShowCargoModal(true)} 
-              className="w-full bg-[#0f1c2d] text-white p-6 rounded-3xl border border-slate-800 shadow-md transition-all hover:bg-slate-900 group relative overflow-hidden text-left cursor-pointer"
+              className="w-full bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs transition-all duration-200 hover:border-slate-300 hover:shadow-md group text-left cursor-pointer"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-[9px] font-black uppercase text-red-500 tracking-widest mb-1">Análisis Detallado</h4>
-                  <p className="text-base font-black uppercase italic tracking-tight leading-tight text-white">Movimientos por Cargo</p>
-                  <p className="text-[9px] font-medium text-slate-400 mt-1.5 flex items-center gap-1.5">
-                    <PieChart className="w-3.5 h-3.5 text-red-500" /> Desglose y tasa de rotación
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Análisis Detallado</h4>
+                  <p className="text-base font-black uppercase tracking-tight leading-tight text-slate-900 group-hover:text-red-600 transition-colors">
+                    Movimientos por Cargo
+                  </p>
+                  <p className="text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                    <PieChart className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500 transition-colors" /> Desglose y tasa de rotación
                   </p>
                 </div>
-                <div className="p-3 bg-red-600 text-white rounded-2xl group-hover:bg-red-700 transition-all shrink-0 shadow-md shadow-red-600/30">
-                  <ChevronRight className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 group-hover:bg-slate-900 group-hover:text-white text-slate-600 flex items-center justify-center transition-all shrink-0 shadow-2xs">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
             </button>
@@ -487,22 +489,25 @@ const EntriesExitsReport: React.FC = () => {
       {/* ── Modal Análisis por Cargo ──────────────────────────────────────────── */}
       {showCargoModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-[#0f1c2d] text-white flex justify-between items-center border-b border-slate-800">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-600/30">
-                  <PieChart className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black uppercase italic tracking-tight text-lg">Análisis por Cargo</h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">Periodo: {singleMonthLabel}</p>
-                </div>
+          <div className="relative bg-white rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            {/* Header Principal */}
+            <div className="bg-white px-6 py-3.5 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+              {/* Título Limpio */}
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+                  Análisis por Cargo
+                </h2>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                  {singleMonthLabel}
+                </span>
               </div>
+
               <button 
                 onClick={() => setShowCargoModal(false)} 
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                title="Cerrar"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">

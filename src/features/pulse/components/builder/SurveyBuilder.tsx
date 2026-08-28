@@ -183,10 +183,10 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
           <button
             type="button"
             onClick={handleAttemptExit}
-            className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl transition text-slate-700 cursor-pointer shrink-0 h-11 flex items-center justify-center"
+            className="p-3 bg-white hover:bg-slate-900 border border-slate-200 hover:border-slate-800 rounded-xl transition-all duration-200 text-slate-600 hover:text-white cursor-pointer shrink-0 h-11 w-11 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95"
             title="Volver"
           >
-            <ArrowLeft className="w-5 h-5 text-[#E4002B]" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
 
           <input
@@ -207,9 +207,9 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
               type="button"
               disabled={isSaving}
               onClick={handleSave}
-              className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-6 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xs shadow-md shadow-red-600/20 transition cursor-pointer shrink-0 disabled:opacity-50"
+              className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-5 rounded-xl bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer shrink-0 disabled:opacity-50"
             >
-              {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-white" />}
+              {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>
             </button>
           </div>
@@ -300,7 +300,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddMenuOpen(prev => !prev)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-md shadow-red-600/20 active:scale-95 cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Agregar Pregunta</span>

@@ -371,18 +371,8 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
   return (
     <div className="space-y-6">
-      {/* Title & Subtitle Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tight flex items-center gap-3">
-            <Users className="w-8 h-8 text-red-600" />
-            Usuarios
-          </h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-            Gestiona y administra especialistas y coordinadores
-          </p>
-        </div>
-
+      {/* Action Toolbar */}
+      <div className="flex justify-start px-2">
         <button 
           onClick={() => {
             setSelectedUser(null);
@@ -397,7 +387,7 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
             setSearchTerm(''); 
             setShowUserModal(true);
           }}
-          className="flex items-center gap-2 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 flex-shrink-0"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer flex-shrink-0"
         >
           <UserPlus className="w-4 h-4" />
           <span>Nuevo Usuario</span>

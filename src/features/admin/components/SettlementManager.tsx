@@ -88,12 +88,14 @@ export const SettlementManager: React.FC<Props> = ({ hierarchy, setHierarchy, se
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="p-4 bg-red-600 text-white rounded-[24px] shadow-xl"><Calendar className="w-8 h-8" /></div>
+      <div className="bg-slate-50/70 p-6 md:p-8 rounded-3xl border border-slate-200/80">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl shadow-sm">
+            <Calendar className="w-5 h-5" />
+          </div>
           <div>
-            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">Asentar Calificaciones</h3>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 italic">* Una vez asentado un mes, no se podrán realizar más cambios en las notas.</p>
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 leading-none">Asentar Calificaciones</h3>
+            <p className="text-[10.5px] text-slate-500 font-medium mt-1">Una vez asentado un mes, se bloquea la edición de notas para ese periodo.</p>
           </div>
         </div>
 
@@ -101,17 +103,21 @@ export const SettlementManager: React.FC<Props> = ({ hierarchy, setHierarchy, se
           {monthsToManage.map(m => {
             const isLocked = hierarchy.lockedMonths.includes(m);
             return (
-              <div key={m} className={`p-6 rounded-[32px] border-2 flex items-center justify-between transition-all ${isLocked ? 'bg-white border-red-500 shadow-xl' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-2xl ${isLocked ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {isLocked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
+              <div key={m} className={`p-5 rounded-2xl border flex items-center justify-between transition-all bg-white shadow-xs ${isLocked ? 'border-amber-300' : 'border-slate-200 hover:border-slate-300'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${isLocked ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                    {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                   </div>
-                  <span className="text-lg font-black uppercase italic tracking-tighter text-slate-800">{m}</span>
+                  <span className="text-sm font-black uppercase tracking-tight text-slate-800">{m}</span>
                 </div>
                 <button
                   onClick={() => toggleMonthLock(m)}
                   disabled={isSaving}
-                  className={`px-6 py-2.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] transition-all ${isLocked ? 'bg-red-600 text-white shadow-lg hover:bg-red-700' : 'bg-slate-900 text-white hover:bg-black shadow-md'}`}
+                  className={`px-4 py-2 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer ${
+                    isLocked
+                      ? 'bg-white hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-300 hover:border-amber-500'
+                      : 'bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800'
+                  }`}
                 >
                   {isLocked ? 'Abrir Periodo' : 'Asentar Notas'}
                 </button>

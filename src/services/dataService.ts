@@ -227,7 +227,8 @@ export const dataService = {
       dataService._cache.bancaExternalPersonnel = (await localforage.getItem<BancaExternalPerson[]>('la_akademia_banca_external_personnel')) || [];
       dataService._cache.surveys = (await localforage.getItem<Survey[]>('la_akademia_surveys')) || [];
       dataService._cache.responses = (await localforage.getItem<ResponseRecord[]>('la_akademia_responses')) || [];
-      dataService._cache.surveyCategories = (await localforage.getItem<string[]>('la_akademia_survey_categories')) || [
+      const localSurveyCats = await localforage.getItem<string[]>('la_akademia_survey_categories');
+      dataService._cache.surveyCategories = (localSurveyCats !== null && Array.isArray(localSurveyCats)) ? localSurveyCats : [
         'Entrenamientos',
         'Seguridad y Salud',
         'Operaciones',
@@ -280,10 +281,8 @@ export const dataService = {
       // Sincronizar categorías de Pulse
       if (Array.isArray(pulseCats) && pulseCats.length > 0) {
         const catNames = pulseCats.map((c: any) => c.name || c).filter(Boolean);
-        const currentCats = dataService.getSurveyCategories();
-        const mergedCats = Array.from(new Set([...currentCats, ...catNames]));
-        dataService._cache.surveyCategories = mergedCats;
-        await localforage.setItem('la_akademia_survey_categories', mergedCats);
+        dataService._cache.surveyCategories = catNames;
+        await localforage.setItem('la_akademia_survey_categories', catNames);
       }
 
       const defaultBanca: BancaData = { assignments: [] };
@@ -1046,7 +1045,7 @@ export const dataService = {
   },
 
   getSurveyCategories: (): string[] => {
-    if (dataService._cache.surveyCategories && dataService._cache.surveyCategories.length > 0) {
+    if (dataService._cache.surveyCategories !== null && dataService._cache.surveyCategories !== undefined) {
       return dataService._cache.surveyCategories;
     }
     const defaultCats = [
@@ -1067,16 +1066,28 @@ export const dataService = {
 
     // Sincronizar en la nube en tabla pulse_categories
     try {
-      const payload = categories.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
-      await dataService.supabaseFetch('pulse_categories', 'POST', payload, '?on_conflict=id');
-    } catch (err) {
-      console.warn('[saveSurveyCategories] Falló supabaseFetch en pulse_categories, reintentando con cliente JS:', err);
+      const newIds = categories.map(name => name.toLowerCase().replace(/\s+/g, '-'));
+
+      // 1. Borrar en Supabase las categorías que fueron eliminadas
       try {
+        const { data: existingRows } = await supabase.from('pulse_categories').select('id');
+        if (existingRows && existingRows.length > 0) {
+          const idsToDelete = existingRows.map((r: any) => r.id).filter((id: string) => !newIds.includes(id));
+          if (idsToDelete.length > 0) {
+            await supabase.from('pulse_categories').delete().in('id', idsToDelete);
+          }
+        }
+      } catch (delErr) {
+        console.warn('[saveSurveyCategories] Error depurando categorías eliminadas en Supabase:', delErr);
+      }
+
+      // 2. Insertar/Actualizar categorías actuales
+      if (categories.length > 0) {
         const payload = categories.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name }));
         await supabase.from('pulse_categories').upsert(payload, { onConflict: 'id' });
-      } catch (clientErr) {
-        console.error('[saveSurveyCategories] Error al persistir categorías en Supabase:', clientErr);
       }
+    } catch (err) {
+      console.error('[saveSurveyCategories] Error al persistir categorías en Supabase:', err);
     }
   },
 
