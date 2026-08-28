@@ -208,20 +208,7 @@ const PublicValidation: React.FC = () => {
                 </div>
               </div>
 
-              {/* Specialist Info */}
-              <div className="pt-5 sm:pt-6 border-t border-dashed border-slate-100 flex items-center justify-between px-1 sm:px-2">
-                 <div className="flex items-center gap-3 sm:gap-4">
-                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center">
-                     <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-                   </div>
-                   <div>
-                     <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 sm:mb-1.5">ESPECIALISTA CAPACITADOR</p>
-                     <p className="text-[10px] sm:text-xs font-black text-slate-900 uppercase italic tracking-tight">
-                       {settings?.responsibleName || 'ESPECIALISTA CALIDAD'}
-                     </p>
-                   </div>
-                 </div>
-              </div>
+
 
               {/* Download Action */}
               <button 
