@@ -70,7 +70,7 @@ BEGIN
     CROSS JOIN group_cats gc
     WHERE NOT (gc.group_id = 'C' AND ae.seniority_months <= 3)
   ),
-  -- Notas heredables (Normalizando CECO)
+  -- Notas heredables (Normalizando CECO) - AK, A, B, C
   inherited AS (
     SELECT DISTINCT ON (g.employee_id, TRIM(UPPER(g.restaurant_id)), g.group, g.category)
       g.employee_id,
@@ -79,10 +79,36 @@ BEGIN
       g.score
     FROM grades g
     WHERE g.month <= p_month_date
-      AND g.group NOT IN ('D', 'F')
+      AND g.group NOT IN ('D', 'F', 'E')
     ORDER BY g.employee_id, TRIM(UPPER(g.restaurant_id)), g.group, g.category, g.month DESC
   ),
-  -- Notas NO heredables (Normalizando CECO)
+  -- Para The Vault (E): Unificar notas históricas
+  -- Toma el mes más reciente con notas (<= p_month_date) y calcula el promedio de ese mes
+  latest_vault_month AS (
+    SELECT
+      g.employee_id,
+      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
+      MAX(g.month) AS max_month
+    FROM grades g
+    WHERE g.month <= p_month_date
+      AND g.group = 'E'
+    GROUP BY g.employee_id, TRIM(UPPER(g.restaurant_id))
+  ),
+  vault_effective AS (
+    SELECT
+      g.employee_id,
+      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
+      'E'::TEXT AS group_id,
+      ROUND(AVG(g.score)) AS score
+    FROM grades g
+    INNER JOIN latest_vault_month lvm
+      ON g.employee_id = lvm.employee_id
+      AND TRIM(UPPER(g.restaurant_id)) = lvm.restaurant_id
+      AND g.month = lvm.max_month
+    WHERE g.group = 'E'
+    GROUP BY g.employee_id, TRIM(UPPER(g.restaurant_id))
+  ),
+  -- Notas NO heredables (Normalizando CECO) - D y F
   exact_month AS (
     SELECT
       g.employee_id,
@@ -95,6 +121,8 @@ BEGIN
   ),
   effective AS (
     SELECT * FROM inherited
+    UNION ALL
+    SELECT * FROM vault_effective
     UNION ALL
     SELECT * FROM exact_month
   ),

@@ -96,6 +96,8 @@ const getInitialFallbackMonth = () => {
 
 let _isLoggingOut = false; // Bandera para evitar loop en onAuthStateChange
 
+let _isInitRunning = false;
+
 export const useAppStore = create<AppState>((set, get) => ({
     auth: { user: null, isAuthenticated: false },
     employees: [],
@@ -120,7 +122,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     handleLogin: async (user) => {
         set({ auth: { user, isAuthenticated: true } });
-        await get().initData(true); // Forzar recarga completa al iniciar sesión
+        // Iniciar sincronización en segundo plano sin bloquear
+        void get().initData(true);
     },
 
     handleLogout: async () => {
@@ -169,39 +172,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
 
     initData: async (force: boolean = false) => {
-        if (!get().auth.isAuthenticated) return;
+        if (!get().auth.isAuthenticated || _isInitRunning) return;
+        _isInitRunning = true;
 
-        set({ syncStatus: 'syncing' });
-
-        // 1. Carga instantánea desde localforage (offline-first)
-        await dataService.initLocalCache();
-        get().refreshData();
-
-        // 2. Sincronización con la nube (respeta TTL de 30 min salvo que sea forzado)
-        const success = await dataService.loadAllFromCloud(force);
-
-        // 3. Selección inteligente del mes basada en meses asentados
         try {
-            const hierarchy = dataService.getHierarchy();
-            const lockedMonths = hierarchy?.lockedMonths || [];
-            
-            if (lockedMonths.length > 0) {
-                const sortedLocked = [...lockedMonths].sort((a, b) => b.localeCompare(a));
-                const lastSettledPrefix = sortedLocked[0].substring(0, 7);
-                
-                const nextEvalMonth = new Date(`${lastSettledPrefix}-01T12:00:00Z`);
-                nextEvalMonth.setMonth(nextEvalMonth.getMonth() + 1);
-                const evalMonthPrefix = nextEvalMonth.toISOString().slice(0, 7);
-                
-                set({ selectedMonth: evalMonthPrefix });
-            }
-        } catch (err) {
-            console.warn('[initData] Error al calcular mes óptimo desde meses asentados. Usando mes actual como fallback.', err);
-        }
+            set({ syncStatus: 'syncing' });
 
-        get().refreshData();
-        await get().loadQuickShortcuts();
-        set({ syncStatus: success ? 'online' : 'offline' });
+            // 1. Carga instantánea desde localforage (offline-first)
+            await dataService.initLocalCache();
+            get().refreshData();
+
+            // 2. Sincronización con la nube (respeta TTL de 30 min salvo que sea forzado)
+            const success = await dataService.loadAllFromCloud(force);
+
+            // 3. Selección inteligente del mes basada en meses asentados
+            try {
+                const hierarchy = dataService.getHierarchy();
+                const lockedMonths = hierarchy?.lockedMonths || [];
+                
+                if (lockedMonths.length > 0) {
+                    const sortedLocked = [...lockedMonths].sort((a, b) => b.localeCompare(a));
+                    const lastSettledPrefix = sortedLocked[0].substring(0, 7);
+                    
+                    const nextEvalMonth = new Date(`${lastSettledPrefix}-01T12:00:00Z`);
+                    nextEvalMonth.setMonth(nextEvalMonth.getMonth() + 1);
+                    const evalMonthPrefix = nextEvalMonth.toISOString().slice(0, 7);
+                    
+                    set({ selectedMonth: evalMonthPrefix });
+                }
+            } catch (err) {
+                console.warn('[initData] Error al calcular mes óptimo desde meses asentados. Usando mes actual como fallback.', err);
+            }
+
+            get().refreshData();
+            await get().loadQuickShortcuts();
+            set({ syncStatus: success ? 'online' : 'offline' });
+        } finally {
+            _isInitRunning = false;
+        }
     },
 
     loadMonthly: async () => {
