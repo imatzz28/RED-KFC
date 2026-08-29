@@ -136,19 +136,23 @@ export const useAppStore = create<AppState>((set, get) => ({
             // Borrar SOLO las claves de esta app, no todo el storage del dominio
             const APP_KEYS = [
                 'la_akademia_employees', 'la_akademia_stores', 'la_akademia_grades',
-                'la_akademia_summary', 'la_akademia_hierarchy', 'la_akademia_users', 'la_akademia_banca'
+                'la_akademia_summary', 'la_akademia_hierarchy', 'la_akademia_users', 'la_akademia_banca',
+                'la_akademia_banca_external_personnel', 'la_akademia_survey_categories', 'red_quick_shortcuts'
             ];
             await Promise.all(APP_KEYS.map(key => localforage.removeItem(key)));
         } catch (err) {
             console.error('[handleLogout] Error al cerrar sesión en Supabase. La sesión local fue limpiada de todas formas.', err);
+        } finally {
+            _isInitRunning = false;
+            _isLoggingOut = false;
         }
         set({ 
             auth: { user: null, isAuthenticated: false }, 
             filteredEmployees: [],
             employees: [],
-            restaurants: []
+            restaurants: [],
+            quickShortcuts: []
         });
-        _isLoggingOut = false;
     },
 
     setSelectedMonth: (month) => set({ selectedMonth: month }),
@@ -265,3 +269,22 @@ let _authSubscription: { unsubscribe: () => void } | null = null;
 })();
 
 export const unsubscribeAuth = () => _authSubscription?.unsubscribe();
+
+// Sincronización en vivo entre pestañas del navegador
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+        const syncChannel = new BroadcastChannel('red_kfc_sync_channel');
+        syncChannel.onmessage = (event) => {
+            if (event.data?.type === 'DATA_UPDATED') {
+                const store = useAppStore.getState();
+                if (store.auth.isAuthenticated) {
+                    console.log('[MultiTabSync] Datos actualizados en otra pestaña. Resincronizando...');
+                    store.initData(true);
+                }
+            }
+        };
+    } catch (err) {
+        console.debug('[MultiTabSync] BroadcastChannel no soportado o deshabilitado.', err);
+    }
+}
+

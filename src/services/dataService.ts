@@ -41,6 +41,19 @@ const parseExcelDate = (serial: number | string) => {
   }
 };
 
+// Sincronización en tiempo real entre múltiples pestañas del navegador
+const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
+  ? new BroadcastChannel('red_kfc_sync_channel')
+  : null;
+
+export const broadcastSync = (type: string) => {
+  try {
+    syncChannel?.postMessage({ type, timestamp: Date.now() });
+  } catch (err) {
+    console.debug('[broadcastSync] Error notificando a otras pestañas:', err);
+  }
+};
+
 export const dataService = {
   supabaseFetch: async (table: string, method: string = 'GET', body?: unknown, queryParams: string = '') => {
     const url = `${SUPABASE_URL}/rest/v1/${table}${queryParams}`;
@@ -249,34 +262,51 @@ export const dataService = {
       return true;
     }
     try {
-      // surveys y responses NO se descargan aquí: se cargan bajo demanda cuando el usuario
-      // abre el módulo Pulse (via fetchSurveysAndResponses). Esto evita 2 consultas innecesarias
-      // a Supabase en cada login para usuarios que no usan Pulse.
-      const [employees, restaurants, hierarchy, users, banca, externalPersonnel, pulseCats] = await Promise.all([
+      const results = await Promise.allSettled([
         dataService.supabaseFetchAll('employees'),
         dataService.supabaseFetchAll('restaurants'),
-        dataService.supabaseFetch('hierarchy').catch(() => []),
-        dataService.supabaseFetchAll('users').catch(() => []),
-        dataService.supabaseFetch('banca').catch(() => []),
-        dataService.supabaseFetch('banca_external_personnel').catch(() => []),
-        dataService.supabaseFetch('pulse_categories').catch(() => []),
+        dataService.supabaseFetch('hierarchy'),
+        dataService.supabaseFetchAll('users'),
+        dataService.supabaseFetch('banca'),
+        dataService.supabaseFetch('banca_external_personnel'),
+        dataService.supabaseFetch('pulse_categories'),
       ]);
 
-      await Promise.all([
-        localforage.setItem('la_akademia_employees', employees || []),
-        localforage.setItem('la_akademia_stores', restaurants || []),
-        localforage.setItem('la_akademia_users', users || []),
-      ]);
+      const employees = results[0].status === 'fulfilled' ? results[0].value : null;
+      const restaurants = results[1].status === 'fulfilled' ? results[1].value : null;
+      const hierarchy = results[2].status === 'fulfilled' ? results[2].value : null;
+      const users = results[3].status === 'fulfilled' ? results[3].value : null;
+      const banca = results[4].status === 'fulfilled' ? results[4].value : null;
+      const externalPersonnel = results[5].status === 'fulfilled' ? results[5].value : null;
+      const pulseCats = results[6].status === 'fulfilled' ? results[6].value : null;
 
-      const defaultHierarchy = { lockedMonths: [], regions: [] };
-      const cloudHierarchy = (hierarchy && (hierarchy as any)[0]?.data) ? (hierarchy as any)[0].data : defaultHierarchy;
-      await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
+      if (employees && Array.isArray(employees)) {
+        await localforage.setItem('la_akademia_employees', employees);
+        dataService._cache.employees = employees as Employee[];
+      }
+      if (restaurants && Array.isArray(restaurants)) {
+        await localforage.setItem('la_akademia_stores', restaurants);
+        dataService._cache.restaurants = restaurants as Restaurant[];
+      }
+      if (users && Array.isArray(users)) {
+        await localforage.setItem('la_akademia_users', users);
+        dataService._cache.users = users as User[];
+      }
+
+      if (hierarchy && Array.isArray(hierarchy) && (hierarchy as any)[0]?.data) {
+        const cloudHierarchy = (hierarchy as any)[0].data;
+        await localforage.setItem('la_akademia_hierarchy', cloudHierarchy);
+        dataService._cache.hierarchy = cloudHierarchy;
+      }
 
       // Sincronizar personal externo de banca
-      const cloudExternal = Array.isArray(externalPersonnel) ? (externalPersonnel as BancaExternalPerson[]) : [];
-      const currentLocalExternal = dataService._cache.bancaExternalPersonnel || (await localforage.getItem<BancaExternalPerson[]>('la_akademia_banca_external_personnel')) || [];
-      const mergedExternal = cloudExternal.length > 0 ? cloudExternal : currentLocalExternal;
-      await localforage.setItem('la_akademia_banca_external_personnel', mergedExternal);
+      if (externalPersonnel && Array.isArray(externalPersonnel)) {
+        const cloudExternal = externalPersonnel as BancaExternalPerson[];
+        const currentLocalExternal = dataService._cache.bancaExternalPersonnel || (await localforage.getItem<BancaExternalPerson[]>('la_akademia_banca_external_personnel')) || [];
+        const mergedExternal = cloudExternal.length > 0 ? cloudExternal : currentLocalExternal;
+        await localforage.setItem('la_akademia_banca_external_personnel', mergedExternal);
+        dataService._cache.bancaExternalPersonnel = mergedExternal;
+      }
 
       // Sincronizar categorías de Pulse
       if (Array.isArray(pulseCats) && pulseCats.length > 0) {
@@ -285,37 +315,32 @@ export const dataService = {
         await localforage.setItem('la_akademia_survey_categories', catNames);
       }
 
-      const defaultBanca: BancaData = { assignments: [] };
-      let rawBanca: BancaData = defaultBanca;
-      if (Array.isArray(banca) && banca.length > 0) {
-        rawBanca = banca[0]?.data || (banca[0]?.assignments ? (banca[0] as any) : defaultBanca);
-      } else if (banca && typeof banca === 'object') {
-        rawBanca = (banca as any)?.data || ((banca as any)?.assignments ? (banca as any) : defaultBanca);
+      if (banca) {
+        const defaultBanca: BancaData = { assignments: [] };
+        let rawBanca: BancaData = defaultBanca;
+        if (Array.isArray(banca) && banca.length > 0) {
+          rawBanca = banca[0]?.data || (banca[0]?.assignments ? (banca[0] as any) : defaultBanca);
+        } else if (banca && typeof banca === 'object') {
+          rawBanca = (banca as any)?.data || ((banca as any)?.assignments ? (banca as any) : defaultBanca);
+        }
+
+        const currentLocalBanca = dataService._cache.banca || (await localforage.getItem<BancaData>('la_akademia_banca'));
+        const hasLocalAssignments = (currentLocalBanca?.assignments?.length ?? 0) > 0;
+        const hasCloudAssignments = (rawBanca?.assignments?.length ?? 0) > 0;
+
+        let finalBanca: BancaData;
+        if (!hasCloudAssignments && hasLocalAssignments) {
+          finalBanca = dataService.normalizeBancaData(currentLocalBanca!);
+          dataService.saveBancaData(finalBanca).catch(err => console.warn('[loadAllFromCloud] Auto-sync banca error:', err));
+        } else {
+          finalBanca = dataService.normalizeBancaData(rawBanca);
+          await localforage.setItem('la_akademia_banca', finalBanca);
+        }
+        dataService._cache.banca = finalBanca;
       }
 
-      // Si la nube viene vacía pero ya teníamos asignaciones locales guardadas, preservar las locales y resincronizar a la nube
-      const currentLocalBanca = dataService._cache.banca || (await localforage.getItem<BancaData>('la_akademia_banca'));
-      const hasLocalAssignments = (currentLocalBanca?.assignments?.length ?? 0) > 0;
-      const hasCloudAssignments = (rawBanca?.assignments?.length ?? 0) > 0;
-
-      let finalBanca: BancaData;
-      if (!hasCloudAssignments && hasLocalAssignments) {
-        finalBanca = dataService.normalizeBancaData(currentLocalBanca!);
-        // Auto-sincronizar hacia la nube para que no se pierdan
-        dataService.saveBancaData(finalBanca).catch(err => console.warn('[loadAllFromCloud] Auto-sync banca error:', err));
-      } else {
-        finalBanca = dataService.normalizeBancaData(rawBanca);
-        await localforage.setItem('la_akademia_banca', finalBanca);
-      }
-
-      dataService._cache.employees = (employees as Employee[]) || [];
-      dataService._cache.restaurants = (restaurants as Restaurant[]) || [];
-      dataService._cache.users = (users as User[]) || [];
-      dataService._cache.hierarchy = cloudHierarchy;
-      dataService._cache.banca = finalBanca;
-      dataService._cache.bancaExternalPersonnel = mergedExternal;
       dataService._cache.gradeIndex = null;
-      dataService._cache.lastCloudSync = Date.now(); // Registrar el momento de sincronización
+      dataService._cache.lastCloudSync = Date.now();
 
       return true;
     } catch (e) {
@@ -757,12 +782,15 @@ export const dataService = {
     } catch (clientErr) {
       console.error('[saveBancaData] No se pudo sincronizar banca con Supabase:', clientErr);
       throw clientErr;
+    } finally {
+      broadcastSync('DATA_UPDATED');
     }
   },
 
   saveEmployees: async (employees: Employee[]) => {
     await localforage.setItem('la_akademia_employees', employees);
     dataService._cache.employees = employees;
+    broadcastSync('DATA_UPDATED');
     // Normalizar para evitar error PGRST102 (llaves faltantes en objetos del array)
     const normalized = employees.map(e => ({
       id: e.id,

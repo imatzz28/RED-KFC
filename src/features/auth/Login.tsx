@@ -23,7 +23,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      const loginEmail = username.includes('@') ? username : `${username}@kfc.co`;
+      const cleanUsername = username.trim();
+      const loginEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@kfc.co`;
+
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: password

@@ -39,10 +39,40 @@ export const DataUploader: React.FC<Props> = ({ setImportStatus, onEmployeesImpo
               return;
             }
 
+            if (data.length > 10000) {
+              setImportStatus({ message: 'Error: El archivo excede el límite máximo permitido de 10,000 registros.', isError: true });
+              return;
+            }
+
+            const firstRow = data[0] as Record<string, unknown>;
+            const headers = Object.keys(firstRow).map(k => k.toLowerCase().trim());
+
             if (type === 'employees') {
+              // Validar que al menos existan columnas clave de identificación
+              const hasDoc = headers.some(h => h.includes('doc') || h.includes('cedula') || h.includes('cédula') || h.includes('id') || h.includes('codigo') || h.includes('código'));
+              const hasName = headers.some(h => h.includes('nom') || h.includes('nombre') || h.includes('trabajador') || h.includes('empleado'));
+
+              if (!hasDoc || !hasName) {
+                setImportStatus({ 
+                  message: 'Error: Formato inválido. El archivo de nómina debe contener columnas de identificación (Documento/Cédula) y Nombre.', 
+                  isError: true 
+                });
+                return;
+              }
+
               const res = await dataService.importMonthlyExcel(data as Record<string, unknown>[]);
               setImportStatus({ message: `Carga exitosa: ${res.count} trabajadores sincronizados.`, isError: false });
             } else {
+              // Validar que existan columnas clave de estructura
+              const hasStore = headers.some(h => h.includes('tienda') || h.includes('restaurante') || h.includes('ceco') || h.includes('centro'));
+              if (!hasStore) {
+                setImportStatus({ 
+                  message: 'Error: Formato inválido. El archivo de estructura debe contener columnas de Tienda/Restaurante/CECO.', 
+                  isError: true 
+                });
+                return;
+              }
+
               const count = await dataService.importHierarchyExcel(data as Record<string, unknown>[]);
               setImportStatus({ message: `Éxito: ${count} tiendas sincronizadas correctamente.`, isError: false });
               setHierarchy(dataService.getHierarchy());

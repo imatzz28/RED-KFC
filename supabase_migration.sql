@@ -79,6 +79,7 @@ BEGIN
       g.score
     FROM grades g
     WHERE g.month <= p_month_date
+      AND g.month >= (p_month_date - INTERVAL '24 months')
       AND g.group NOT IN ('D', 'F', 'E')
     ORDER BY g.employee_id, TRIM(UPPER(g.restaurant_id)), g.group, g.category, g.month DESC
   ),
@@ -91,6 +92,7 @@ BEGIN
       MAX(g.month) AS max_month
     FROM grades g
     WHERE g.month <= p_month_date
+      AND g.month >= (p_month_date - INTERVAL '24 months')
       AND g.group = 'E'
     GROUP BY g.employee_id, TRIM(UPPER(g.restaurant_id))
   ),
@@ -711,6 +713,19 @@ DECLARE
   v_vals TEXT[] := ARRAY[]::TEXT[];
   v_col RECORD;
 BEGIN
+  -- Validar que solo un administrador autenticado pueda ejecutar esta función
+  IF auth.uid() IS NOT NULL THEN
+    IF NOT (
+      EXISTS (
+        SELECT 1 FROM public.users 
+        WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+          AND UPPER(role) = 'ADMIN'
+      )
+    ) THEN
+      RAISE EXCEPTION 'No autorizado: Solo administradores pueden gestionar credenciales de usuario.';
+    END IF;
+  END IF;
+
   v_email := LOWER(p_username) || '@kfc.co';
   
   -- Verificar accion
@@ -1177,10 +1192,34 @@ DROP POLICY IF EXISTS "Lectura pública de encuestas publicadas" ON public.surve
 CREATE POLICY "Lectura pública de encuestas publicadas" ON public.surveys FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Control total para personal autenticado en encuestas" ON public.surveys;
-CREATE POLICY "Control total para personal autenticado en encuestas" ON public.surveys FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Gestion de encuestas para administradores y coordinadores" ON public.surveys 
+  FOR ALL TO authenticated 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users 
+      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+        AND UPPER(role) IN ('ADMIN', 'COORDINATOR')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users 
+      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+        AND UPPER(role) IN ('ADMIN', 'COORDINATOR')
+    )
+  );
 
 DROP POLICY IF EXISTS "Permitir guardar y actualizar respuestas" ON public.responses;
-CREATE POLICY "Permitir guardar y actualizar respuestas" ON public.responses FOR ALL USING (true) WITH CHECK (true);
+-- Respuestas: inserción pública/autenticada, lectura solo para autenticados
+CREATE POLICY "Permitir insertar respuestas" ON public.responses FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir lectura de respuestas a autenticados" ON public.responses FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin elimina respuestas" ON public.responses FOR DELETE TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+      AND UPPER(role) = 'ADMIN'
+  )
+);
 
 -- ============================================================
 -- QUICK SHORTCUTS: Accesos Directos Personalizables
@@ -1202,8 +1241,42 @@ CREATE TABLE IF NOT EXISTS public.quick_shortcuts (
 ALTER TABLE public.quick_shortcuts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Permitir lectura de accesos directos" ON public.quick_shortcuts;
-CREATE POLICY "Permitir lectura de accesos directos" ON public.quick_shortcuts FOR SELECT USING (true);
+CREATE POLICY "Permitir lectura de accesos directos" ON public.quick_shortcuts FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Permitir administracion de accesos directos" ON public.quick_shortcuts;
-CREATE POLICY "Permitir administracion de accesos directos" ON public.quick_shortcuts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Solo admin gestiona accesos directos" ON public.quick_shortcuts 
+  FOR ALL TO authenticated 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users 
+      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+        AND UPPER(role) = 'ADMIN'
+    )
+  ) 
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.users 
+      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
+        AND UPPER(role) = 'ADMIN'
+    )
+  );
+
+-- ============================================================
+-- ÍNDICES DE ALTO RENDIMIENTO (OPTIMIZACIÓN DE ESCALABILIDAD)
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_grades_lookup ON public.grades(employee_id, restaurant_id, month DESC, "group");
+CREATE INDEX IF NOT EXISTS idx_grades_month_group ON public.grades(month DESC, "group");
+CREATE INDEX IF NOT EXISTS idx_employees_store ON public.employees(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_employees_id ON public.employees(id);
+CREATE INDEX IF NOT EXISTS idx_monthly_group_stats_lookup ON public.monthly_group_stats(month, restaurant_id, group_id);
+
+-- Eliminar políticas anónimas inseguras
+DROP POLICY IF EXISTS "Permitir lectura con anon de usuarios" ON public.users;
+DROP POLICY IF EXISTS "Permitir lectura con anon de empleados" ON public.employees;
+DROP POLICY IF EXISTS "Permitir lectura con anon de notas" ON public.grades;
+DROP POLICY IF EXISTS "Permitir lectura con anon de banca" ON public.banca;
+DROP POLICY IF EXISTS "Permitir lectura con anon de jerarquia" ON public.hierarchy;
+DROP POLICY IF EXISTS "Permitir lectura con anon de estadisticas" ON public.monthly_group_stats;
+
+
 

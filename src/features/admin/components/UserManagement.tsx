@@ -276,6 +276,13 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
       ? newUser.username.split('@')[0].trim() 
       : newUser.username.trim();
     
+    // Validar caracteres seguros para el nombre de usuario
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!usernameRegex.test(cleanUsername)) {
+      showAlertDialog("El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos (sin espacios ni caracteres especiales).");
+      return;
+    }
+    
     const userToProcess = { ...newUser, username: cleanUsername };
     
     // Validate password for new user
