@@ -782,13 +782,29 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
       {/* Modal - User Management */}
       {showUserModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] md:h-auto md:max-h-[85vh] overflow-hidden border-2 border-white/20">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
-              <h3 className="font-black uppercase italic tracking-tighter text-xl">
-                {selectedUser ? 'Configurar Usuario' : 'Nuevo Usuario'}
-              </h3>
-              <button onClick={() => setShowUserModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><X className="w-6 h-6" /></button>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] sm:rounded-[40px] shadow-2xl w-full max-w-2xl flex flex-col h-[90vh] md:h-auto md:max-h-[85vh] overflow-hidden border border-slate-100 relative">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+            <div className="p-6 sm:p-7 border-b border-slate-100 bg-white text-slate-900 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <UserPlus className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-black uppercase italic tracking-tight text-lg sm:text-xl text-slate-900">
+                    {selectedUser ? 'Configurar Usuario' : 'Nuevo Usuario'}
+                  </h3>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Gestión de accesos y credenciales
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowUserModal(false)} 
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
@@ -1061,29 +1077,53 @@ export const UserManagement: React.FC<Props> = ({ currentUser, users, setUsers, 
 
       {/* Custom Confirmation Modal */}
       {userToDelete && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] p-6 shadow-2xl w-full max-w-sm border border-slate-100 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4 border border-red-100">
-              <Trash2 className="w-6 h-6 animate-pulse" />
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 relative animate-in zoom-in-95 duration-200">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+            <div className="p-7 sm:p-8 border-b border-slate-100 bg-white text-slate-900">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600 animate-bounce" />
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-black uppercase italic tracking-tight text-slate-900">
+                    ¿Eliminar Usuario?
+                  </h4>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Acción irreversible
+                  </p>
+                </div>
+              </div>
             </div>
-            <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight">¿Eliminar Usuario?</h4>
-            <p className="text-xs text-slate-500 font-bold mt-2 px-2 leading-relaxed">
-              ¿Estás seguro de que deseas eliminar al usuario <span className="text-slate-800 font-extrabold">@{userToDelete.username}</span>? Esta acción eliminará permanentemente tanto sus accesos como su perfil.
-            </p>
             
-            <div className="flex items-center gap-3 w-full mt-6">
+            <div className="p-7 sm:p-8 space-y-4">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-medium text-slate-600 leading-relaxed">
+                ¿Estás seguro de que deseas eliminar al usuario <span className="text-slate-900 font-black">@{userToDelete.username}</span>? Esta acción eliminará permanentemente tanto sus accesos como su perfil.
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
               <button 
+                type="button"
                 onClick={() => setUserToDelete(null)}
-                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                className="px-5 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 Cancelar
               </button>
               <button 
+                type="button"
                 onClick={executeDeleteUser}
                 disabled={isSaving}
-                className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-red-200 disabled:opacity-50"
+                className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-red-200 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 active:scale-95"
               >
-                {isSaving ? 'Eliminando...' : 'Eliminar'}
+                {isSaving ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  'Eliminar'
+                )}
               </button>
             </div>
           </div>

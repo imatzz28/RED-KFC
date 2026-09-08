@@ -234,6 +234,9 @@ const Dashboard: React.FC = () => {
         const normalizedEmpStore = String(emp.restaurant_id || '').trim().toUpperCase();
         if (!storeIds.includes(normalizedEmpStore)) return false;
         
+        // Suspendido en este mes → excluir de métricas
+        if (emp.suspended_since && dashboardMonth + '-01' >= emp.suspended_since.substring(0, 10)) return false;
+
         const joinDateStr = emp.join_date ? emp.join_date.substring(0, 10) : '0000-01-01';
         const exitDateStr = emp.exit_date ? emp.exit_date.substring(0, 10) : '9999-12-31';
         
@@ -527,12 +530,13 @@ const Dashboard: React.FC = () => {
 
 
       {showExportModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl sm:rounded-[36px] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl sm:rounded-[36px] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col animate-in zoom-in-95 duration-200 relative">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
             {/* Header Principal */}
-            <div className="bg-white px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+            <div className="bg-white px-6 sm:px-8 py-5 flex items-center justify-between gap-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase leading-tight italic">
                   Configurar Exportación
                 </h2>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">

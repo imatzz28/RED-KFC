@@ -3,6 +3,9 @@
 -- Ejecutar en Supabase > SQL Editor
 -- ============================================================
 
+-- 0. COLUMNA DE SUSPENSIÓN TEMPORAL EN EMPLEADOS
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS suspended_since DATE DEFAULT NULL;
+
 -- 1. TABLA DE ESTADÍSTICAS PRECALCULADAS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS monthly_group_stats (
@@ -56,6 +59,8 @@ BEGIN
       (e.join_date IS NULL OR e.join_date::DATE <= (p_month_date + INTERVAL '1 month' - INTERVAL '8 days')::DATE)
       -- No se había ido antes de que empezara el mes
       AND (e.exit_date IS NULL OR e.exit_date::DATE >= p_month_date)
+      -- No estaba suspendido en este mes
+      AND (e.suspended_since IS NULL OR e.suspended_since > p_month_date)
       AND e.restaurant_id IS NOT NULL
       AND e.restaurant_id NOT IN ('', 'SIN_CECO')
   ),

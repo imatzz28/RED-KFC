@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { User, Restaurant, Employee, UserRole, JobHierarchy, JobTitle } from '@/types';
-import { Store, MapPin, Users, Award, ArrowLeft, TrendingUp, Search, Edit3, LineChart, Download, X, Calendar, RefreshCw, ChevronRight, Activity, BookOpen, GraduationCap, Star, Trophy, ClipboardCheck, Vault } from 'lucide-react';
+import { Store, MapPin, Users, Award, ArrowLeft, TrendingUp, Search, Edit3, LineChart, Download, X, Calendar, RefreshCw, ChevronRight, Activity, BookOpen, GraduationCap, Star, Trophy, ClipboardCheck, Vault, MoreVertical, UserX, UserCheck } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import { APPROVAL_THRESHOLD, TOTAL_CATEGORIES_COUNT, EVALUATION_GROUPS } from '@/utils/constants';
 import GradeEditor from '@/features/dashboard/GradeEditor';
@@ -24,7 +24,7 @@ const GroupIcons: Record<string, React.ReactNode> = {
 
 
 const MyStores: React.FC = () => {
-  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog } = useAppStore();
+  const { auth, restaurants, employees, selectedMonth, refreshData: onUpdate, showAlertDialog, showConfirmDialog } = useAppStore();
   const user = auth.user!;
   const [selectedStore, setSelectedStore] = useState<Restaurant | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -40,6 +40,15 @@ const MyStores: React.FC = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isLoadingGrades, setIsLoadingGrades] = useState(false);
   const [gradeVersion, setGradeVersion] = useState(0); // Trigger re-render tras carga async
+  const [activeMenuEmpId, setActiveMenuEmpId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleGlobalClick = () => {
+      setActiveMenuEmpId(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   const summaryMap = useMemo(() => {
     return new Map((dataService.getGradesSummary() || []).map(s => [String(s.employee_id).trim(), s]));
@@ -316,7 +325,7 @@ const MyStores: React.FC = () => {
 
   if (selectedStore) {
     const stats = getStoreStatsForMonth(selectedStore.id, selectedMonth);
-    const storeEmps = getStoreEmployeesForMonth(selectedStore.id, selectedMonth, employees, summaryMap)
+    const storeEmps = getStoreEmployeesForMonth(selectedStore.id, selectedMonth, employees, summaryMap, true)
       .filter(e => empSearch === '' || e.name.toLowerCase().includes(empSearch.toLowerCase()) || e.id.includes(empSearch))
       .sort((a, b) => (JobHierarchy[a.title] || 99) - (JobHierarchy[b.title] || 99));
 
@@ -422,7 +431,7 @@ const MyStores: React.FC = () => {
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[240px] pb-12">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50">
@@ -430,10 +439,14 @@ const MyStores: React.FC = () => {
                   <th className="px-4 md:px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Colaborador</th>
                   <th className="px-4 md:px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Antigüedad</th>
                   <th className="px-4 md:px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Score</th>
+                  {user.role === UserRole.ADMIN && (
+                    <th className="px-4 md:px-6 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center w-14"></th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {storeEmps.map(emp => {
+                {storeEmps.map((emp, index) => {
+                  const isNearBottom = index >= storeEmps.length - 2 && storeEmps.length > 2;
                   const empSummary = (dataService.getGradesSummary() || []).find((s: any) => String(s.employee_id).trim() === String(emp.id).trim());
                   const effective = dataService.getEffectiveGrades(emp.id, selectedMonth);
 
@@ -451,7 +464,7 @@ const MyStores: React.FC = () => {
 
                   const seniority = getSeniorityMonths(emp.join_date, selectedMonth);
                   return (
-                    <tr key={emp.id} className="hover:bg-slate-50/80 transition-all group relative">
+                    <tr key={emp.id} className={`hover:bg-slate-50/80 transition-all group relative ${emp.suspended_since ? 'opacity-50' : ''}`}>
                       <td className="px-4 md:px-8 py-6 text-center">
                         <button type="button" onClick={() => setEditingEmployee(emp)} className="w-9 h-9 bg-slate-900 text-white rounded-xl hover:bg-red-600 transition-all flex items-center justify-center mx-auto shadow-md"><Edit3 className="w-4 h-4" /></button>
                       </td>
@@ -459,6 +472,9 @@ const MyStores: React.FC = () => {
                         <p className="font-black text-slate-800 text-[12px] uppercase italic">{emp.name}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase tracking-widest border border-slate-200">{emp.title}</span>
+                          {emp.suspended_since && (
+                            <span className="text-[8px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase tracking-widest border border-amber-300">⏸ Inhabilitado</span>
+                          )}
                           <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">ID: {emp.id}</span>
                         </div>
                       </td>
@@ -477,6 +493,70 @@ const MyStores: React.FC = () => {
                           <span className="text-[10px] font-black text-slate-300 uppercase italic">S/N</span>
                         )}
                       </td>
+                      {user.role === UserRole.ADMIN && (
+                        <td className="px-4 md:px-6 py-6 text-center relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuEmpId(prev => prev === emp.id ? null : emp.id);
+                            }}
+                            className={`w-8 h-8 rounded-xl transition-all flex items-center justify-center mx-auto border ${
+                              activeMenuEmpId === emp.id 
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
+                                : 'bg-white text-slate-400 hover:text-slate-800 hover:bg-slate-100 border-slate-200/80 shadow-sm'
+                            }`}
+                            title="Opciones"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {activeMenuEmpId === emp.id && (
+                            <div 
+                              className={`absolute right-4 ${isNearBottom ? 'bottom-11' : 'top-11'} z-50 w-48 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1 animate-in fade-in zoom-in-95 duration-150 text-left`}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuEmpId(null);
+                                  const isSuspended = !!emp.suspended_since;
+                                  const msg = isSuspended
+                                    ? `¿Habilitar a "${emp.name}" para que vuelva a contar en las métricas?`
+                                    : `¿Inhabilitar a "${emp.name}"?\n\nNo se contará en las curvas del mes actual en adelante. Sus notas históricas se conservan intactas.`;
+                                  showConfirmDialog(msg, async () => {
+                                    try {
+                                      await dataService.toggleEmployeeSuspension(emp.id, !isSuspended);
+                                      onUpdate();
+                                      setGradeVersion(v => v + 1);
+                                      showAlertDialog(isSuspended ? `${emp.name} ha sido habilitado.` : `${emp.name} ha sido inhabilitado.`);
+                                    } catch {
+                                      showAlertDialog('Error al actualizar el estado del colaborador.');
+                                    }
+                                  });
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[11px] font-black uppercase tracking-wider transition-all rounded-xl ${
+                                  emp.suspended_since
+                                    ? 'text-emerald-600 hover:bg-emerald-50'
+                                    : 'text-amber-600 hover:bg-amber-50'
+                                }`}
+                              >
+                                {emp.suspended_since ? (
+                                  <>
+                                    <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>Habilitar</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserX className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span>Inhabilitar</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -488,34 +568,59 @@ const MyStores: React.FC = () => {
         {editingEmployee && <GradeEditor employee={editingEmployee} month={selectedMonth} onClose={() => { setEditingEmployee(null); onUpdate(); setGradeVersion(v => v + 1); }} />}
 
         {showPdfModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden border-2 border-white/20 relative">
-              <div className="p-8 bg-slate-900 text-white flex justify-between items-center relative z-10">
-                <div className="flex items-center gap-4">
-                  <LineChart className="w-6 h-6 text-red-500" />
-                  <h3 className="font-black uppercase italic tracking-tighter text-xl">Generar Curvas</h3>
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 relative animate-in zoom-in-95 duration-200">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+              <div className="p-6 sm:p-7 border-b border-slate-100 bg-white text-slate-900 flex justify-between items-center">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                    <LineChart className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-black uppercase italic tracking-tight text-lg text-slate-900">Generar Curvas</h3>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Descarga de reporte en PDF</p>
+                  </div>
                 </div>
-                <button type="button" onClick={() => setShowPdfModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X className="w-5 h-5" /></button>
+                <button 
+                  type="button" 
+                  onClick={() => setShowPdfModal(false)} 
+                  className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="p-10 space-y-8 bg-white relative z-10">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Periodo a Consultar</label>
+              <div className="p-6 sm:p-8 space-y-6 bg-white">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Periodo a Consultar</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none text-red-600"><Calendar className="w-4 h-4" /></div>
                     <input
                       type="month"
                       value={pdfMonth}
                       onChange={e => setPdfMonth(e.target.value)}
-                      className="w-full pl-12 pr-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-3xl text-sm font-black text-slate-900 outline-none focus:border-red-500 transition-all shadow-inner cursor-pointer"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-red-500 transition-all cursor-pointer"
                     />
                   </div>
                 </div>
 
-                <button onClick={handleGeneratePDF} disabled={isGeneratingPdf} className="w-full py-6 bg-red-600 text-white font-black rounded-[32px] hover:bg-red-700 shadow-2xl transition-all uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-4 disabled:opacity-50">
-                  {isGeneratingPdf ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                  {isGeneratingPdf ? 'Calculando...' : 'Descargar Curvas'}
-                </button>
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPdfModal(false)}
+                    className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-black rounded-xl transition-all uppercase tracking-widest text-xs cursor-pointer shadow-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleGeneratePDF} 
+                    disabled={isGeneratingPdf} 
+                    className="flex-1 py-3.5 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 shadow-md shadow-red-200 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95"
+                  >
+                    {isGeneratingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    {isGeneratingPdf ? 'Calculando...' : 'Descargar'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

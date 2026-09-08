@@ -488,10 +488,11 @@ const EntriesExitsReport: React.FC = () => {
 
       {/* ── Modal Análisis por Cargo ──────────────────────────────────────────── */}
       {showCargoModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative bg-white rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-100 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
             {/* Header Principal */}
-            <div className="bg-white px-6 py-3.5 flex items-center justify-between gap-4 border-b border-slate-200 shrink-0">
+            <div className="bg-white px-6 sm:px-8 py-5 flex items-center justify-between gap-4 border-b border-slate-100 shrink-0">
               {/* Título Limpio */}
               <div className="flex items-center gap-2.5">
                 <h2 className="text-base font-black tracking-tight text-slate-900 uppercase leading-tight">

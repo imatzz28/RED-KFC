@@ -801,12 +801,40 @@ export const dataService = {
       restaurant_id: e.restaurant_id,
       zone: e.zone,
       active: e.active,
+      suspended_since: e.suspended_since || null,
       history: e.history || []
     }));
     const chunkSize = 100;
     for (let i = 0; i < normalized.length; i += chunkSize) {
       await dataService.supabaseFetch('employees', 'POST', normalized.slice(i, i + chunkSize), '?on_conflict=id');
     }
+  },
+
+  toggleEmployeeSuspension: async (employeeId: string, suspend: boolean) => {
+    const suspendedSince = suspend ? new Date().toISOString().slice(0, 7) + '-01' : null;
+
+    // 1. Actualizar en Supabase
+    const { error } = await supabase
+      .from('employees')
+      .update({ suspended_since: suspendedSince })
+      .eq('id', employeeId);
+
+    if (error) {
+      console.error('[toggleEmployeeSuspension] Error actualizando en Supabase:', error);
+      throw error;
+    }
+
+    // 2. Actualizar en caché local
+    if (dataService._cache.employees) {
+      const emp = dataService._cache.employees.find(e => e.id === employeeId);
+      if (emp) {
+        emp.suspended_since = suspendedSince;
+      }
+      await localforage.setItem('la_akademia_employees', dataService._cache.employees);
+    }
+
+    broadcastSync('DATA_UPDATED');
+    console.log(`[toggleEmployeeSuspension] ${employeeId} → ${suspend ? 'SUSPENDIDO desde ' + suspendedSince : 'REACTIVADO'}`);
   },
 
   saveRestaurants: async (restaurants: Restaurant[]) => {
@@ -1578,6 +1606,92 @@ export const dataService = {
       const query = `?id=in.(${chunk.map(id => encodeURIComponent(id)).join(',')})`;
       await dataService.supabaseFetch('safe_hands_personnel', 'PATCH', { category: category || null }, query);
     }
+  },
+
+  bulkCategorizeSafeHandsByExcel: async (entries: { id: string; categoryName: string; name?: string }[]): Promise<{
+    totalProcessed: number;
+    updatedCount: number;
+    categoriesCreated: number;
+  }> => {
+    if (!entries || entries.length === 0) {
+      return { totalProcessed: 0, updatedCount: 0, categoriesCreated: 0 };
+    }
+
+    // 1. Obtener categorías existentes
+    const existingCats = await dataService.getSafeHandsOrphanCategories();
+    const catMap = new Map<string, SafeHandsOrphanCategory>();
+    existingCats.forEach(c => {
+      catMap.set(c.id.toLowerCase(), c);
+      catMap.set(c.name.toLowerCase().trim(), c);
+    });
+
+    const COLOR_PALETTE = ['purple', 'blue', 'emerald', 'amber', 'indigo', 'teal', 'rose', 'violet', 'slate'];
+    let createdCount = 0;
+
+    // 2. Resolver o crear categorías necesarias
+    const categoryNameToId = new Map<string, string | null>();
+
+    for (const entry of entries) {
+      const rawCat = (entry.categoryName || '').trim();
+      const cleanLower = rawCat.toLowerCase();
+
+      if (!rawCat || cleanLower === 'ninguna' || cleanLower === 'sin categoria' || cleanLower === 'sin categoría' || cleanLower === 'borrar' || cleanLower === 'null') {
+        categoryNameToId.set(cleanLower, null);
+        continue;
+      }
+
+      if (categoryNameToId.has(cleanLower)) continue;
+
+      if (catMap.has(cleanLower)) {
+        categoryNameToId.set(cleanLower, catMap.get(cleanLower)!.id);
+      } else {
+        // Crear categoría automáticamente
+        const newId = cleanLower.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `cat_${Date.now()}`;
+        const newColor = COLOR_PALETTE[(existingCats.length + createdCount) % COLOR_PALETTE.length];
+        const newCategory: SafeHandsOrphanCategory = {
+          id: newId,
+          name: rawCat,
+          color: newColor,
+          created_at: new Date().toISOString()
+        };
+
+        await dataService.saveSafeHandsOrphanCategory(newCategory);
+        catMap.set(newId, newCategory);
+        catMap.set(cleanLower, newCategory);
+        categoryNameToId.set(cleanLower, newId);
+        createdCount++;
+      }
+    }
+
+    // 3. Agrupar IDs por ID de categoría destino
+    const grouped = new Map<string | null, string[]>();
+    entries.forEach(entry => {
+      const cleanLower = (entry.categoryName || '').trim().toLowerCase();
+      const targetCatId = categoryNameToId.get(cleanLower) ?? null;
+      const cleanId = String(entry.id).trim();
+      if (!cleanId) return;
+
+      if (!grouped.has(targetCatId)) {
+        grouped.set(targetCatId, []);
+      }
+      grouped.get(targetCatId)!.push(cleanId);
+    });
+
+    // 4. Ejecutar actualizaciones por lotes en Supabase
+    let totalUpdated = 0;
+    for (const [targetCatId, ids] of grouped.entries()) {
+      if (ids.length > 0) {
+        await dataService.bulkUpdateSafeHandsPersonnelCategory(ids, targetCatId);
+        totalUpdated += ids.length;
+      }
+    }
+
+    broadcastSync('DATA_UPDATED');
+    return {
+      totalProcessed: entries.length,
+      updatedCount: totalUpdated,
+      categoriesCreated: createdCount
+    };
   },
 
   getAllSafeHandsPersonnelAndCertsForReconciliation: async (): Promise<{ personnel: SafeHandsPerson[], certs: SafeHandsCert[] }> => {

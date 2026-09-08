@@ -125,7 +125,7 @@ self.onmessage = (e) => {
                 return {
                     "Documento": emp.id,
                     "Nombre completo": emp.name,
-                    "Estado": emp.active ? "Activo" : "Retirado",
+                    "Estado": emp.suspended_since ? "Suspendido" : (emp.active ? "Activo" : "Retirado"),
                     "Cargo": emp.title,
                     "Tienda Reportada": empStore?.name || emp.storeIdAtPeriod,
                     "Ceco": emp.storeIdAtPeriod,

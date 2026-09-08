@@ -779,25 +779,36 @@ const SafeHands: React.FC = () => {
       {/* Settings Modal */}
       {isAdmin && showSettings && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
-          <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-8 border-b border-slate-50 bg-slate-900 text-white">
-              <h3 className="text-xl font-black uppercase italic tracking-tighter">Ajustes Safe Hands</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Configuración de Certificados</p>
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
+          <div className="relative bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-7 sm:p-8 border-b border-slate-100 bg-white text-slate-900 relative">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900">Ajustes Safe Hands</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Configuración de Certificados</p>
+                </div>
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="p-7 sm:p-8 space-y-6">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Nombre del Responsable</label>
                 <input 
                   type="text" 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-red-500 transition-all text-xs font-bold"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-500 transition-all text-xs font-bold text-slate-800"
                   value={settings.responsibleName}
                   onChange={e => setSettings(prev => ({ ...prev, responsibleName: e.target.value }))}
                 />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Firma Digital (PNG/SVG)</label>
-                <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+                <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                   {settings.signatureBase64 ? (
                     <div className="relative group">
                       <img src={settings.signatureBase64} alt="Firma" className="max-h-24 object-contain" />
@@ -810,8 +821,8 @@ const SafeHands: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      <Signature className="w-10 h-10 text-slate-200" />
-                      <label className="cursor-pointer px-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600 transition-all shadow-sm">
+                      <Signature className="w-10 h-10 text-slate-300" />
+                      <label className="cursor-pointer px-4 py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-red-600 transition-all shadow-xs">
                         Cargar Imagen
                         <input type="file" accept="image/*" className="hidden" onChange={handleSignatureUpload} />
                       </label>
@@ -823,9 +834,19 @@ const SafeHands: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="p-8 bg-slate-50 flex gap-3">
-               <button onClick={() => setShowSettings(false)} className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400">Cancelar</button>
-               <button onClick={saveSettings} className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700">Guardar</button>
+            <div className="p-6 bg-slate-50 flex gap-3 border-t border-slate-100">
+               <button 
+                 onClick={() => setShowSettings(false)} 
+                 className="flex-1 px-5 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-black uppercase text-slate-700 transition-all shadow-xs cursor-pointer"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 onClick={saveSettings} 
+                 className="flex-1 px-5 py-3.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase shadow-md shadow-red-200 transition-all hover:bg-red-700 cursor-pointer"
+               >
+                 Guardar
+               </button>
             </div>
           </div>
         </div>
@@ -836,12 +857,15 @@ const SafeHands: React.FC = () => {
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => { if (!isDeleting) setShowDeleteConfirm(false); }} />
           <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-red-50 bg-red-600 text-white">
+            <div className="p-8 border-b border-slate-100 bg-white text-slate-900 relative">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
               <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 animate-bounce" />
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100">
+                  <AlertCircle className="w-5 h-5 text-red-600 animate-bounce" />
+                </div>
                 ¿Confirmar Borrado Total?
               </h3>
-              <p className="text-[10px] text-red-100 font-bold uppercase tracking-[0.2em] mt-1">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
                 Esta acción eliminará todos los carnets y personal de manipulación
               </p>
             </div>
@@ -882,7 +906,7 @@ const SafeHands: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-8 bg-slate-50 flex gap-3">
+            <div className="p-6 bg-slate-50 flex gap-3">
                <button 
                  disabled={isDeleting}
                  onClick={() => {
@@ -891,14 +915,14 @@ const SafeHands: React.FC = () => {
                    setConfirmPassword('');
                    setDeleteError('');
                  }} 
-                 className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 disabled:opacity-50"
+                 className="flex-1 px-5 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-black uppercase text-slate-700 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                >
                  Cancelar
                </button>
                <button 
                  disabled={isDeleting || !confirmEmail || !confirmPassword}
                  onClick={handleDeleteAllData} 
-                 className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                 className="flex-1 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase shadow-md shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                >
                  {isDeleting ? (
                    <>
@@ -918,10 +942,13 @@ const SafeHands: React.FC = () => {
       {showBulkDeleteConfirm && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => { if (!isBulkDeleting) setShowBulkDeleteConfirm(false); }} />
-          <div className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-red-50 bg-slate-900 text-white">
+          <div className="relative bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
+            <div className="p-7 sm:p-8 border-b border-slate-100 bg-white text-slate-900 relative">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
               <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 text-red-500 animate-pulse" />
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <AlertCircle className="w-5 h-5 text-red-600 animate-bounce" />
+                </div>
                 Eliminación Masiva
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
@@ -929,27 +956,27 @@ const SafeHands: React.FC = () => {
               </p>
             </div>
             
-            <div className="p-8 space-y-6">
-              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-[10px] font-bold text-red-600 uppercase leading-relaxed">
+            <div className="p-7 sm:p-8 space-y-4">
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-xs font-bold text-red-700 leading-relaxed">
                 ¡Atención! Se eliminarán <strong>{bulkDeleteIds.length}</strong> colaboradores y sus respectivos carnets de manipulación de alimentos de forma permanente. Esta acción es irreversible.
               </div>
             </div>
 
-            <div className="p-8 bg-slate-50 flex gap-3">
+            <div className="p-6 bg-slate-50 flex gap-3">
                <button 
                  disabled={isBulkDeleting}
                  onClick={() => {
                    setShowBulkDeleteConfirm(false);
                    setBulkDeleteIds([]);
                  }} 
-                 className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 disabled:opacity-50"
+                 className="flex-1 px-5 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-black uppercase text-slate-700 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                >
                  Cancelar
                </button>
                <button 
                  disabled={isBulkDeleting}
                  onClick={handleConfirmBulkDelete} 
-                 className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                 className="flex-1 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase shadow-md shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                >
                  {isBulkDeleting ? (
                    <>

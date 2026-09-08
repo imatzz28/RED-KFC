@@ -34,7 +34,8 @@ export const getStoreEmployeesForMonth = (
     storeId: string,
     month: string,
     employees: Employee[],
-    summaryMap?: Map<string, any>
+    summaryMap?: Map<string, any>,
+    includeSuspended: boolean = false
 ): Employee[] => {
     const normStoreId = storeId.trim().toUpperCase();
     const [yVal, mVal] = month.split('-').map(Number);
@@ -49,6 +50,10 @@ export const getStoreEmployeesForMonth = (
     return employees.filter(e => {
         const empStoreId = (e.restaurant_id || '').trim().toUpperCase();
         if (empStoreId !== normStoreId) return false;
+
+        // Suspendido en este mes → excluir de métricas a menos que se indique incluirlos para la vista de gestión
+        const isSuspended = !!(e.suspended_since && month + '-01' >= e.suspended_since.substring(0, 10));
+        if (isSuspended && !includeSuspended) return false;
 
         const joinDateStr = e.join_date ? e.join_date.substring(0, 10) : '0000-01-01';
         const exitDateStr = e.exit_date ? e.exit_date.substring(0, 10) : '9999-12-31';

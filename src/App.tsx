@@ -128,23 +128,32 @@ const App: React.FC = () => {
       {/* Global custom premium dialog modal */}
       {dialog.isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border-2 border-slate-800/80 rounded-[32px] p-8 max-w-md w-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col relative overflow-hidden animate-in scale-in duration-300">
+          <div className="bg-white border border-slate-100 rounded-[32px] sm:rounded-[36px] p-7 sm:p-8 max-w-md w-full shadow-2xl flex flex-col relative overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Red header accent */}
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
             
             {/* Title / Header */}
             <div className="flex items-center gap-3.5 mb-5 relative z-10">
-              <div className={`p-2.5 rounded-xl shrink-0 ${dialog.type === 'confirm' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
-                {dialog.type === 'confirm' ? <AlertTriangle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                dialog.type === 'confirm' 
+                  ? 'bg-red-50 text-red-600 border border-red-100' 
+                  : 'bg-slate-50 text-slate-700 border border-slate-200'
+              }`}>
+                {dialog.type === 'confirm' ? <AlertTriangle className="w-5 h-5 text-red-600" /> : <Info className="w-5 h-5 text-slate-700" />}
               </div>
-              <h4 className="text-base font-black uppercase italic tracking-tighter text-white">
-                {dialog.title || (dialog.type === 'confirm' ? 'Confirmación' : 'Notificación')}
-              </h4>
+              <div className="min-w-0">
+                <h4 className="text-base sm:text-lg font-black uppercase italic tracking-tight text-slate-900 leading-tight">
+                  {dialog.title || (dialog.type === 'confirm' ? 'Confirmación' : 'Notificación')}
+                </h4>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-0.5">
+                  {dialog.type === 'confirm' ? 'Confirmación requerida' : 'Información del sistema'}
+                </p>
+              </div>
             </div>
 
             {/* Message Body */}
-            <div className="mb-8 relative z-10">
-              <p className="text-slate-300 text-xs font-bold leading-relaxed whitespace-pre-line uppercase tracking-wide">
+            <div className="mb-6 relative z-10 bg-slate-50/80 rounded-2xl p-4 border border-slate-100">
+              <p className="text-slate-700 text-xs sm:text-sm font-bold leading-relaxed whitespace-pre-line">
                 {dialog.message}
               </p>
             </div>
@@ -158,7 +167,7 @@ const App: React.FC = () => {
                     closeDialog();
                     if (dialog.onCancel) dialog.onCancel();
                   }}
-                  className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-widest transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-2xs active:scale-95"
                 >
                   Cancelar
                 </button>
@@ -169,7 +178,7 @@ const App: React.FC = () => {
                   closeDialog();
                   if (dialog.onConfirm) dialog.onConfirm();
                 }}
-                className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/25"
+                className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-red-600/20 cursor-pointer active:scale-95 flex items-center justify-center gap-2"
               >
                 Aceptar
               </button>

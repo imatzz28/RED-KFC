@@ -218,39 +218,55 @@ const GradeEditor: React.FC<GradeEditorProps> = ({ employee, month, onClose }) =
 
       {/* Modal de Historial de Movimientos */}
       {showHistory && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden border-2 border-white/20">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <History className="w-5 h-5 text-red-500" />
-                <h3 className="font-black uppercase italic tracking-tighter text-lg">Historial de Movimientos</h3>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 relative animate-in zoom-in-95 duration-200">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+            <div className="p-6 sm:p-7 border-b border-slate-100 bg-white text-slate-900 flex justify-between items-center">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <History className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-black uppercase italic tracking-tight text-lg text-slate-900">Historial de Movimientos</h3>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ingresos, traslados y retiros</p>
+                </div>
               </div>
-              <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X className="w-5 h-5" /></button>
+              <button 
+                onClick={() => setShowHistory(false)} 
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="p-8 max-h-[60vh] overflow-y-auto no-scrollbar">
+            <div className="p-6 sm:p-8 max-h-[60vh] overflow-y-auto no-scrollbar">
               <div className="space-y-6">
                 {employee.history?.map((h, i) => (
                   <div key={i} className="flex gap-4 items-start relative pb-6 last:pb-0">
                     {i < (employee.history?.length || 0) - 1 && <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-slate-100" />}
-                    <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${h.action === 'INGRESO' ? 'bg-emerald-50 text-emerald-600' : h.action === 'RETIRO' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${h.action === 'INGRESO' ? 'bg-emerald-50 text-emerald-600' : h.action === 'RETIRO' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
                       {h.action === 'INGRESO' ? <ArrowUp className="w-4 h-4" /> : h.action === 'RETIRO' ? <ArrowDown className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                     </div>
-                    <div className="min-w-0 bg-slate-50 p-4 rounded-3xl flex-1 border border-slate-100">
+                    <div className="min-w-0 bg-slate-50 p-4 rounded-2xl flex-1 border border-slate-100">
                       <p className="text-[9px] font-black uppercase text-slate-800 tracking-widest">{h.action}</p>
-                      <p className="text-[11px] font-black text-slate-500 uppercase italic mt-1">{h.restaurantName}</p>
+                      <p className="text-[11px] font-black text-slate-600 uppercase italic mt-1">{h.restaurantName}</p>
                       <p className="text-[9px] font-bold text-slate-400 mt-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> {h.date}</p>
                     </div>
                   </div>
                 ))}
                 {(!employee.history || employee.history.length === 0) && (
                   <div className="text-center py-10">
-                    <p className="text-[10px] text-slate-300 uppercase font-black italic tracking-widest">Sin historial registrado en el sistema</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black italic tracking-widest">Sin historial registrado en el sistema</p>
                   </div>
                 )}
               </div>
             </div>
-            <div className="p-6 bg-slate-50 text-center">
-              <button onClick={() => setShowHistory(false)} className="px-8 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 transition-colors">Cerrar Historial</button>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
+              <button 
+                onClick={() => setShowHistory(false)} 
+                className="w-full py-3.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-black uppercase tracking-widest text-slate-700 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                Cerrar Historial
+              </button>
             </div>
           </div>
         </div>

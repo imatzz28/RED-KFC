@@ -23,7 +23,9 @@ import {
   ChevronRight,
   ShieldCheck,
   UserX,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Upload,
+  FileDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -72,8 +74,9 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string; badg
 };
 
 export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModalProps> = ({ onClose }) => {
-  const { auth, restaurants, employees } = useAppStore();
+  const { auth, restaurants, employees, showAlertDialog, showConfirmDialog } = useAppStore();
   const isAdmin = auth.user?.role === UserRole.ADMIN;
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
 
   // Data states
   const [personnel, setPersonnel] = useState<SafeHandsPerson[]>([]);
@@ -461,6 +464,116 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
     setSelectedIds(next);
   };
 
+  // Descargar plantilla Excel para categorización masiva
+  const handleDownloadCategoryTemplate = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Hoja 1: Formato para carga
+    const templateData = [
+      ['Cedula', 'Nombre_Opcional', 'Categoria'],
+      ['1001234567', 'Juan Pérez', 'SENA'],
+      ['1009876543', 'María Gómez', 'Temporal'],
+      ['1005554443', 'Carlos Ruiz', 'Proveedor Externo'],
+      ['1007778889', 'Laura Sánchez', 'Seguridad'],
+      ['1004445556', 'Luis Castro', 'Aseo']
+    ];
+    const wsTemplate = XLSX.utils.aoa_to_sheet(templateData);
+    wsTemplate['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 24 }];
+    XLSX.utils.book_append_sheet(wb, wsTemplate, 'Categorizacion');
+
+    // Hoja 2: Categorías actualmente registradas para guía
+    const catList = categories.map(c => [c.id, c.name, c.color || 'purple']);
+    const catData = [
+      ['ID_CATEGORIA', 'NOMBRE_CATEGORIA', 'COLOR'],
+      ...catList
+    ];
+    const wsCats = XLSX.utils.aoa_to_sheet(catData);
+    wsCats['!cols'] = [{ wch: 22 }, { wch: 28 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, wsCats, 'Categorias_Registradas');
+
+    XLSX.writeFile(wb, 'plantilla_categorizacion_safehands.xlsx');
+  };
+
+  // Carga masiva de categorías desde archivo Excel
+  const handleUploadCategoriesExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset para permitir seleccionar el mismo archivo de nuevo si se corrige
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws);
+
+        if (!rawData || rawData.length === 0) {
+          showAlertDialog('El archivo Excel está vacío o no contiene datos válidos.');
+          return;
+        }
+
+        const parsedRows: { id: string; categoryName: string; name?: string }[] = [];
+
+        rawData.forEach((row: any) => {
+          const keys = Object.keys(row);
+          const getVal = (prefixes: string[]) => {
+            for (const key of keys) {
+              const cleanKey = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+              if (prefixes.some(p => cleanKey === p.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
+                return row[key];
+              }
+            }
+            return undefined;
+          };
+
+          const cedula = String(getVal(['cedula', 'id', 'documento', 'identificacion']) || '').trim();
+          const categoria = String(getVal(['categoria', 'category', 'tipo', 'clasificacion']) || '').trim();
+          const nombre = String(getVal(['nombre', 'colaborador', 'empleado', 'name']) || '').trim();
+
+          if (cedula && categoria) {
+            parsedRows.push({
+              id: cedula,
+              categoryName: categoria,
+              name: nombre || undefined
+            });
+          }
+        });
+
+        if (parsedRows.length === 0) {
+          showAlertDialog('No se encontraron registros válidos. Asegúrate de incluir columnas "Cedula" y "Categoria".');
+          return;
+        }
+
+        showConfirmDialog(
+          `Se encontraron ${parsedRows.length} registros para categorizar en "${file.name}".\n\n¿Deseas aplicar la categorización masiva en SafeHands?`,
+          async () => {
+            setIsProcessingExcel(true);
+            try {
+              const result = await dataService.bulkCategorizeSafeHandsByExcel(parsedRows);
+              await loadData(true);
+              showAlertDialog(
+                `¡Categorización exitosa!\n\n• Registros procesados: ${result.totalProcessed}\n• Colaboradores actualizados: ${result.updatedCount}\n• Nuevas categorías creadas: ${result.categoriesCreated}`
+              );
+            } catch (err) {
+              console.error('Error al categorizar masivamente:', err);
+              showAlertDialog('Ocurrió un error al guardar las categorías en la base de datos.');
+            } finally {
+              setIsProcessingExcel(false);
+            }
+          }
+        );
+      } catch (err) {
+        console.error('Error leyendo archivo Excel:', err);
+        showAlertDialog('Error al leer el archivo Excel. Verifica que sea un archivo .xlsx o .xls válido.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   // Category Manager: Create new category
   const handleCreateCategory = async () => {
     if (!newCatName.trim()) return;
@@ -580,6 +693,35 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
           </div>
 
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleDownloadCategoryTemplate}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                  title="Descargar Plantilla Excel para categorización masiva"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Plantilla Categorías</span>
+                </button>
+
+                <label 
+                  className={`flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer ${isProcessingExcel ? 'opacity-50 pointer-events-none' : ''}`}
+                  title="Cargar archivo Excel con cédulas y categorías para clasificar masivamente"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{isProcessingExcel ? 'Cargando...' : 'Cargar Categorías'}</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleUploadCategoriesExcel}
+                    disabled={isProcessingExcel}
+                  />
+                </label>
+              </>
+            )}
+
             <button
               onClick={() => loadData(true)}
               disabled={isRefreshing}
@@ -807,13 +949,37 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
 
             <div className="flex items-center gap-2 ml-auto">
               {isAdmin && (activeTab === 'orphan_categorized' || activeTab === 'orphan_uncategorized') && (
-                <button
-                  onClick={() => setShowCategoryManager(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-2xs"
-                >
-                  <Tag className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Gestionar Categorías</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadCategoryTemplate}
+                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                    title="Descargar Plantilla Excel para categorización masiva"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Plantilla</span>
+                  </button>
+
+                  <label className={`flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer ${isProcessingExcel ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isProcessingExcel ? 'Cargando...' : 'Cargar Excel'}</span>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={handleUploadCategoriesExcel}
+                      disabled={isProcessingExcel}
+                    />
+                  </label>
+
+                  <button
+                    onClick={() => setShowCategoryManager(true)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>Gestionar</span>
+                  </button>
+                </div>
               )}
 
               {/* Bulk Categorization if items selected */}
@@ -1065,19 +1231,22 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
         {/* ── Category Manager Floating Modal ─────────────────────────────── */}
         {showCategoryManager && (
           <div
-            className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
             onClick={() => setShowCategoryManager(false)}
           >
             <div
-              className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+              className="bg-white rounded-[32px] p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 relative overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-slate-600" />
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 pt-1">
+                <h4 className="text-base font-black text-slate-900 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center border border-red-100">
+                    <Tag className="w-4 h-4 text-red-600" />
+                  </div>
                   Catálogo de Categorías
                 </h4>
-                <button onClick={() => setShowCategoryManager(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">
+                <button onClick={() => setShowCategoryManager(false)} className="w-8 h-8 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -1091,13 +1260,13 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                     placeholder="Ej. Aprendiz SENA, Proveedor..."
                     value={newCatName}
                     onChange={e => setNewCatName(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-slate-400"
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-red-500"
                   />
                 </div>
                 <button
                   onClick={handleCreateCategory}
                   disabled={!newCatName.trim()}
-                  className="w-full mt-1.5 py-2 bg-slate-900 hover:bg-black disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-xs"
+                  className="w-full mt-1.5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-md shadow-red-200"
                 >
                   Agregar Categoría
                 </button>

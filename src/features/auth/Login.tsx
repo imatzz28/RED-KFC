@@ -191,19 +191,32 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       </div>
 
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
-              <h3 className="font-black uppercase tracking-tighter flex items-center italic text-base">
-                <ShieldCheck className="w-5 h-5 mr-3 text-red-500" />
-                Tratamiento de Datos Personales
-              </h3>
-              <button onClick={() => setShowPrivacyModal(false)} className="hover:text-red-500 transition-colors">
-                <X className="w-6 h-6" />
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-lg border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200 relative">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+            <div className="p-6 sm:p-7 border-b border-slate-100 bg-white text-slate-900 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-black uppercase tracking-tight italic text-base sm:text-lg text-slate-900">
+                    Tratamiento de Datos
+                  </h3>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Política de Privacidad y Habeas Data
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPrivacyModal(false)} 
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-8 overflow-y-auto space-y-6 text-slate-600 text-xs font-medium leading-relaxed text-left">
+            <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-slate-600 text-xs font-medium leading-relaxed text-left">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">POLÍTICA DE PRIVACIDAD Y HABEAS DATA - LEY 1581 DE 2012</p>
               
               <div className="space-y-2">
@@ -247,10 +260,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
             </div>
             
-            <div className="p-6 border-t border-slate-100 shrink-0">
+            <div className="p-6 border-t border-slate-100 shrink-0 bg-slate-50">
               <button 
                 onClick={() => setShowPrivacyModal(false)}
-                className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-xl transition-all uppercase tracking-widest text-[10px]"
+                className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-md shadow-red-200 transition-all uppercase tracking-widest text-xs cursor-pointer active:scale-95"
               >
                 Entendido y Aceptar
               </button>

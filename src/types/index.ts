@@ -57,6 +57,7 @@ export interface Employee {
   restaurant_id: string;
   zone: string;
   active: boolean;
+  suspended_since?: string | null; // YYYY-MM-DD — si tiene valor, excluido de métricas desde ese mes
   history?: StoreHistory[];
 }
 

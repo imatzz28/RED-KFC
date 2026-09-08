@@ -175,28 +175,59 @@ const Header: React.FC = () => {
       </div>
 
       {showPassModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden border-2 border-slate-100">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-tighter flex items-center italic text-lg"><Shield className="w-5 h-5 mr-3 text-red-500" /> Seguridad</h3>
-              <button onClick={() => setShowPassModal(false)}><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-8 space-y-5">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Contraseña Actual</label>
-                <input type="password" value={passData.old} onChange={e => setPassData({ ...passData, old: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Nueva Contraseña</label>
-                <input type="password" value={passData.new} onChange={e => setPassData({ ...passData, new: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-500 transition-all" />
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 relative animate-in zoom-in-95 duration-200">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+            <div className="p-6 sm:p-7 border-b border-slate-100 bg-white text-slate-900 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shrink-0">
+                  <Shield className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-black uppercase tracking-tight italic text-base sm:text-lg text-slate-900">Seguridad</h3>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Actualización de contraseña</p>
+                </div>
               </div>
               <button 
-                onClick={handleUpdatePassword}
-                disabled={isUpdatingPassword}
-                className="w-full py-5 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 shadow-xl transition-all uppercase tracking-[0.2em] text-[10px] mt-4 disabled:opacity-50"
+                onClick={() => setShowPassModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
               >
-                {isUpdatingPassword ? 'Actualizando...' : 'Actualizar Clave'}
+                <X className="w-5 h-5" />
               </button>
+            </div>
+            <div className="p-6 sm:p-8 space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Contraseña Actual</label>
+                <input type="password" value={passData.old} onChange={e => setPassData({ ...passData, old: e.target.value })} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-red-500 transition-all text-slate-900" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Nueva Contraseña</label>
+                <input type="password" value={passData.new} onChange={e => setPassData({ ...passData, new: e.target.value })} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-red-500 transition-all text-slate-900" />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowPassModal(false)}
+                  className="flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-black rounded-xl transition-all uppercase tracking-widest text-xs cursor-pointer shadow-xs"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleUpdatePassword}
+                  disabled={isUpdatingPassword}
+                  className="flex-1 py-3.5 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 shadow-md shadow-red-200 transition-all uppercase tracking-widest text-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isUpdatingPassword ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    'Actualizar Clave'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
