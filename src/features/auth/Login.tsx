@@ -91,18 +91,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-96 h-96 bg-black rounded-full blur-[120px] opacity-10" />
 
       <div className="bg-white p-6 md:p-10 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-[480px] relative z-10 border border-white/20 overflow-hidden">
-        {/* KFC bucket stripes decoration on the top edge */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-5 bg-red-600 rounded-b-xl flex justify-center gap-1.5 pt-1 shadow-inner">
-          <div className="w-1 h-3 bg-white rounded-full"></div>
-          <div className="w-1 h-3 bg-white rounded-full"></div>
-          <div className="w-1 h-3 bg-white rounded-full"></div>
-        </div>
-
-        <div className="flex flex-col items-center mb-6 mt-2">
-          <div className="w-28 h-28 flex items-center justify-center mb-2 transition-transform hover:scale-105">
-            <img src="/logo_red.png" alt="RED Logo" className="w-full h-full object-contain" />
+        <div className="flex flex-col items-center justify-center text-center mb-6 mt-1 w-full">
+          {/* Círculo con sombra y el logo principal */}
+          <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full p-3.5 flex items-center justify-center mx-auto mb-3 shadow-lg border border-slate-100 hover:scale-105 transition-transform">
+            <img src="/logo.png" alt="Icono RED" className="w-full h-full object-contain mx-auto" />
           </div>
-          <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest text-center">Ruta de Entrenamiento y Desempeño</p>
+
+          {/* Texto de Bienvenida con mejores prácticas UX/UI */}
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-700 tracking-tight leading-tight">
+            ¡Bienvenido!
+          </h1>
+          <p className="text-xs font-medium text-slate-400 mt-1">
+            Ingresa a la Ruta de Entrenamiento y Desempeño
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -178,7 +179,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center flex flex-col items-center gap-1.5">
+        <div className="mt-7 pt-5 pb-4 border-t border-slate-100 text-center flex flex-col items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShowPrivacyModal(true)}
@@ -187,6 +188,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Política de Tratamiento de Datos
           </button>
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">© 2026 RED KFC - A2M LABS</p>
+        </div>
+
+        {/* 3 líneas rojas KFC más anchas naciendo desde la base del contenedor */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex items-end justify-center gap-2">
+          <div className="w-4 sm:w-5 h-5 bg-red-600"></div>
+          <div className="w-4 sm:w-5 h-5 bg-red-600"></div>
+          <div className="w-4 sm:w-5 h-5 bg-red-600"></div>
         </div>
       </div>
 

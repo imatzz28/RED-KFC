@@ -243,14 +243,14 @@ const Sidebar: React.FC = () => {
       <div className="px-3.5 pt-5 pb-2">
         <div className="flex items-center min-h-[44px] overflow-hidden">
           <div className="w-10 h-10 rounded-2xl bg-white p-1 flex items-center justify-center shrink-0 shadow-md">
-            <img src="/Favicon.png" alt="RED Logo" className="w-8 h-8 object-contain rounded-lg" />
+            <img src="/logo.png" alt="RED Logo" className="w-8 h-8 object-contain rounded-lg" />
           </div>
           
           <div className={`overflow-hidden transition-all duration-300 ${
-            isCollapsed ? 'max-w-0 opacity-0 ml-0 -translate-x-2' : 'max-w-[150px] opacity-100 ml-3.5 translate-x-0'
+            isCollapsed ? 'max-w-0 opacity-0 ml-0 -translate-x-2' : 'max-w-[200px] opacity-100 ml-3.5 translate-x-0'
           }`}>
-            <span className="text-3xl font-black text-white tracking-tight leading-none uppercase whitespace-nowrap">
-              RED
+            <span className="text-4xl font-bold font-['Poppins'] text-white tracking-wide leading-none whitespace-nowrap">
+              R.E.D
             </span>
           </div>
 

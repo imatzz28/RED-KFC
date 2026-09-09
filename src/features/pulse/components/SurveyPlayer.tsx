@@ -606,7 +606,7 @@ export const SurveyPlayer: React.FC<SurveyPlayerProps> = ({
                   : 'bg-white border-2 border-red-100/80 shadow-xl shadow-red-600/15 hover:shadow-2xl hover:shadow-red-600/25'
               }`}>
                 <img
-                  src="/Favicon.png"
+                  src="/logo.png"
                   alt="RED Logo"
                   className="w-full h-full object-contain rounded-2xl animate-pulse group-hover:scale-110 transition-transform duration-300"
                 />

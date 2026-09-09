@@ -101,8 +101,8 @@ const PublicValidation: React.FC = () => {
       
       {/* Header KFC Style */}
       <div className="w-full max-w-4xl pt-8 sm:pt-16 px-6 flex flex-col items-center">
-        <div className="h-20 sm:h-32 mb-4 sm:mb-8 transition-transform hover:scale-105">
-           <img src="/KFC-Logo-PNG.png" alt="KFC Logo" className="h-full object-contain drop-shadow-2xl" />
+        <div className="h-20 sm:h-28 mb-4 sm:mb-6 transition-transform hover:scale-105 flex items-center justify-center">
+           <img src="/kfc_emblem.png" alt="KFC Logo" className="h-full w-auto object-contain drop-shadow-[0_12px_30px_rgba(0,0,0,0.35)]" />
         </div>
         <h1 className="text-3xl sm:text-5xl font-black text-white italic uppercase tracking-tighter mb-2 text-center drop-shadow-lg">
           KFC <span className="font-light opacity-50 mx-1">|</span> SAFE HANDS
