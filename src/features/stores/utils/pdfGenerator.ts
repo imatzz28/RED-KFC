@@ -1,7 +1,11 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { APPROVAL_THRESHOLD, EVALUATION_GROUPS } from '@/utils/constants';
-import { APP_LOGO_B64 } from '@/utils/logo_final';
+import * as LogoModule from '@/utils/logo_final';
+const APP_LOGO_B64 = LogoModule.APP_LOGO_B64;
+const APP_LOGO_RATIO = ((LogoModule as any).APP_LOGO_RATIO && !isNaN((LogoModule as any).APP_LOGO_RATIO))
+    ? Number((LogoModule as any).APP_LOGO_RATIO)
+    : 1;
 import { Restaurant, Employee, JobTitle, JobHierarchy } from '@/types';
 import { getMonthText, normalizeRole, getStoreEmployeesForMonth, getSeniorityMonths } from './storeUtils';
 import { dataService } from '@/services/dataService';
@@ -62,12 +66,34 @@ export const generateStorePdf = async (
                         d.setFontSize(10);
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id}  •  REGIÓN: ${selectedStore.region}  •  PERIODO: ${getMonthText(pdfMonth)}`, 20, 36);
-                        d.addImage(APP_LOGO_B64, 'PNG', 190, 2, 42, 42, 'logo', 'FAST');
+
+                        const maxH = 40;
+                        const maxW = 55;
+                        let logoH = maxH;
+                        let logoW = logoH * APP_LOGO_RATIO;
+                        if (logoW > maxW) {
+                            logoW = maxW;
+                            logoH = logoW / APP_LOGO_RATIO;
+                        }
+                        const logoX = 250 - logoW;
+                        const logoY = (headerH - logoH) / 2;
+                        d.addImage(APP_LOGO_B64, 'PNG', logoX, logoY, logoW, logoH, 'logo', 'FAST');
                     } else {
                         d.setFontSize(7.5);
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id} | ${selectedStore.region} | ${getMonthText(pdfMonth)}`, 130, 13);
-                        d.addImage(APP_LOGO_B64, 'PNG', 225, 1, 15, 15, 'logo', 'FAST');
+
+                        const maxH2 = 14;
+                        const maxW2 = 25;
+                        let logoH2 = maxH2;
+                        let logoW2 = logoH2 * APP_LOGO_RATIO;
+                        if (logoW2 > maxW2) {
+                            logoW2 = maxW2;
+                            logoH2 = logoW2 / APP_LOGO_RATIO;
+                        }
+                        const logoX2 = 252 - logoW2;
+                        const logoY2 = (headerH - logoH2) / 2;
+                        d.addImage(APP_LOGO_B64, 'PNG', logoX2, logoY2, logoW2, logoH2, 'logo', 'FAST');
                     }
                 };
 
