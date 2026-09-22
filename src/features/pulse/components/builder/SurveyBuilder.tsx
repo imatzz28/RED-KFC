@@ -1,0 +1,558 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Survey, Question, QuestionType, QuestionOption, SurveyStatus, ThemeConfig, ThankYouConfig } from '@/types';
+import {
+  Save, ArrowLeft, Plus, Trash2, CheckCircle2, AlertCircle, Settings,
+  Sparkles, Layers, Palette, Eye, HelpCircle, Check, Clock, Shuffle,
+  Lock, FileText, ArrowRight, ShieldCheck, Zap, GitFork, LayoutGrid,
+  ListOrdered, Award, RefreshCw, ChevronDown, CircleDot, CheckSquare,
+  ToggleLeft, Type, AlignLeft, MapPin, Calendar, Star
+} from 'lucide-react';
+import { QuestionEditor } from './QuestionEditor';
+import { LogicFlowPanel } from './LogicFlowPanel';
+import { ThemeEditor } from './ThemeEditor';
+import { AccessSettings } from './AccessSettings';
+import { QuizSettings } from './QuizSettings';
+
+interface SurveyBuilderProps {
+  initialSurvey: Survey;
+  onSave: (survey: Survey) => void;
+  onCancel: () => void;
+}
+
+export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
+  initialSurvey,
+  onSave,
+  onCancel,
+}) => {
+  const [survey, setSurvey] = useState<Survey>(initialSurvey);
+  const [activeTab, setActiveTab] = useState<'questions' | 'logic' | 'theme' | 'access' | 'quiz'>('questions');
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(
+    survey.questions[0]?.id || null
+  );
+
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isBottomAddMenuOpen, setIsBottomAddMenuOpen] = useState(false);
+
+  const isQuiz = survey.type === 'quiz';
+
+  const initialSnapshotRef = useRef<string>(JSON.stringify(initialSurvey));
+  const hasUnsavedChanges = JSON.stringify(survey) !== initialSnapshotRef.current;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleAttemptExit = () => {
+    if (hasUnsavedChanges) {
+      setShowExitConfirmModal(true);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    initialSnapshotRef.current = JSON.stringify(survey);
+    await onSave(survey);
+    setIsSaving(false);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === index) return;
+
+    const newQuestions = [...survey.questions];
+    const draggedItem = newQuestions[draggedIdx];
+    newQuestions.splice(draggedIdx, 1);
+    newQuestions.splice(index, 0, draggedItem);
+    newQuestions.forEach((q, i) => (q.order = i + 1));
+
+    setDraggedIdx(index);
+    setSurvey(prev => ({ ...prev, questions: newQuestions }));
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
+  };
+
+  const handleAddQuestion = (type: QuestionType) => {
+    const newQuestion: Question = {
+      id: `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      survey_id: survey.id,
+      type,
+      title: 'Nueva Pregunta',
+      description: '',
+      order: survey.questions.length + 1,
+      required: true,
+      points: isQuiz ? 10 : undefined,
+      options: ['single_choice', 'multiple_choice', 'ordering'].includes(type)
+        ? [
+            { id: `opt_1_${Date.now()}`, question_id: '', text: 'Opción 1', value: 'opt_1', is_correct: isQuiz ? true : undefined },
+            { id: `opt_2_${Date.now()}`, question_id: '', text: 'Opción 2', value: 'opt_2', is_correct: false },
+          ]
+        : undefined,
+    };
+
+    setSurvey(prev => ({
+      ...prev,
+      questions: [...prev.questions, newQuestion],
+    }));
+    setExpandedQuestionId(newQuestion.id);
+  };
+
+  const handleUpdateQuestion = (updatedQ: Question) => {
+    setSurvey(prev => ({
+      ...prev,
+      questions: prev.questions.map(q => q.id === updatedQ.id ? updatedQ : q),
+    }));
+  };
+
+  const handleDeleteQuestion = (qId: string) => {
+    setSurvey(prev => ({
+      ...prev,
+      questions: prev.questions.filter(q => q.id !== qId).map((q, idx) => ({ ...q, order: idx + 1 })),
+    }));
+  };
+
+  const handleMoveUp = (idx: number) => {
+    if (idx <= 0) return;
+    const newQuestions = [...survey.questions];
+    const temp = newQuestions[idx];
+    newQuestions[idx] = newQuestions[idx - 1];
+    newQuestions[idx - 1] = temp;
+    newQuestions.forEach((q, i) => (q.order = i + 1));
+    setSurvey({ ...survey, questions: newQuestions });
+  };
+
+  const handleMoveDown = (idx: number) => {
+    if (idx >= survey.questions.length - 1) return;
+    const newQuestions = [...survey.questions];
+    const temp = newQuestions[idx];
+    newQuestions[idx] = newQuestions[idx + 1];
+    newQuestions[idx + 1] = temp;
+    newQuestions.forEach((q, i) => (q.order = i + 1));
+    setSurvey({ ...survey, questions: newQuestions });
+  };
+
+  // Tipos de pregunta permitidos con iconos y descripciones
+  const availableQuestionTypes = [
+    { type: 'single_choice', label: 'Opción Única', description: 'Seleccionar una sola opción', color: 'bg-red-600', icon: CircleDot },
+    { type: 'multiple_choice', label: 'Opción Múltiple', description: 'Seleccionar varias opciones', color: 'bg-red-700', icon: CheckSquare },
+    { type: 'ordering', label: 'Ordenar Secuencia', description: 'Organizar las opciones en el orden secuencial correcto', color: 'bg-slate-900', icon: ListOrdered },
+    { type: 'yes_no', label: 'Sí / No', description: 'Respuesta dicotómica rápida', color: 'bg-slate-800', icon: ToggleLeft },
+    { type: 'short_text', label: 'Texto Corto', description: 'Respuestas breves de una línea', color: 'bg-slate-700', icon: Type },
+    { type: 'long_text', label: 'Texto Largo', description: 'Párrafos y comentarios abiertos', color: 'bg-slate-600', icon: AlignLeft },
+    { type: 'store_hierarchy', label: 'Jerarquía KFC', description: 'Selector de Tienda / CECO', color: 'bg-[#E4002B]', icon: MapPin },
+    { type: 'date', label: 'Fecha', description: 'Selector de fecha calendario', color: 'bg-slate-500', icon: Calendar },
+    { type: 'rating', label: 'Escala / Estrellas', description: 'Calificación numérica o estrellas', color: 'bg-[#E4002B]', icon: Star },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Top Bar Header */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
+        {/* Top Metadata Badges */}
+        <div className="flex items-center gap-2">
+          <span className={`text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
+            isQuiz ? 'bg-red-50 text-[#E4002B] border border-red-200' : 'bg-slate-100 text-slate-800 border border-slate-200'
+          }`}>
+            {isQuiz ? 'EVALUACIÓN OPERATIVA (QUIZ)' : 'ENCUESTA ESTÁNDAR'}
+          </span>
+          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+            Título del Formulario
+          </label>
+        </div>
+
+        {/* Input & Save Button Row */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <button
+            type="button"
+            onClick={handleAttemptExit}
+            className="p-3 bg-white hover:bg-slate-900 border border-slate-200 hover:border-slate-800 rounded-xl transition-all duration-200 text-slate-600 hover:text-white cursor-pointer shrink-0 h-11 w-11 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95"
+            title="Volver"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          <input
+            type="text"
+            value={survey.title}
+            onChange={e => setSurvey({ ...survey, title: e.target.value })}
+            className="flex-1 w-full bg-slate-50 border-2 border-slate-200 focus:border-[#E4002B] focus:bg-white focus:ring-4 focus:ring-red-500/10 rounded-2xl px-4 text-sm font-black text-slate-900 outline-none transition shadow-2xs h-11"
+            placeholder="Escribe el Título del Formulario aquí..."
+          />
+
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 whitespace-nowrap">
+                Cambios sin guardar
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleSave}
+              className="w-full sm:w-auto h-11 flex items-center justify-center gap-2 px-5 rounded-xl bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Sub-Tabs */}
+      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('questions')}
+          className={`pb-3 text-xs font-black tracking-tight transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'questions' ? 'text-[#E4002B] border-b-2 border-[#E4002B]' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ListOrdered className="w-4 h-4 text-slate-500" />
+          <span>Preguntas ({survey.questions.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('logic')}
+          className={`pb-3 text-xs font-black tracking-tight transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'logic' ? 'text-[#E4002B] border-b-2 border-[#E4002B]' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <GitFork className="w-4 h-4 text-[#E4002B]" />
+          <span>Flujo Lógico</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('theme')}
+          className={`pb-3 text-xs font-black tracking-tight transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'theme' ? 'text-[#E4002B] border-b-2 border-[#E4002B]' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Palette className="w-4 h-4 text-slate-500" />
+          <span>Diseño & Tema</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('access')}
+          className={`pb-3 text-xs font-black tracking-tight transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            activeTab === 'access' ? 'text-[#E4002B] border-b-2 border-[#E4002B]' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-slate-500" />
+          <span>Acceso & Enlaces</span>
+        </button>
+
+        {isQuiz && (
+          <button
+            onClick={() => setActiveTab('quiz')}
+            className={`pb-3 text-xs font-black tracking-tight transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              activeTab === 'quiz' ? 'text-[#E4002B] border-b-2 border-[#E4002B]' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Award className="w-4 h-4 text-slate-500" />
+            <span>Ajustes de Evaluación</span>
+          </button>
+        )}
+      </div>
+
+      {/* TAB 1: PREGUNTAS */}
+      {activeTab === 'questions' && (
+        <div className="space-y-5 max-w-5xl mx-auto">
+          {/* Header de la sección de preguntas con botón '+' desplegable */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-black shrink-0">
+                <HelpCircle className="w-5 h-5 text-slate-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-black uppercase italic tracking-tight text-slate-900">
+                    Preguntas del Formulario
+                  </h3>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {survey.questions.length} {survey.questions.length === 1 ? 'pregunta' : 'preguntas'}
+                  </span>
+                </div>
+                <p className="text-[10px] font-medium text-slate-400 truncate">
+                  {isQuiz ? 'Crea y califica las preguntas de la evaluación' : 'Configura y organiza el flujo de preguntas'}
+                </p>
+              </div>
+            </div>
+
+            {/* Dropdown de Añadir Pregunta */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddMenuOpen(prev => !prev)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Agregar Pregunta</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isAddMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsAddMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-2 space-y-1 animate-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        {isQuiz ? 'Preguntas Permitidas (Quiz)' : 'Tipos de Pregunta'}
+                      </span>
+                      {isQuiz && (
+                        <span className="text-[8px] font-black uppercase bg-red-50 text-red-600 px-2 py-0.5 rounded">
+                          Quiz
+                        </span>
+                      )}
+                    </div>
+                    <div className="max-h-[380px] overflow-y-auto space-y-1 p-1">
+                      {availableQuestionTypes.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.type}
+                            type="button"
+                            onClick={() => {
+                              handleAddQuestion(item.type as QuestionType);
+                              setIsAddMenuOpen(false);
+                            }}
+                            className="w-full text-left p-2.5 rounded-2xl hover:bg-slate-50 transition flex items-center gap-3 group cursor-pointer border border-transparent hover:border-slate-200/60"
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-red-50 group-hover:text-red-600 text-slate-600 flex items-center justify-center shrink-0 transition">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-800 group-hover:text-red-600 transition truncate">
+                                {item.label}
+                              </p>
+                              <p className="text-[9.5px] font-medium text-slate-400 truncate">
+                                {item.description}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Listado de Preguntas con Drag and Drop */}
+          <div className="space-y-4">
+            {survey.questions.length === 0 ? (
+              <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300 space-y-4">
+                <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-3xl flex items-center justify-center mx-auto border border-slate-200/60">
+                  <Plus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black uppercase italic tracking-tight text-slate-800">
+                    Tu formulario aún no tiene preguntas
+                  </h4>
+                  <p className="text-xs font-medium text-slate-400 max-w-sm mx-auto mt-1">
+                    Haz clic en el botón de agregar para desplegar los tipos de preguntas y comenzar a construir tu encuesta.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMenuOpen(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-md shadow-red-600/20 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar Primera Pregunta</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {survey.questions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    className={`transition-all duration-150 ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                  >
+                    <QuestionEditor
+                      question={q}
+                      allQuestions={survey.questions}
+                      surveyType={survey.type}
+                      onUpdate={handleUpdateQuestion}
+                      onDelete={() => handleDeleteQuestion(q.id)}
+                      onMoveUp={() => handleMoveUp(idx)}
+                      onMoveDown={() => handleMoveDown(idx)}
+                      isFirst={idx === 0}
+                      isLast={idx === survey.questions.length - 1}
+                      isExpanded={expandedQuestionId === q.id}
+                      onSelectQuestion={() => setExpandedQuestionId(q.id)}
+                      onMinimizeQuestion={() => setExpandedQuestionId(null)}
+                    />
+                  </div>
+                ))}
+
+                {/* Botón inferior para agregar más preguntas con dropdown */}
+                <div className="pt-2 flex justify-center">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsBottomAddMenuOpen(prev => !prev)}
+                      className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 hover:text-red-600 border-2 border-dashed border-slate-300 hover:border-red-400 font-bold text-xs rounded-2xl transition shadow-2xs cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 text-red-600" />
+                      <span>Agregar otra pregunta</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isBottomAddMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isBottomAddMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsBottomAddMenuOpen(false)} />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-2 space-y-1 animate-in zoom-in-95 duration-150">
+                          <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              {isQuiz ? 'Preguntas Permitidas (Quiz)' : 'Tipos de Pregunta'}
+                            </span>
+                            {isQuiz && (
+                              <span className="text-[8px] font-black uppercase bg-red-50 text-red-600 px-2 py-0.5 rounded">
+                                Quiz
+                              </span>
+                            )}
+                          </div>
+                          <div className="max-h-[380px] overflow-y-auto space-y-1 p-1">
+                            {availableQuestionTypes.map(item => {
+                              const Icon = item.icon;
+                              return (
+                                <button
+                                  key={item.type}
+                                  type="button"
+                                  onClick={() => {
+                                    handleAddQuestion(item.type as QuestionType);
+                                    setIsBottomAddMenuOpen(false);
+                                  }}
+                                  className="w-full text-left p-2.5 rounded-2xl hover:bg-slate-50 transition flex items-center gap-3 group cursor-pointer border border-transparent hover:border-slate-200/60"
+                                >
+                                  <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-red-50 group-hover:text-red-600 text-slate-600 flex items-center justify-center shrink-0 transition">
+                                    <Icon className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-slate-800 group-hover:text-red-600 transition truncate">
+                                      {item.label}
+                                    </p>
+                                    <p className="text-[9.5px] font-medium text-slate-400 truncate">
+                                      {item.description}
+                                    </p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: FLUJO LÓGICO */}
+      {activeTab === 'logic' && (
+        <LogicFlowPanel
+          survey={survey}
+          onUpdateQuestion={handleUpdateQuestion}
+        />
+      )}
+
+      {/* TAB 3: TEMA VISUAL */}
+      {activeTab === 'theme' && (
+        <ThemeEditor
+          survey={survey}
+          theme={survey.theme}
+          thankYou={survey.thank_you || { title: '¡Muchas Gracias!', message: 'Tus respuestas han sido registradas exitosamente.', show_button: false }}
+          category={survey.category}
+          onThemeUpdate={(theme) => setSurvey(prev => ({ ...prev, theme }))}
+          onThankYouUpdate={(thankYou) => setSurvey(prev => ({ ...prev, thank_you: thankYou }))}
+          onCategoryUpdate={(category) => setSurvey(prev => ({ ...prev, category }))}
+        />
+      )}
+
+      {/* TAB 4: ACCESO */}
+      {activeTab === 'access' && (
+        <AccessSettings
+          survey={survey}
+          onUpdateSurvey={(updates) => setSurvey(prev => ({ ...prev, ...updates }))}
+        />
+      )}
+
+      {/* TAB 5: QUIZ */}
+      {activeTab === 'quiz' && isQuiz && (
+        <QuizSettings
+          survey={survey}
+          onUpdateSurvey={(updates) => setSurvey(prev => ({ ...prev, ...updates }))}
+        />
+      )}
+
+      {/* Modal de Confirmación: Salir sin Guardar */}
+      {showExitConfirmModal && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowExitConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-[#E4002B] flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">¿Salir sin guardar los cambios?</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Tienes modificaciones pendientes en este formulario. Si sales ahora, se perderán los cambios recientes.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Continuar Editando
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirmModal(false);
+                  onCancel();
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-[#E4002B] hover:bg-red-700 text-white transition cursor-pointer shadow-md shadow-red-600/20"
+              >
+                Salir sin Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

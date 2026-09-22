@@ -1,0 +1,214 @@
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  COORDINATOR = 'COORDINATOR',
+  SPECIALIST = 'SPECIALIST',
+  LIDER = 'LIDER',
+  GUEST = 'GUEST'
+}
+
+export enum JobTitle {
+  GERENTE = 'Gerente',
+  SUBGERENTE = 'Subgerente',
+  LIDER_TURNO = 'Líder de turno',
+  ENTRENADOR = 'Entrenador',
+  LICENCIA_EN_CURSO = 'Licencia en Curso',
+  MIEMBRO_EQUIPO_FULL = 'Miembro de equipo Full',
+  MIEMBRO_EQUIPO_ROLEX = 'Miembro de equipo Rolex',
+  DOMICILIARIO = 'Domiciliario'
+}
+
+export const JobHierarchy: Record<string, number> = {
+  [JobTitle.GERENTE]: 1,
+  [JobTitle.SUBGERENTE]: 2,
+  [JobTitle.LIDER_TURNO]: 3,
+  [JobTitle.ENTRENADOR]: 4,
+  [JobTitle.MIEMBRO_EQUIPO_FULL]: 5,
+  [JobTitle.MIEMBRO_EQUIPO_ROLEX]: 6,
+  [JobTitle.DOMICILIARIO]: 7
+};
+
+export interface User {
+  id: string;
+  username: string;
+  role: UserRole;
+  assignedZones: string[];
+  assignedRestaurants: string[];
+  assignedRegions: string[]; // Campo para filtrar por regiones
+  cedula?: string;           // Cédula / Documento del especialista
+  // GUEST granular permissions
+  allowedModules?: string[];  // e.g. ['dashboard','banca','safe-hands']
+  guestCanEdit?: boolean;     // false = solo lectura (default)
+  pendingDays?: number;       // Días pendientes
+}
+
+export interface StoreHistory {
+  date: string;
+  restaurantName: string;
+  action: 'INGRESO' | 'TRASLADO' | 'RETIRO';
+}
+
+export interface Employee {
+  id: string; // Cédula
+  name: string;
+  join_date: string;
+  exit_date?: string; 
+  title: JobTitle;
+  restaurant_id: string;
+  zone: string;
+  active: boolean;
+  suspended_since?: string | null; // YYYY-MM-DD — si tiene valor, excluido de métricas desde ese mes
+  history?: StoreHistory[];
+}
+
+export interface GradeEntry {
+  employeeId: string;
+  restaurantId: string; // Ubicación en el momento de la nota
+  month: string; // YYYY-MM
+  group: string;
+  category: string;
+  score: number; // 0-100
+}
+
+export interface Restaurant {
+  id: string; // Ceco
+  name: string;
+  zone: string;
+  region: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+}
+
+export interface HierarchyData {
+  lockedMonths: string[]; 
+  groupDConfig?: Record<string, { cat1: string, cat2: string }>; // Configuración mensual de temas Grupo D
+  regions: {
+    name: string;
+    zones: {
+      name: string;
+      restaurantIds: string[];
+    }[];
+  }[];
+}
+
+// ── Banca ──────────────────────────────────────────────────────────────────
+export type Certification = 'GBR' | 'GAR' | 'GER' | 'EAE';
+export type BancaRole = 'Gerente' | 'Subgerente' | 'Líder de turno' | 'Entrenador' | 'Entrenador HRS' | 'Potencial';
+
+export const BANCA_ROLES: BancaRole[] = ['Gerente', 'Subgerente', 'Líder de turno', 'Entrenador', 'Entrenador HRS', 'Potencial'];
+
+export type StoreCategory = 'A' | 'B' | 'C' | 'D';
+
+export interface StoreIdeal {
+  gerentes: number;
+  lideresTurno: number;
+  entrenadores: number;
+  category?: StoreCategory;
+}
+
+export interface BancaData {
+  assignments: StoreAssignment[];
+  storeIdeals?: Record<string, StoreIdeal>;
+}
+
+export interface StoreLeader {
+  employeeId: string;
+  role: BancaRole;
+  certifications: Certification[];
+}
+
+export interface StoreAssignment {
+  restaurantId: string;
+  members: StoreLeader[];
+}
+
+export interface BancaExternalPerson {
+  id: string; // Cédula o identificador único
+  first_name: string;
+  last_name: string;
+  name: string; // Nombre completo generado
+  document_id?: string;
+  role_tag?: string; // 'Operaciones'
+  created_at?: string;
+}
+
+export interface SafeHandsPerson {
+  id: string; // Cedula
+  name: string; // Nombre
+  restaurantId?: string;
+  lastIssueDate?: string; // Fecha
+  category?: string; // Categoría para huérfanos/personal especial (ej: sena, proveedor, etc.)
+  createdAt?: string;
+}
+
+export interface SafeHandsOrphanCategory {
+  id: string;
+  name: string;
+  color?: string;
+  created_at?: string;
+}
+
+export interface SafeHandsCert {
+  id?: string;
+  employeeId: string;
+  restaurantId: string;
+  issueDate: string;
+  expiryDate: string;
+  certificateCode: string;
+  signatureUrl?: string;
+  createdAt?: string;
+}
+
+export interface SafeHandsSettings {
+  signatureBase64?: string;
+  responsibleName?: string;
+  updatedAt?: string;
+}
+
+// ── Schedule Requests ──────────────────────────────────────────────────────
+export type ScheduleRequestType = 'Descanso' | 'Horario Específico' | 'Permiso Especial';
+export type ScheduleRequestStatus = 'PENDIENTE' | 'PROCESADO';
+
+export interface ScheduleRequest {
+  id?: string;
+  employee_id: string;   // Cédula del especialista
+  date: string;          // YYYY-MM-DD — fecha solicitada
+  request_type: ScheduleRequestType;
+  requested_shift_id?: number | null; // ID del turno catalogo si es Horario Específico
+  comments?: string;     // Justificación / nota del especialista
+  status: ScheduleRequestStatus;
+  created_at?: string;   // TIMESTAMPTZ — registrado automáticamente
+}
+
+export interface DailySchedule {
+  id?: string;
+  employee_id: string; // Cédula del especialista (snake_case para matching directo de base de datos)
+  date: string;        // YYYY-MM-DD
+  shift_type: 'Laboral' | 'Capacitación' | 'Descanso' | 'Incapacidad';
+  check_in?: string;   // HH:MM
+  check_out?: string;  // HH:MM
+  restaurant_id?: string; // CECO
+  activity?: string;      // Actividad a realizar
+  custom_message?: string; // Mensaje personalizado de máximo 200 caracteres
+  no_restaurant?: boolean; // Opción para no programar un restaurante específico
+  created_at?: string;
+}
+
+export * from './pulse';
+
+export interface QuickShortcut {
+  id: string;
+  title: string;
+  url: string;
+  icon?: string;
+  description?: string;
+  target?: '_blank' | '_self';
+  roles?: UserRole[];
+  order?: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
