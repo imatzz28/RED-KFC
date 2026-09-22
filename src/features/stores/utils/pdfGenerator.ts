@@ -96,8 +96,8 @@ export const generateStorePdf = async (
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id}  •  REGIÓN: ${selectedStore.region}  •  PERIODO: ${getMonthText(pdfMonth)}`, 20, 36);
 
-                        // Centrado vertical exacto en la barra roja (con compensación óptica y de borde)
-                        const maxH = 32;
+                        // Centrado vertical exacto en la barra roja con mayor tamaño y legibilidad
+                        const maxH = 37;
                         const maxW = 50;
                         let logoH = maxH;
                         let logoW = logoH * activeRatio;
@@ -106,14 +106,14 @@ export const generateStorePdf = async (
                             logoH = logoW / activeRatio;
                         }
                         const logoX = 250 - logoW;
-                        const logoY = (headerH + 1.5 - logoH) / 2;
+                        const logoY = (headerH - logoH) / 2;
                         d.addImage(activeLogoB64, 'PNG', logoX, logoY, logoW, logoH, 'logo', 'FAST');
                     } else {
                         d.setFontSize(7.5);
                         d.setFont('helvetica', 'normal');
                         d.text(`CECO: ${selectedStore.id} | ${selectedStore.region} | ${getMonthText(pdfMonth)}`, 130, 13);
 
-                        const maxH2 = 12;
+                        const maxH2 = 13.5;
                         const maxW2 = 25;
                         let logoH2 = maxH2;
                         let logoW2 = logoH2 * activeRatio;
@@ -122,7 +122,7 @@ export const generateStorePdf = async (
                             logoH2 = logoW2 / activeRatio;
                         }
                         const logoX2 = 252 - logoW2;
-                        const logoY2 = (headerH + 1.5 - logoH2) / 2;
+                        const logoY2 = (headerH - logoH2) / 2;
                         d.addImage(activeLogoB64, 'PNG', logoX2, logoY2, logoW2, logoH2, 'logo', 'FAST');
                     }
                 };
