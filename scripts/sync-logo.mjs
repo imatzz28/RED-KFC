@@ -7,9 +7,11 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 const candidatePaths = [
-  'C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.user_uploaded/media_1790096976215.png',
-  'C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.user_uploaded/media_1790096493931.png',
-  'C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.tempmediaStorage/media_1790096524235.png'
+  path.resolve(rootDir, 'public/logo_reporte.png'),
+  path.resolve(rootDir, 'public/logo_curvas_reporte.png'),
+  path.normalize('C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.user_uploaded/media_1790096976215.png'),
+  path.normalize('C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.user_uploaded/media_1790096493931.png'),
+  path.normalize('C:/Users/andres.matiz/.gemini/antigravity/brain/f3c551a1-a0d0-4c36-b50d-9830ebc3764e/.tempmediaStorage/media_1790096524235.png')
 ];
 
 let found = false;

@@ -34,6 +34,35 @@ export const generateStorePdf = async (
                     emerald: [16, 185, 129]
                 };
 
+                let activeLogoB64 = APP_LOGO_B64;
+                let activeRatio = APP_LOGO_RATIO;
+
+                try {
+                    const res = await fetch('/logo_reporte.png');
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        activeLogoB64 = await new Promise<string>((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = () => resolve(APP_LOGO_B64);
+                            reader.readAsDataURL(blob);
+                        });
+                        await new Promise<void>((resolve) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                if (img.naturalWidth && img.naturalHeight) {
+                                    activeRatio = img.naturalWidth / img.naturalHeight;
+                                }
+                                resolve();
+                            };
+                            img.onerror = () => resolve();
+                            img.src = activeLogoB64;
+                        });
+                    }
+                } catch {
+                    // Fallback to activeLogoB64
+                }
+
                 const drawHeader = (d: typeof doc, isPage1 = true) => {
                     const headerH = isPage1 ? 45 : 18;
 
@@ -70,14 +99,14 @@ export const generateStorePdf = async (
                         const maxH = 40;
                         const maxW = 55;
                         let logoH = maxH;
-                        let logoW = logoH * APP_LOGO_RATIO;
+                        let logoW = logoH * activeRatio;
                         if (logoW > maxW) {
                             logoW = maxW;
-                            logoH = logoW / APP_LOGO_RATIO;
+                            logoH = logoW / activeRatio;
                         }
                         const logoX = 250 - logoW;
                         const logoY = (headerH - logoH) / 2;
-                        d.addImage(APP_LOGO_B64, 'PNG', logoX, logoY, logoW, logoH, 'logo', 'FAST');
+                        d.addImage(activeLogoB64, 'PNG', logoX, logoY, logoW, logoH, 'logo', 'FAST');
                     } else {
                         d.setFontSize(7.5);
                         d.setFont('helvetica', 'normal');
@@ -86,14 +115,14 @@ export const generateStorePdf = async (
                         const maxH2 = 14;
                         const maxW2 = 25;
                         let logoH2 = maxH2;
-                        let logoW2 = logoH2 * APP_LOGO_RATIO;
+                        let logoW2 = logoH2 * activeRatio;
                         if (logoW2 > maxW2) {
                             logoW2 = maxW2;
-                            logoH2 = logoW2 / APP_LOGO_RATIO;
+                            logoH2 = logoW2 / activeRatio;
                         }
                         const logoX2 = 252 - logoW2;
                         const logoY2 = (headerH - logoH2) / 2;
-                        d.addImage(APP_LOGO_B64, 'PNG', logoX2, logoY2, logoW2, logoH2, 'logo', 'FAST');
+                        d.addImage(activeLogoB64, 'PNG', logoX2, logoY2, logoW2, logoH2, 'logo', 'FAST');
                     }
                 };
 
