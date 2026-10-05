@@ -507,6 +507,28 @@ export const dataService = {
     }
   },
 
+  fetchEmployeeGradesHistory: async (employeeId: string): Promise<GradeEntry[]> => {
+    try {
+      const result = await dataService.supabaseFetch(
+        'grades',
+        'GET',
+        null,
+        `?employee_id=eq.${encodeURIComponent(employeeId.trim())}&order=month.desc`
+      );
+      return (result || []).map((g: any) => ({
+        employeeId: String(g.employee_id).trim(),
+        restaurantId: String(g.restaurant_id || '').trim(),
+        month: g.month,
+        group: g.group,
+        category: g.category,
+        score: g.score
+      }));
+    } catch (e) {
+      console.warn('Error fetching employee grades history:', e);
+      return [];
+    }
+  },
+
   getEmployees: (): Employee[] => {
     return dataService._cache.employees || [];
   },
@@ -552,6 +574,30 @@ export const dataService = {
 
   getGradesSummary: (): any[] => {
     return dataService._cache.summary || [];
+  },
+
+  fetchEmployeeGradesHistory: async (employeeId: string): Promise<GradeEntry[]> => {
+    try {
+      const result = await dataService.supabaseFetch(
+        'grades',
+        'GET',
+        null,
+        `?employee_id=eq.${encodeURIComponent(employeeId)}&order=month.desc`
+      );
+      if (Array.isArray(result) && result.length > 0) {
+        return result.map((g: any) => ({
+          employeeId: g.employee_id,
+          restaurantId: g.restaurant_id,
+          month: g.month ? g.month.substring(0, 7) : '',
+          group: g.group,
+          category: g.category,
+          score: Number(g.score) || 0
+        }));
+      }
+    } catch (e) {
+      console.warn('Error fetching employee grades history:', e);
+    }
+    return (dataService._cache.grades || []).filter(g => g.employeeId === employeeId);
   },
 
   // Nuevo: Indexador de notas para búsqueda O(1)
@@ -1750,6 +1796,21 @@ export const dataService = {
   deleteDailySchedule: async (employeeId: string, date: string): Promise<void> => {
     const query = `?employee_id=eq.${employeeId}&date=eq.${date}`;
     await dataService.supabaseFetch('schedules', 'DELETE', null, query);
+  },
+
+  getEmployeeRecentSchedules: async (employeeId: string, limit: number = 20): Promise<DailySchedule[]> => {
+    try {
+      const result = await dataService.supabaseFetch(
+        'schedules',
+        'GET',
+        null,
+        `?employee_id=eq.${encodeURIComponent(employeeId)}&order=date.desc&limit=${limit}`
+      );
+      return (result || []) as DailySchedule[];
+    } catch (e) {
+      console.warn('Error fetching employee schedules:', e);
+      return [];
+    }
   },
 
   // ── Schedule Requests ────────────────────────────────────────────────────

@@ -147,6 +147,15 @@ export const PulseModule: React.FC = () => {
     loadData();
   };
 
+  const handleImportSurvey = async (importedSurvey: Survey, openInBuilder: boolean) => {
+    if (openInBuilder) {
+      setSelectedSurvey(importedSurvey);
+      setActiveTab('builder');
+    } else {
+      await handleSaveSurveyFromBuilder(importedSurvey);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
       {activeTab === 'list' && (
@@ -162,6 +171,7 @@ export const PulseModule: React.FC = () => {
           onToggleStatus={handleToggleStatus}
           onRefresh={() => loadData(true)}
           isRefreshing={isRefreshing}
+          onImportSurvey={handleImportSurvey}
         />
       )}
 

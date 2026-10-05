@@ -3,11 +3,13 @@ import { Survey, SurveyStatus, UserRole } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import {
   FileSpreadsheet, Plus, Search, Edit3, Trash2, Copy, Play, BarChart2,
-  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, ChevronLeft, Share2, QrCode, Check, Eye, RefreshCw
+  CheckCircle2, Clock, Archive, Sparkles, Filter, ChevronRight, ChevronLeft, Share2, QrCode, Check, Eye, RefreshCw,
+  Upload
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
 import { dataService } from '@/services/dataService';
+import { PulseExcelImportModal } from './PulseExcelImportModal';
 
 interface SurveyListProps {
   surveys: Survey[];
@@ -21,6 +23,7 @@ interface SurveyListProps {
   onToggleStatus: (survey: Survey, status: SurveyStatus) => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  onImportSurvey?: (survey: Survey, openInBuilder: boolean) => void;
 }
 
 export const SurveyList: React.FC<SurveyListProps> = ({
@@ -35,6 +38,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   onToggleStatus,
   onRefresh,
   isRefreshing,
+  onImportSurvey,
 }) => {
   const { auth } = useAppStore();
   const isAdmin = auth.user?.role === UserRole.ADMIN;
@@ -45,6 +49,7 @@ export const SurveyList: React.FC<SurveyListProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [shareModalSurvey, setShareModalSurvey] = useState<Survey | null>(null);
   const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
@@ -150,6 +155,16 @@ export const SurveyList: React.FC<SurveyListProps> = ({
         >
           <Sparkles className="w-4 h-4" />
           <span>Nueva Evaluación (Quiz)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsImportModalOpen(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+          title="Crear evaluación o encuesta cargando una plantilla Excel estructurada"
+        >
+          <Upload className="w-4 h-4 text-slate-500" />
+          <span>Cargar Formulario</span>
         </button>
       </div>
 
@@ -516,6 +531,19 @@ export const SurveyList: React.FC<SurveyListProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Importación de Plantilla Excel */}
+      <PulseExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onConfirmImport={(importedSurvey, openInBuilder) => {
+          if (onImportSurvey) {
+            onImportSurvey(importedSurvey, openInBuilder);
+          }
+        }}
+        currentUserId={auth.user?.id}
+        currentUsername={auth.user?.username}
+      />
     </div>
   );
 };

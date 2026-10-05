@@ -5,13 +5,14 @@ import {
   Sparkles, Layers, Palette, Eye, HelpCircle, Check, Clock, Shuffle,
   Lock, FileText, ArrowRight, ShieldCheck, Zap, GitFork, LayoutGrid,
   ListOrdered, Award, RefreshCw, ChevronDown, CircleDot, CheckSquare,
-  ToggleLeft, Type, AlignLeft, MapPin, Calendar, Star
+  ToggleLeft, Type, AlignLeft, MapPin, Calendar, Star, FileSpreadsheet, Upload
 } from 'lucide-react';
 import { QuestionEditor } from './QuestionEditor';
 import { LogicFlowPanel } from './LogicFlowPanel';
 import { ThemeEditor } from './ThemeEditor';
 import { AccessSettings } from './AccessSettings';
 import { QuizSettings } from './QuizSettings';
+import { PulseExcelImportModal } from '../PulseExcelImportModal';
 
 interface SurveyBuilderProps {
   initialSurvey: Survey;
@@ -35,6 +36,7 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isBottomAddMenuOpen, setIsBottomAddMenuOpen] = useState(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
   const isQuiz = survey.type === 'quiz';
 
@@ -295,17 +297,29 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
               </div>
             </div>
 
-            {/* Dropdown de Añadir Pregunta */}
-            <div className="relative shrink-0">
+            {/* Acciones de Pregunta */}
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setIsAddMenuOpen(prev => !prev)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                onClick={() => setIsExcelModalOpen(true)}
+                className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                title="Cargar o actualizar preguntas mediante plantilla Excel"
               >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Agregar Pregunta</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+                <Upload className="w-4 h-4 text-slate-500" />
+                <span className="hidden sm:inline">Cargar Formulario</span>
               </button>
+
+              {/* Dropdown de Añadir Pregunta */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAddMenuOpen(prev => !prev)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Agregar Pregunta</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
 
               {isAddMenuOpen && (
                 <>
@@ -354,8 +368,9 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
               )}
             </div>
           </div>
+        </div>
 
-          {/* Listado de Preguntas con Drag and Drop */}
+        {/* Listado de Preguntas con Drag and Drop */}
           <div className="space-y-4">
             {survey.questions.length === 0 ? (
               <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300 space-y-4">
@@ -553,6 +568,36 @@ export const SurveyBuilder: React.FC<SurveyBuilderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Importación desde Excel en SurveyBuilder */}
+      <PulseExcelImportModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onConfirmImport={(importedSurvey, openInBuilder) => {
+          const updatedSurvey = {
+            ...survey,
+            title: importedSurvey.title || survey.title,
+            description: importedSurvey.description || survey.description,
+            passing_score_percent: importedSurvey.passing_score_percent ?? survey.passing_score_percent,
+            time_limit_seconds: importedSurvey.time_limit_seconds ?? survey.time_limit_seconds,
+            max_attempts: importedSurvey.max_attempts ?? survey.max_attempts,
+            shuffle_questions: importedSurvey.shuffle_questions ?? survey.shuffle_questions,
+            shuffle_options: importedSurvey.shuffle_options ?? survey.shuffle_options,
+            questions: importedSurvey.questions.map((q, idx) => ({
+              ...q,
+              survey_id: survey.id,
+              order: idx + 1,
+            })),
+          };
+          setSurvey(updatedSurvey);
+          if (updatedSurvey.questions.length > 0) {
+            setExpandedQuestionId(updatedSurvey.questions[0].id);
+          }
+          if (!openInBuilder) {
+            onSave(updatedSurvey);
+          }
+        }}
+      />
     </div>
   );
 };

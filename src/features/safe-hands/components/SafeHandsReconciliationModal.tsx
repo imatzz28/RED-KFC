@@ -719,6 +719,16 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
                     disabled={isProcessingExcel}
                   />
                 </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryManager(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                  title="Gestionar catálogo de categorías de personal"
+                >
+                  <Tag className="w-4 h-4" />
+                  <span>Gestionar</span>
+                </button>
               </>
             )}
 
@@ -891,7 +901,7 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
         </div>
 
         {/* ── Sub-Bar: Desglose y Filtro de Carnets por Categoría / Acciones de Categorización ─────────────── */}
-        {(activeTab === 'orphan_categorized' || activeTab === 'orphan_uncategorized' || (selectedIds.size > 0 && isAdmin)) && (
+        {(activeTab === 'orphan_categorized' || (selectedIds.size > 0 && isAdmin)) && (
           <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 animate-in fade-in duration-150">
             {activeTab === 'orphan_categorized' ? (
               <div className="flex items-center gap-2 overflow-x-auto">
@@ -948,40 +958,6 @@ export const SafeHandsReconciliationModal: React.FC<SafeHandsReconciliationModal
             ) : <div />}
 
             <div className="flex items-center gap-2 ml-auto">
-              {isAdmin && (activeTab === 'orphan_categorized' || activeTab === 'orphan_uncategorized') && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleDownloadCategoryTemplate}
-                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
-                    title="Descargar Plantilla Excel para categorización masiva"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Plantilla</span>
-                  </button>
-
-                  <label className={`flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer ${isProcessingExcel ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{isProcessingExcel ? 'Cargando...' : 'Cargar Excel'}</span>
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      className="hidden"
-                      onChange={handleUploadCategoriesExcel}
-                      disabled={isProcessingExcel}
-                    />
-                  </label>
-
-                  <button
-                    onClick={() => setShowCategoryManager(true)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-widest transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
-                  >
-                    <Tag className="w-3.5 h-3.5" />
-                    <span>Gestionar</span>
-                  </button>
-                </div>
-              )}
-
               {/* Bulk Categorization if items selected */}
               {selectedIds.size > 0 && isAdmin && (
                 <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1 rounded-xl animate-fade-in">

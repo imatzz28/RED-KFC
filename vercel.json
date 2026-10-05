@@ -1,20 +1,21 @@
 {
-    "name": "red-kfc",
-    "headers": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
         {
-            "source": "/:path*",
-            "headers": [
-                {
-                    "key": "Content-Security-Policy",
-                    "value": "frame-ancestors *"
-                }
-            ]
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *"
         }
-    ],
-    "rewrites": [
-        {
-            "source": "/:path*",
-            "destination": "/"
-        }
-    ]
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

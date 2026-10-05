@@ -20,6 +20,7 @@ const PublicValidation = lazy(() => import('@/features/safe-hands/PublicValidati
 const Schedules = lazy(() => import('@/features/schedules/Schedules'));
 const PulseModule = lazy(() => import('@/features/pulse/PulseModule'));
 const PublicSurveyRunner = lazy(() => import('@/features/pulse/PublicSurveyRunner').then(m => ({ default: m.PublicSurveyRunner })));
+const CollaboratorSearch = lazy(() => import('@/features/collaborators/CollaboratorSearch'));
 
 const App: React.FC = () => {
   const {
@@ -97,6 +98,9 @@ const App: React.FC = () => {
                       )}
                       {(nonGuest([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.LIDER]) || guestCan('banca')) && (
                         <Route path="/banca" element={<Banca />} />
+                      )}
+                      {nonGuest([UserRole.ADMIN, UserRole.LIDER]) && (
+                        <Route path="/colaboradores" element={<CollaboratorSearch />} />
                       )}
                       {(nonGuest([UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR]) || guestCan('safe-hands')) && (
                         <Route path="/safe-hands" element={<SafeHands />} />

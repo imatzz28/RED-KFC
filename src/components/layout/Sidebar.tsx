@@ -20,7 +20,8 @@ import {
   X,
   Compass,
   ExternalLink,
-  Globe
+  Globe,
+  UserCheck
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
@@ -138,6 +139,13 @@ const Sidebar: React.FC = () => {
           icon: ArrowUpDown,
           roles: [UserRole.ADMIN, UserRole.LIDER, UserRole.COORDINATOR],
           key: 'entries-exits'
+        },
+        {
+          to: '/colaboradores',
+          label: 'Buscar Colaborador',
+          icon: UserCheck,
+          roles: [UserRole.ADMIN, UserRole.LIDER],
+          key: 'colaboradores'
         }
       ]
     },

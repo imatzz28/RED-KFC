@@ -1,1287 +1,517 @@
--- ============================================================
--- RED KFC — Migración: monthly_group_stats + RPCs
--- Ejecutar en Supabase > SQL Editor
--- ============================================================
+-- ==============================================================================
+-- R.E.D (Ruta de Entrenamiento y Desarrollo) - KFC Colombia
+-- MIGRATION SQL / SCHEMA COMPLETO DE BASE DE DATOS SUPABASE (POSTGRESQL)
+-- Incluye: Tablas, Extensiones, Índices, Vistas, Funciones RPC, RLS y Políticas
+-- ==============================================================================
 
--- 0. COLUMNA DE SUSPENSIÓN TEMPORAL EN EMPLEADOS
-ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS suspended_since DATE DEFAULT NULL;
+-- 1. EXTENSIONES
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 1. TABLA DE ESTADÍSTICAS PRECALCULADAS
--- ============================================================
-CREATE TABLE IF NOT EXISTS monthly_group_stats (
-  id              SERIAL PRIMARY KEY,
-  restaurant_id   TEXT NOT NULL,
-  month           DATE NOT NULL,
-  group_id        TEXT NOT NULL,
-  employee_count  INT  NOT NULL DEFAULT 0,
-  avg_score       NUMERIC(5,2) NOT NULL DEFAULT 0,
-  approved_count  INT  NOT NULL DEFAULT 0,
-  UNIQUE (restaurant_id, month, group_id)
+-- ==============================================================================
+-- 2. TABLAS MAESTRAS DEL SISTEMA
+-- ==============================================================================
+
+-- 2.1 RESTAURANTES (TIENDAS / CECOS)
+CREATE TABLE IF NOT EXISTS public.restaurants (
+    id TEXT PRIMARY KEY,                       -- CECO (e.g. 'K034', 'K038')
+    name TEXT NOT NULL,                        -- Nombre de tienda (e.g. 'PALMETO')
+    zone TEXT NOT NULL,                        -- Zona (e.g. 'CALI 1')
+    region TEXT NOT NULL,                      -- Región (e.g. 'VALLE')
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mgs_month       ON monthly_group_stats(month);
-CREATE INDEX IF NOT EXISTS idx_mgs_restaurant  ON monthly_group_stats(restaurant_id);
+-- 2.2 USUARIOS Y PERFILES (Vinculado a Supabase Auth)
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,                       -- UUID o ID de usuario
+    username TEXT UNIQUE NOT NULL,             -- Usuario (e.g. 'admin', 'coordinador_valle')
+    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'COORDINATOR', 'SPECIALIST', 'LIDER', 'GUEST')),
+    "assignedZones" TEXT[] DEFAULT '{}'::TEXT[],
+    "assignedRestaurants" TEXT[] DEFAULT '{}'::TEXT[],
+    "assignedRegions" TEXT[] DEFAULT '{}'::TEXT[],
+    "allowedModules" TEXT[] DEFAULT '{}'::TEXT[],
+    "guestCanEdit" BOOLEAN DEFAULT false,
+    cedula TEXT,
+    "pendingDays" INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
 
+-- 2.3 COLABORADORES / CENSO DE EMPLEADOS
+CREATE TABLE IF NOT EXISTS public.employees (
+    id TEXT PRIMARY KEY,                       -- Cédula / Documento único
+    name TEXT NOT NULL,                        -- Nombre completo
+    join_date TEXT NOT NULL,                   -- Fecha ingreso (YYYY-MM-DD)
+    exit_date TEXT,                            -- Fecha retiro si aplica (YYYY-MM-DD)
+    title TEXT NOT NULL,                       -- Cargo (Gerente, Subgerente, etc.)
+    restaurant_id TEXT REFERENCES public.restaurants(id) ON DELETE SET NULL,
+    zone TEXT,
+    active BOOLEAN NOT NULL DEFAULT true,
+    suspended_since TEXT,                      -- YYYY-MM-DD de suspensión si aplica
+    history JSONB DEFAULT '[]'::JSONB,         -- Historial de traslados/ingresos/retiros
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
 
--- 2. FUNCIÓN: settle_monthly_group_stats(p_month TEXT)
--- Calcula y guarda stats por tienda+mes+grupo.
--- Es IDEMPOTENTE: borra y recalcula si ya existe el mes.
--- ============================================================
-CREATE OR REPLACE FUNCTION settle_monthly_group_stats(p_month TEXT)
-RETURNS INT AS $$
-DECLARE
-  p_month_date DATE := (p_month || '-01')::DATE;
-  rows_inserted INT;
-BEGIN
-  -- Limpiar solo el mes específico (normalizando el mes)
-  DELETE FROM monthly_group_stats WHERE month = p_month_date;
+-- 2.4 CALIFICACIONES / NOTAS POR CATEGORÍA Y CURVAS
+CREATE TABLE IF NOT EXISTS public.grades (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id TEXT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+    restaurant_id TEXT NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    month DATE NOT NULL,                       -- Fecha primer día de mes (e.g. '2026-09-01')
+    "group" TEXT NOT NULL,                     -- Grupo ('AK', 'A', 'B', 'C', 'D', 'E', 'F')
+    category TEXT NOT NULL,                    -- Nombre del tema evaluado
+    score NUMERIC NOT NULL CHECK (score >= 0 AND score <= 100),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uq_grades_emp_month_cat UNIQUE (employee_id, month, "group", category)
+);
 
-  INSERT INTO monthly_group_stats (restaurant_id, month, group_id, employee_count, avg_score, approved_count)
-  WITH
-  -- Categorías por grupo
-  group_cats AS (
-    SELECT * FROM (VALUES
-      ('AK', 1), ('A', 3), ('B', 6), ('C', 1), ('D', 1), ('E', 1), ('F', 1)
-    ) AS t(group_id, cat_count)
-  ),
-  -- Empleados que estaban contratados en el mes objetivo (Lógica Histórica)
-  active_emps AS (
-    SELECT
-      e.id AS employee_id,
-      TRIM(UPPER(e.restaurant_id)) AS restaurant_id,
-      (
-        (EXTRACT(YEAR  FROM p_month_date)::INT - EXTRACT(YEAR  FROM e.join_date::DATE)::INT) * 12 +
-        (EXTRACT(MONTH FROM p_month_date)::INT - EXTRACT(MONTH FROM e.join_date::DATE)::INT)
-      ) AS seniority_months
-    FROM employees e
-    WHERE 
-      -- Regla de Inducción/STAR: Si ingresó en los últimos 7 días del mes, empieza a evaluar a partir del mes siguiente
-      (e.join_date IS NULL OR e.join_date::DATE <= (p_month_date + INTERVAL '1 month' - INTERVAL '8 days')::DATE)
-      -- No se había ido antes de que empezara el mes
-      AND (e.exit_date IS NULL OR e.exit_date::DATE >= p_month_date)
-      -- No estaba suspendido en este mes
-      AND (e.suspended_since IS NULL OR e.suspended_since > p_month_date)
-      AND e.restaurant_id IS NOT NULL
-      AND e.restaurant_id NOT IN ('', 'SIN_CECO')
-  ),
-  -- Filtro All-Star (>3 meses)
-  emp_groups AS (
-    SELECT
-      ae.employee_id,
-      ae.restaurant_id,
-      gc.group_id,
-      gc.cat_count
-    FROM active_emps ae
-    CROSS JOIN group_cats gc
-    WHERE NOT (gc.group_id = 'C' AND ae.seniority_months <= 3)
-  ),
-  -- Notas heredables (Normalizando CECO) - AK, A, B, C
-  inherited AS (
-    SELECT DISTINCT ON (g.employee_id, TRIM(UPPER(g.restaurant_id)), g.group, g.category)
-      g.employee_id,
-      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
-      g.group  AS group_id,
-      g.score
-    FROM grades g
-    WHERE g.month <= p_month_date
-      AND g.month >= (p_month_date - INTERVAL '24 months')
-      AND g.group NOT IN ('D', 'F', 'E')
-    ORDER BY g.employee_id, TRIM(UPPER(g.restaurant_id)), g.group, g.category, g.month DESC
-  ),
-  -- Para The Vault (E): Unificar notas históricas
-  -- Toma el mes más reciente con notas (<= p_month_date) y calcula el promedio de ese mes
-  latest_vault_month AS (
-    SELECT
-      g.employee_id,
-      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
-      MAX(g.month) AS max_month
-    FROM grades g
-    WHERE g.month <= p_month_date
-      AND g.month >= (p_month_date - INTERVAL '24 months')
-      AND g.group = 'E'
-    GROUP BY g.employee_id, TRIM(UPPER(g.restaurant_id))
-  ),
-  vault_effective AS (
-    SELECT
-      g.employee_id,
-      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
-      'E'::TEXT AS group_id,
-      ROUND(AVG(g.score)) AS score
-    FROM grades g
-    INNER JOIN latest_vault_month lvm
-      ON g.employee_id = lvm.employee_id
-      AND TRIM(UPPER(g.restaurant_id)) = lvm.restaurant_id
-      AND g.month = lvm.max_month
-    WHERE g.group = 'E'
-    GROUP BY g.employee_id, TRIM(UPPER(g.restaurant_id))
-  ),
-  -- Notas NO heredables (Normalizando CECO) - D y F
-  exact_month AS (
-    SELECT
-      g.employee_id,
-      TRIM(UPPER(g.restaurant_id)) AS restaurant_id,
-      g.group AS group_id,
-      g.score
-    FROM grades g
-    WHERE g.month = p_month_date
-      AND g.group IN ('D', 'F')
-  ),
-  effective AS (
-    SELECT * FROM inherited
-    UNION ALL
-    SELECT * FROM vault_effective
-    UNION ALL
-    SELECT * FROM exact_month
-  ),
-  -- Suma por empleado (unido por ID de tienda normalizado)
-  emp_group_sum AS (
-    SELECT employee_id, restaurant_id, group_id, SUM(score) AS total_score
-    FROM effective
-    GROUP BY employee_id, restaurant_id, group_id
-  ),
-  -- Promedio por grupo de cada empleado
-  emp_group_avgs AS (
-    SELECT
-      eg.employee_id,
-      eg.restaurant_id,
-      eg.group_id,
-      COALESCE(egs.total_score::NUMERIC / eg.cat_count, 0) AS group_avg
-    FROM emp_groups eg
-    LEFT JOIN emp_group_sum egs
-      ON  egs.employee_id   = eg.employee_id
-      AND egs.restaurant_id = eg.restaurant_id
-      AND egs.group_id      = eg.group_id
-  )
-  -- Agregación final
-  SELECT
-    ega.restaurant_id,
-    p_month_date        AS month,
-    ega.group_id,
-    COUNT(*)::INT       AS employee_count,
-    ROUND(AVG(ega.group_avg)::NUMERIC, 2) AS avg_score,
-    COUNT(CASE WHEN ega.group_avg >= 90 THEN 1 END)::INT AS approved_count
-  FROM emp_group_avgs ega
-  GROUP BY ega.restaurant_id, ega.group_id;
+-- 2.5 JERARQUÍA Y MESES ASENTADOS (Singleton id=1)
+CREATE TABLE IF NOT EXISTS public.hierarchy (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    data JSONB NOT NULL DEFAULT '{"lockedMonths": [], "regions": []}'::JSONB,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
 
-  GET DIAGNOSTICS rows_inserted = ROW_COUNT;
-  RETURN rows_inserted;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 2.6 BANCA DE LIDERAZGO (Singleton id=1)
+CREATE TABLE IF NOT EXISTS public.banca (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    data JSONB NOT NULL DEFAULT '{"assignments": []}'::JSONB,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
 
+-- 2.7 PERSONAL EXTERNO DE BANCA (Operaciones)
+CREATE TABLE IF NOT EXISTS public.banca_external_personnel (
+    id TEXT PRIMARY KEY,                       -- Documento / Identificador
+    first_name TEXT,
+    last_name TEXT,
+    name TEXT NOT NULL,                        -- Nombre completo generado
+    document_id TEXT,
+    role_tag TEXT DEFAULT 'Operaciones',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- 3. FUNCIÓN: backfill_monthly_group_stats()
--- Rellena monthly_group_stats para TODOS los meses que tienen datos en grades.
--- Ejecutar UNA sola vez después de crear la tabla.
--- ============================================================
-CREATE OR REPLACE FUNCTION backfill_monthly_group_stats()
-RETURNS TEXT AS $$
-DECLARE
-  p_month_date DATE;
-BEGIN
-  -- Identificar TODOS los meses que tienen notas en la base de datos
-  FOR p_month_date IN 
-    SELECT DISTINCT date_trunc('month', month)::DATE 
-    FROM grades
-  LOOP
-    RAISE NOTICE 'Procesando mes: %', p_month_date;
-    PERFORM settle_monthly_group_stats(to_char(p_month_date, 'YYYY-MM'));
-  END LOOP;
+-- ==============================================================================
+-- 3. MÓDULO SAFE HANDS (MANIPULACIÓN DE ALIMENTOS)
+-- ==============================================================================
 
-  RETURN 'Proceso de backfill completado para todos los meses con datos.';
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 3.1 PERSONAL SAFE HANDS
+CREATE TABLE IF NOT EXISTS public.safe_hands_personnel (
+    id TEXT PRIMARY KEY,                       -- Cédula
+    name TEXT NOT NULL,
+    restaurant_id TEXT REFERENCES public.restaurants(id) ON DELETE SET NULL,
+    last_issue_date TEXT,
+    category TEXT,                             -- Categoría para personal huérfano
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
+-- 3.2 CERTIFICACIONES SAFE HANDS
+CREATE TABLE IF NOT EXISTS public.safe_hands_certs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id TEXT NOT NULL UNIQUE REFERENCES public.safe_hands_personnel(id) ON DELETE CASCADE,
+    restaurant_id TEXT REFERENCES public.restaurants(id) ON DELETE SET NULL,
+    issue_date TEXT NOT NULL,
+    expiry_date TEXT NOT NULL,
+    certificate_code TEXT NOT NULL UNIQUE,     -- Código para validación pública /verify
+    signature_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- 4. FUNCIÓN RPC: get_dashboard_stats
--- Devuelve estadísticas agregadas (promedio ponderado por nro de empleados).
--- Se llama desde el Dashboard cuando el filtro es zona / región / nacional.
--- ============================================================
-CREATE OR REPLACE FUNCTION get_dashboard_stats(
-  p_month     TEXT,
-  p_store_ids TEXT[] DEFAULT NULL
+-- 3.3 CONFIGURACIÓN DE FIRMA Y RESPONSABLE SAFE HANDS (Singleton id=1)
+CREATE TABLE IF NOT EXISTS public.safe_hands_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    signature_base64 TEXT,
+    responsible_name TEXT DEFAULT 'RESPONSABLE CALIDAD',
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3.4 CATEGORÍAS DE PERSONAL HUÉRFANO SAFE HANDS
+CREATE TABLE IF NOT EXISTS public.safe_hands_orphan_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    color TEXT DEFAULT 'emerald',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ==============================================================================
+-- 4. MÓDULO DE HORARIOS Y SOLICITUDES DE ESPECIALISTAS
+-- ==============================================================================
+
+-- 4.1 MALLA DE TURNOS DIARIOS
+CREATE TABLE IF NOT EXISTS public.schedules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id TEXT NOT NULL,
+    date DATE NOT NULL,
+    shift_type TEXT NOT NULL,                 -- 'Laboral', 'Capacitación', 'Descanso', 'Incapacidad'
+    check_in TEXT,                            -- 'HH:MM'
+    check_out TEXT,                           -- 'HH:MM'
+    restaurant_id TEXT REFERENCES public.restaurants(id) ON DELETE SET NULL,
+    activity TEXT,
+    custom_message TEXT,
+    no_restaurant BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uq_schedules_emp_date UNIQUE (employee_id, date)
+);
+
+-- 4.2 SOLICITUDES DE TURNOS / DESCANSO
+CREATE TABLE IF NOT EXISTS public.schedule_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id TEXT NOT NULL,
+    date DATE NOT NULL,
+    request_type TEXT NOT NULL,               -- 'Descanso', 'Horario Específico', 'Permiso Especial'
+    requested_shift_id INTEGER,
+    comments TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK (status IN ('PENDIENTE', 'PROCESADO')),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uq_schedule_requests_emp_date UNIQUE (employee_id, date)
+);
+
+-- ==============================================================================
+-- 5. MÓDULO RED PULSE (ENCUESTAS, EVALUACIONES Y QUIZZES)
+-- ==============================================================================
+
+-- 5.1 CATEGORÍAS DE PULSE
+CREATE TABLE IF NOT EXISTS public.pulse_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5.2 ENCUESTAS Y QUIZZES
+CREATE TABLE IF NOT EXISTS public.surveys (
+    id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    owner_name TEXT,
+    type TEXT NOT NULL DEFAULT 'survey' CHECK (type IN ('survey', 'quiz')),
+    category TEXT,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+    theme JSONB DEFAULT '{}'::JSONB,
+    thank_you JSONB DEFAULT '{}'::JSONB,
+    access_mode TEXT NOT NULL DEFAULT 'open' CHECK (access_mode IN ('open', 'password', 'invitation')),
+    access_password TEXT,
+    hidden_fields JSONB DEFAULT '[]'::JSONB,
+    scoring_type TEXT DEFAULT 'simple',
+    passing_score_percent NUMERIC DEFAULT 70,
+    show_results_immediately BOOLEAN DEFAULT false,
+    show_results_in_reports BOOLEAN DEFAULT false,
+    shuffle_questions BOOLEAN DEFAULT false,
+    shuffle_options BOOLEAN DEFAULT false,
+    max_attempts INTEGER DEFAULT 0,
+    time_limit_seconds INTEGER DEFAULT 0,
+    questions JSONB DEFAULT '[]'::JSONB,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5.3 RESPUESTAS Y RESULTADOS DE ENCUESTAS
+CREATE TABLE IF NOT EXISTS public.responses (
+    id TEXT PRIMARY KEY,
+    survey_id TEXT NOT NULL REFERENCES public.surveys(id) ON DELETE CASCADE,
+    token TEXT,
+    respondent_id TEXT,
+    respondent_email TEXT,
+    respondent_ref TEXT,
+    status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('partial', 'completed')),
+    last_question_id TEXT,
+    started_at TIMESTAMPTZ DEFAULT now(),
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    duration_seconds INTEGER,
+    score_percent NUMERIC,
+    passed BOOLEAN,
+    total_points NUMERIC,
+    earned_points NUMERIC,
+    segments JSONB DEFAULT '{}'::JSONB,
+    answers JSONB DEFAULT '[]'::JSONB
+);
+
+-- ==============================================================================
+-- 6. ACCESOS DIRECTOS (QUICK SHORTCUTS)
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.quick_shortcuts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    icon TEXT DEFAULT 'Globe',
+    description TEXT,
+    target TEXT DEFAULT '_blank',
+    roles TEXT[],
+    "order" INTEGER DEFAULT 0,
+    "isActive" BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ==============================================================================
+-- 7. TABLA DE RESÚMENES AGREGADOS PARA EL DASHBOARD
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.monthly_group_stats (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    store_id TEXT NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    month TEXT NOT NULL,                       -- Formato 'YYYY-MM'
+    group_id TEXT NOT NULL,                    -- 'AK', 'A', 'B', 'C', 'D', 'E', 'F'
+    employee_count INTEGER DEFAULT 0,
+    approved_count INTEGER DEFAULT 0,
+    avg_score NUMERIC(5,2) DEFAULT 0,
+    approval_rate NUMERIC(5,2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uq_monthly_group_stats UNIQUE (store_id, month, group_id)
+);
+
+-- ==============================================================================
+-- 8. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE CONSULTAS)
+-- ==============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_employees_restaurant ON public.employees(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_employees_active ON public.employees(active);
+CREATE INDEX IF NOT EXISTS idx_employees_suspended ON public.employees(suspended_since);
+
+CREATE INDEX IF NOT EXISTS idx_grades_month ON public.grades(month);
+CREATE INDEX IF NOT EXISTS idx_grades_rest_month ON public.grades(restaurant_id, month);
+CREATE INDEX IF NOT EXISTS idx_grades_emp_month ON public.grades(employee_id, month);
+CREATE INDEX IF NOT EXISTS idx_grades_group ON public.grades("group");
+
+CREATE INDEX IF NOT EXISTS idx_safe_hands_personnel_rest ON public.safe_hands_personnel(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_safe_hands_certs_code ON public.safe_hands_certs(certificate_code);
+CREATE INDEX IF NOT EXISTS idx_safe_hands_certs_expiry ON public.safe_hands_certs(expiry_date);
+
+CREATE INDEX IF NOT EXISTS idx_schedules_emp_date ON public.schedules(employee_id, date);
+CREATE INDEX IF NOT EXISTS idx_schedule_requests_status ON public.schedule_requests(status);
+CREATE INDEX IF NOT EXISTS idx_responses_survey_id ON public.responses(survey_id);
+CREATE INDEX IF NOT EXISTS idx_mgs_month_store ON public.monthly_group_stats(month, store_id);
+
+-- ==============================================================================
+-- 9. VISTAS SQL
+-- ==============================================================================
+
+-- Vista de resumen mensual por empleado (usada para cálculo de efectivas e históricos)
+CREATE OR REPLACE VIEW public.employee_monthly_summary AS
+SELECT 
+    g.employee_id,
+    g.restaurant_id,
+    g.month,
+    to_char(g.month, 'YYYY-MM') as month_str,
+    COUNT(DISTINCT g.category) as evaluated_categories,
+    ROUND(AVG(g.score), 2) as avg_score,
+    BOOL_AND(g.score >= 80) as all_passed
+FROM public.grades g
+GROUP BY g.employee_id, g.restaurant_id, g.month;
+
+-- ==============================================================================
+-- 10. FUNCIONES RPC (PROCEDIMIENTOS ALMACENADOS)
+-- ==============================================================================
+
+-- 10.1 get_dashboard_stats: Retorna estadísticas agregadas por grupo
+CREATE OR REPLACE FUNCTION public.get_dashboard_stats(
+    p_month TEXT,
+    p_store_ids TEXT[] DEFAULT NULL
 )
 RETURNS TABLE (
-  group_id       TEXT,
-  avg_score      NUMERIC,
-  employee_count BIGINT,
-  approved_count BIGINT,
-  approval_rate  NUMERIC
-) AS $$
+    group_id TEXT,
+    employee_count NUMERIC,
+    approved_count NUMERIC,
+    avg_score NUMERIC,
+    approval_rate NUMERIC
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 BEGIN
-  RETURN QUERY
-  SELECT
-    mgs.group_id,
-    -- PROMEDIO GLOBAL (Suma de puntos de todos los empleados / nro total de empleados)
-    ROUND(
-      CASE WHEN SUM(mgs.employee_count) > 0
-        THEN SUM(mgs.avg_score * mgs.employee_count) / SUM(mgs.employee_count)
-        ELSE 0
-      END, 1
-    ) AS avg_score,
-    SUM(mgs.employee_count) AS employee_count,
-    SUM(mgs.approved_count) AS approved_count,
-    -- TASA GLOBAL (Ej: 88 certificados de 100 totales = 88%)
-    ROUND(
-      CASE WHEN SUM(mgs.employee_count) > 0
-        THEN SUM(mgs.approved_count)::NUMERIC / SUM(mgs.employee_count) * 100
-        ELSE 0
-      END, 1
-    ) AS approval_rate
-  FROM monthly_group_stats mgs
-  WHERE mgs.month = (p_month || '-01')::DATE
-    AND (p_store_ids IS NULL OR TRIM(UPPER(mgs.restaurant_id)) = ANY(p_store_ids))
-  GROUP BY mgs.group_id
-  ORDER BY mgs.group_id;
+    RETURN QUERY
+    SELECT 
+        mgs.group_id,
+        COALESCE(SUM(mgs.employee_count), 0)::NUMERIC as employee_count,
+        COALESCE(SUM(mgs.approved_count), 0)::NUMERIC as approved_count,
+        COALESCE(ROUND(AVG(mgs.avg_score), 0), 0)::NUMERIC as avg_score,
+        CASE 
+            WHEN SUM(mgs.employee_count) > 0 
+            THEN ROUND((SUM(mgs.approved_count)::NUMERIC / SUM(mgs.employee_count)::NUMERIC) * 100, 0)
+            ELSE 0
+        END::NUMERIC as approval_rate
+    FROM public.monthly_group_stats mgs
+    WHERE mgs.month = p_month
+      AND (p_store_ids IS NULL OR mgs.store_id = ANY(p_store_ids))
+    GROUP BY mgs.group_id;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$;
 
+-- 10.2 settle_monthly_group_stats: Calcula y asienta notas mensuales
+CREATE OR REPLACE FUNCTION public.settle_monthly_group_stats(p_month TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    month_start DATE := (p_month || '-01')::DATE;
+BEGIN
+    INSERT INTO public.monthly_group_stats (
+        store_id, 
+        month, 
+        group_id, 
+        employee_count, 
+        approved_count, 
+        avg_score, 
+        approval_rate
+    )
+    SELECT 
+        g.restaurant_id as store_id,
+        p_month as month,
+        g."group" as group_id,
+        COUNT(DISTINCT g.employee_id) as employee_count,
+        COUNT(DISTINCT CASE WHEN g.score >= 80 THEN g.employee_id END) as approved_count,
+        ROUND(AVG(g.score), 2) as avg_score,
+        CASE 
+            WHEN COUNT(DISTINCT g.employee_id) > 0 
+            THEN ROUND((COUNT(DISTINCT CASE WHEN g.score >= 80 THEN g.employee_id END)::NUMERIC / COUNT(DISTINCT g.employee_id)::NUMERIC) * 100, 2)
+            ELSE 0 
+        END as approval_rate
+    FROM public.grades g
+    WHERE g.month = month_start
+    GROUP BY g.restaurant_id, g."group"
+    ON CONFLICT (store_id, month, group_id) 
+    DO UPDATE SET 
+        employee_count = EXCLUDED.employee_count,
+        approved_count = EXCLUDED.approved_count,
+        avg_score = EXCLUDED.avg_score,
+        approval_rate = EXCLUDED.approval_rate,
+        created_at = now();
+END;
+$$;
 
--- ============================================================
--- SAFE HANDS: Gestión de Manipulación de Alimentos (INDEPENDIENTE)
--- ============================================================
+-- 10.3 backfill_monthly_group_stats: Recalcula todo el histórico
+CREATE OR REPLACE FUNCTION public.backfill_monthly_group_stats()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    m_record RECORD;
+    v_count INTEGER := 0;
+BEGIN
+    FOR m_record IN 
+        SELECT DISTINCT to_char(month, 'YYYY-MM') as month_str 
+        FROM public.grades 
+        ORDER BY month_str
+    LOOP
+        PERFORM public.settle_monthly_group_stats(m_record.month_str);
+        v_count := v_count + 1;
+    END LOOP;
+    
+    RETURN 'Backfill completado exitosamente para ' || v_count || ' periodos.';
+END;
+$$;
 
--- 1. TABLA DE PERSONAL ESPECÍFICA (Basada en CM.xlsx)
-CREATE TABLE IF NOT EXISTS safe_hands_personnel (
-  id                TEXT PRIMARY KEY, -- Cedula
-  name              TEXT NOT NULL,    -- Nombre
-  restaurant_id     TEXT,             -- Opcional para filtros
-  last_issue_date   DATE,             -- Fecha
-  category          TEXT,             -- Categoría para personal externo/huérfano (ej: sena, proveedor, etc.)
-  created_at        TIMESTAMPTZ DEFAULT NOW()
-);
+-- ==============================================================================
+-- 11. ROW LEVEL SECURITY (RLS) Y POLÍTICAS DE ACCESO
+-- ==============================================================================
 
--- Asegurar columna category en tablas existentes
-ALTER TABLE safe_hands_personnel ADD COLUMN IF NOT EXISTS category TEXT;
+-- Habilitar RLS en todas las tablas
+ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hierarchy ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banca ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banca_external_personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.safe_hands_personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.safe_hands_certs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.safe_hands_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.safe_hands_orphan_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pulse_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quick_shortcuts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monthly_group_stats ENABLE ROW LEVEL SECURITY;
 
--- 2. TABLA DE CERTIFICACIONES (Referenciando personal independiente)
-CREATE TABLE IF NOT EXISTS safe_hands_certs (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id       TEXT UNIQUE NOT NULL, -- Solo un certificado por persona
-  restaurant_id     TEXT NOT NULL,
-  issue_date        DATE NOT NULL,
-  expiry_date       DATE NOT NULL,
-  certificate_code  TEXT UNIQUE NOT NULL,
-  signature_url     TEXT,
-  created_at        TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT fk_sh_person FOREIGN KEY (employee_id) REFERENCES safe_hands_personnel(id) ON DELETE CASCADE
-);
+-- 11.1 Políticas para Usuarios Autenticados (Acceso completo para la aplicación)
+DO $$ 
+DECLARE 
+    t TEXT;
+BEGIN
+    FOR t IN 
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+          AND table_type = 'BASE TABLE'
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS "Allow authenticated full access" ON public.%I', t);
+        EXECUTE format('CREATE POLICY "Allow authenticated full access" ON public.%I FOR ALL TO authenticated USING (true) WITH CHECK (true)', t);
+    END LOOP;
+END $$;
 
-CREATE INDEX IF NOT EXISTS idx_sh_employee    ON safe_hands_certs(employee_id);
-CREATE INDEX IF NOT EXISTS idx_sh_expiry      ON safe_hands_certs(expiry_date);
-CREATE INDEX IF NOT EXISTS idx_sh_code        ON safe_hands_certs(certificate_code);
+-- 11.2 Políticas Públicas / Anónimas (Lectura de validación de carnets y runner de encuestas)
+-- Permitir lectura anónima para verificar certificados de manipulación de alimentos (/verify)
+DROP POLICY IF EXISTS "Allow anon read for safe_hands_certs" ON public.safe_hands_certs;
+CREATE POLICY "Allow anon read for safe_hands_certs" ON public.safe_hands_certs FOR SELECT TO anon USING (true);
 
--- 3. TABLA DE CONFIGURACIÓN (Firma Digital)
-CREATE TABLE IF NOT EXISTS safe_hands_settings (
-  id            SERIAL PRIMARY KEY,
-  signature_base64 TEXT,
-  responsible_name TEXT,
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
-);
+DROP POLICY IF EXISTS "Allow anon read for safe_hands_personnel" ON public.safe_hands_personnel;
+CREATE POLICY "Allow anon read for safe_hands_personnel" ON public.safe_hands_personnel FOR SELECT TO anon USING (true);
 
--- Insertar settings por defecto si no existen
-INSERT INTO safe_hands_settings (id, responsible_name) 
+-- Permitir lectura y respuesta anónima para encuestas públicas (RED Pulse)
+DROP POLICY IF EXISTS "Allow anon read for published surveys" ON public.surveys;
+CREATE POLICY "Allow anon read for published surveys" ON public.surveys FOR SELECT TO anon USING (status = 'published');
+
+DROP POLICY IF EXISTS "Allow anon insert for survey responses" ON public.responses;
+CREATE POLICY "Allow anon insert for survey responses" ON public.responses FOR INSERT TO anon WITH CHECK (true);
+
+-- Permitir lectura de accesos directos
+DROP POLICY IF EXISTS "Allow anon read for quick_shortcuts" ON public.quick_shortcuts;
+CREATE POLICY "Allow anon read for quick_shortcuts" ON public.quick_shortcuts FOR SELECT TO anon USING ("isActive" = true);
+
+-- Permitir login inicial (leer perfil para autenticación)
+DROP POLICY IF EXISTS "Allow anon read for users login" ON public.users;
+CREATE POLICY "Allow anon read for users login" ON public.users FOR SELECT TO anon USING (true);
+
+-- ==============================================================================
+-- 12. DATOS INICIALES SEMILLA (SEED DATA)
+-- ==============================================================================
+
+-- Configuración de jerarquía inicial (singleton id=1)
+INSERT INTO public.hierarchy (id, data)
+VALUES (1, '{"lockedMonths": [], "regions": []}'::JSONB)
+ON CONFLICT (id) DO NOTHING;
+
+-- Configuración de banca inicial (singleton id=1)
+INSERT INTO public.banca (id, data)
+VALUES (1, '{"assignments": []}'::JSONB)
+ON CONFLICT (id) DO NOTHING;
+
+-- Configuración de Safe Hands (singleton id=1)
+INSERT INTO public.safe_hands_settings (id, responsible_name)
 VALUES (1, 'RESPONSABLE CALIDAD')
 ON CONFLICT (id) DO NOTHING;
 
--- 4. TABLA DE CATEGORÍAS DE PERSONAL EXTERNO / HUÉRFANOS
-CREATE TABLE IF NOT EXISTS safe_hands_orphan_categories (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  color       TEXT DEFAULT 'purple',
-  created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Insertar categorías iniciales por defecto
-INSERT INTO safe_hands_orphan_categories (id, name, color) VALUES
-  ('sena', 'Aprendiz SENA', 'emerald'),
-  ('proveedor', 'Proveedor / Tercero', 'blue'),
-  ('mantenimiento', 'Mantenimiento / Técnico', 'amber'),
-  ('admin', 'Personal Administrativo', 'indigo'),
-  ('temporal', 'Temporal / Relevo', 'violet'),
-  ('ingreso', 'En Proceso de Ingreso', 'teal')
+-- Categorías por defecto de Safe Hands
+INSERT INTO public.safe_hands_orphan_categories (id, name, color)
+VALUES
+    ('sena', 'Aprendiz SENA', 'emerald'),
+    ('proveedor', 'Proveedor / Tercero', 'blue'),
+    ('mantenimiento', 'Mantenimiento / Técnico', 'amber'),
+    ('admin', 'Personal Administrativo', 'indigo'),
+    ('temporal', 'Temporal / Relevo', 'violet'),
+    ('ingreso', 'En Proceso de Ingreso', 'teal')
 ON CONFLICT (id) DO NOTHING;
 
--- 5. POLÍTICAS DE ACCESO (RLS)
-ALTER TABLE safe_hands_certs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE safe_hands_personnel ENABLE ROW LEVEL SECURITY;
-ALTER TABLE safe_hands_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE safe_hands_orphan_categories ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow read for all orphan categories" ON safe_hands_orphan_categories;
-CREATE POLICY "Allow read for all orphan categories" 
-ON safe_hands_orphan_categories FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow write for orphan categories" ON safe_hands_orphan_categories;
-CREATE POLICY "Allow write for orphan categories" 
-ON safe_hands_orphan_categories FOR ALL USING (true);
-
--- Lectura pública para validación y visualización
-DROP POLICY IF EXISTS "Public validation access" ON safe_hands_certs;
-CREATE POLICY "Public validation access" ON safe_hands_certs FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public person access" ON safe_hands_personnel;
-CREATE POLICY "Public person access" ON safe_hands_personnel FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public settings access" ON safe_hands_settings;
-CREATE POLICY "Public settings access" ON safe_hands_settings FOR SELECT USING (true);
-
--- Asegurar columna guest_can_edit en tabla users
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS guest_can_edit BOOLEAN DEFAULT false;
-
--- Escritura permitida para roles autorizados (ADMIN, COORDINATOR, LIDER o GUEST con permiso de edición)
-DROP POLICY IF EXISTS "Allow all for safe_hands_certs" ON safe_hands_certs;
-DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_certs;
-DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_certs;
-CREATE POLICY "Allow write for authorized roles" ON safe_hands_certs 
-FOR ALL 
-TO authenticated 
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-);
-
-DROP POLICY IF EXISTS "Allow all for safe_hands_personnel" ON safe_hands_personnel;
-DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_personnel;
-DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_personnel;
-CREATE POLICY "Allow write for authorized roles" ON safe_hands_personnel 
-FOR ALL 
-TO authenticated 
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-);
-
-DROP POLICY IF EXISTS "Allow all for safe_hands_settings" ON safe_hands_settings;
-DROP POLICY IF EXISTS "Allow write for admin only" ON safe_hands_settings;
-DROP POLICY IF EXISTS "Allow write for authorized roles" ON safe_hands_settings;
-CREATE POLICY "Allow write for authorized roles" ON safe_hands_settings 
-FOR ALL 
-TO authenticated 
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE (users.id = auth.uid()::text OR LOWER(users.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(users.role) IN ('ADMIN', 'COORDINATOR', 'LIDER') 
-        OR (UPPER(users.role) = 'GUEST' AND users.guest_can_edit = true)
-      )
-  )
-);
-
--- ============================================================
--- ELIMINAR CREDENCIALES POR DEFECTO (admin / 123)
--- Por seguridad, se eliminan el usuario por defecto 'admin@kfc.co' de la tabla auth.users
--- y su respectivo perfil 'admin-master' de la tabla pública 'users'.
--- ============================================================
-DELETE FROM public.users WHERE username = 'admin' OR id = 'admin-master';
-DELETE FROM auth.users WHERE email = 'admin@kfc.co';
-
-
--- Asegurar existencia de tablas core de configuración
-CREATE TABLE IF NOT EXISTS public.banca (
-  id INT PRIMARY KEY DEFAULT 1,
-  data JSONB NOT NULL DEFAULT '{"assignments":[]}'::jsonb
-);
-
-CREATE TABLE IF NOT EXISTS public.banca_external_personnel (
-  id TEXT PRIMARY KEY,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  name TEXT NOT NULL,
-  document_id TEXT,
-  role_tag TEXT DEFAULT 'Operaciones',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.pulse_categories (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.hierarchy (
-  id INT PRIMARY KEY DEFAULT 1,
-  data JSONB NOT NULL DEFAULT '{"lockedMonths":[],"regions":[]}'::jsonb
-);
-
-INSERT INTO public.banca (id, data)
-VALUES (1, '{"assignments":[]}'::jsonb)
+-- Categorías por defecto de RED Pulse
+INSERT INTO public.pulse_categories (id, name)
+VALUES
+    ('entrenamientos', 'Entrenamientos'),
+    ('seguridad-y-salud', 'Seguridad y Salud'),
+    ('operaciones', 'Operaciones'),
+    ('clima-laboral', 'Clima Laboral'),
+    ('auditorias', 'Auditorías'),
+    ('servicio-al-cliente', 'Servicio al Cliente')
 ON CONFLICT (id) DO NOTHING;
 
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.banca ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.banca_external_personnel ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pulse_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hierarchy ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.monthly_group_stats ENABLE ROW LEVEL SECURITY;
-
--- Políticas de lectura pública para usuarios autenticados
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.banca_external_personnel;
-CREATE POLICY "Permitir lectura a autenticados" ON public.banca_external_personnel FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.pulse_categories;
-CREATE POLICY "Permitir lectura a autenticados" ON public.pulse_categories FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Roles autorizados modifican banca_external_personnel" ON public.banca_external_personnel;
-CREATE POLICY "Roles autorizados modifican banca_external_personnel" ON public.banca_external_personnel
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
-      )
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
-      )
-  )
-);
-
-DROP POLICY IF EXISTS "Solo admin puede modificar pulse_categories" ON public.pulse_categories;
-CREATE POLICY "Solo admin puede modificar pulse_categories" ON public.pulse_categories
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
-  )
-);
-
--- Políticas de lectura pública para usuarios autenticados
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.users;
-CREATE POLICY "Permitir lectura a autenticados" ON public.users FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.employees;
-CREATE POLICY "Permitir lectura a autenticados" ON public.employees FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.restaurants;
-DROP POLICY IF EXISTS "Permitir lectura publica de restaurantes" ON public.restaurants;
-CREATE POLICY "Permitir lectura publica de restaurantes" ON public.restaurants FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.grades;
-CREATE POLICY "Permitir lectura a autenticados" ON public.grades FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.banca;
-CREATE POLICY "Permitir lectura a autenticados" ON public.banca FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.hierarchy;
-CREATE POLICY "Permitir lectura a autenticados" ON public.hierarchy FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.monthly_group_stats;
-CREATE POLICY "Permitir lectura a autenticados" ON public.monthly_group_stats FOR SELECT TO authenticated USING (true);
-
--- Políticas de escritura restrictivas según Rol
-
--- Tabla 'users' (Solo ADMIN)
-DROP POLICY IF EXISTS "Solo admin puede modificar usuarios" ON public.users;
-
-CREATE POLICY "Solo admin puede insertar usuarios" ON public.users
-FOR INSERT TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
-CREATE POLICY "Solo admin puede actualizar usuarios" ON public.users
-FOR UPDATE TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
-CREATE POLICY "Solo admin puede borrar usuarios" ON public.users
-FOR DELETE TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
-
--- Tabla 'employees' (ADMIN y COORDINATOR)
-DROP POLICY IF EXISTS "Admin o Coordinator modifican empleados" ON public.employees;
-CREATE POLICY "Admin o Coordinator modifican empleados" ON public.employees
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR')
-  )
-);
-
--- Tabla 'restaurants' (Solo ADMIN)
-DROP POLICY IF EXISTS "Solo admin puede modificar restaurantes" ON public.restaurants;
-CREATE POLICY "Solo admin puede modificar restaurantes" ON public.restaurants
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
--- Tabla 'grades' (ADMIN, COORDINATOR y SPECIALIST)
-DROP POLICY IF EXISTS "Admin o Coordinator modifican notas" ON public.grades;
-DROP POLICY IF EXISTS "Roles autorizados modifican notas" ON public.grades;
-CREATE POLICY "Roles autorizados modifican notas" ON public.grades
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'SPECIALIST')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'SPECIALIST')
-  )
-);
-
--- Tabla 'banca' (ADMIN, COORDINATOR, LIDER y GUEST con permisos de edición)
-DROP POLICY IF EXISTS "Admin o Coordinator modifican banca" ON public.banca;
-DROP POLICY IF EXISTS "Roles autorizados modifican banca" ON public.banca;
-CREATE POLICY "Roles autorizados modifican banca" ON public.banca
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
-      )
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND (
-        UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-        OR (UPPER(u.role) = 'GUEST' AND (u."guestCanEdit" = true OR u.guest_can_edit = true))
-      )
-  )
-);
-
--- Tabla 'hierarchy' (Solo ADMIN)
-DROP POLICY IF EXISTS "Solo admin puede modificar jerarquias" ON public.hierarchy;
-CREATE POLICY "Solo admin puede modificar jerarquias" ON public.hierarchy
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
--- Tabla 'monthly_group_stats' (Solo ADMIN)
-DROP POLICY IF EXISTS "Solo admin puede modificar estadisticas" ON public.monthly_group_stats;
-CREATE POLICY "Solo admin puede modificar estadisticas" ON public.monthly_group_stats
-FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-      AND UPPER(u.role) = 'ADMIN'
-  )
-);
-
-
--- ============================================================
--- AUTH USER MANAGEMENT RPC (SECURITY DEFINER)
--- Permite al panel de admin crear, actualizar clave y borrar
--- usuarios en auth.users sin usar el Admin SDK client-side.
--- Implementación Dinámica auto-adaptable a la versión de Supabase.
--- ============================================================
-CREATE OR REPLACE FUNCTION manage_user_auth(
-  p_username TEXT,
-  p_password TEXT,
-  p_action TEXT
-) RETURNS TEXT AS $$
-DECLARE
-  v_user_id UUID;
-  v_email TEXT;
-  v_encrypted_password TEXT;
-  v_sql TEXT;
-  v_cols TEXT[] := ARRAY[]::TEXT[];
-  v_vals TEXT[] := ARRAY[]::TEXT[];
-  v_col RECORD;
-BEGIN
-  -- Validar que solo un administrador autenticado pueda ejecutar esta función
-  IF auth.uid() IS NOT NULL THEN
-    IF NOT (
-      EXISTS (
-        SELECT 1 FROM public.users 
-        WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-          AND UPPER(role) = 'ADMIN'
-      )
-    ) THEN
-      RAISE EXCEPTION 'No autorizado: Solo administradores pueden gestionar credenciales de usuario.';
-    END IF;
-  END IF;
-
-  v_email := LOWER(p_username) || '@kfc.co';
-  
-  -- Verificar accion
-  IF p_action = 'CREATE' THEN
-    -- Verificar si ya existe en auth.users
-    SELECT id INTO v_user_id FROM auth.users WHERE email = v_email;
-    IF v_user_id IS NOT NULL THEN
-      RETURN v_user_id::TEXT;
-    END IF;
-    
-    v_user_id := gen_random_uuid();
-    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
-    
-    -- Columnas base obligatorias comunes (inicializadas como ARRAY)
-    v_cols := ARRAY['id', 'instance_id', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at', 'aud', 'role', 'raw_app_meta_data', 'raw_user_meta_data'];
-    v_vals := ARRAY[quote_literal(v_user_id::text), quote_literal('00000000-0000-0000-0000-000000000000'), quote_literal(v_email), quote_literal(v_encrypted_password), 'NOW()', 'NOW()', 'NOW()', quote_literal('authenticated'), quote_literal('authenticated'), quote_literal('{"provider":"email","providers":["email"]}'), quote_literal('{}')];
-    
-    -- Inspeccionar dinámicamente columnas existentes en la tabla auth.users
-    -- y setear valores seguros por defecto para evitar errores de Scan de GoTrue (NULL a tipo estricto)
-    FOR v_col IN 
-      SELECT column_name::text as colname
-      FROM information_schema.columns 
-      WHERE table_schema = 'auth' AND table_name = 'users'
-    LOOP
-      IF v_col.colname = 'is_super_admin' THEN
-        v_cols := array_append(v_cols, 'is_super_admin');
-        v_vals := array_append(v_vals, 'FALSE');
-      ELSIF v_col.colname = 'is_sso_user' THEN
-        v_cols := array_append(v_cols, 'is_sso_user');
-        v_vals := array_append(v_vals, 'FALSE');
-      ELSIF v_col.colname = 'email_change_confirm_status' THEN
-        v_cols := array_append(v_cols, 'email_change_confirm_status');
-        v_vals := array_append(v_vals, '0');
-      ELSIF v_col.colname = 'confirmation_token' THEN
-        v_cols := array_append(v_cols, 'confirmation_token');
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'recovery_token' THEN
-        v_cols := array_append(v_cols, 'recovery_token');
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'phone_change' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change_token_new' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'phone_change_token_new' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change_token_current' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'reauthentication_token' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      END IF;
-    END LOOP;
-    
-    -- Compilar y ejecutar la inserción dinámica
-    v_sql := 'INSERT INTO auth.users (' || array_to_string(v_cols, ', ') || ') VALUES (' || array_to_string(v_vals, ', ') || ')';
-    EXECUTE v_sql;
-    
-    -- Insertar en auth.identities
-    INSERT INTO auth.identities (
-      id,
-      user_id,
-      identity_data,
-      provider,
-      last_sign_in_at,
-      created_at,
-      updated_at,
-      provider_id
-    ) VALUES (
-      gen_random_uuid(),
-      v_user_id,
-      json_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true, 'phone_verified', false)::jsonb,
-      'email',
-      NOW(),
-      NOW(),
-      NOW(),
-      v_email
-    );
-    
-    RETURN v_user_id::TEXT;
-    
-  ELSIF p_action = 'UPDATE_PASSWORD' THEN
-    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
-    UPDATE auth.users 
-    SET encrypted_password = v_encrypted_password,
-        updated_at = NOW()
-    WHERE email = v_email;
-    RETURN 'PASSWORD_UPDATED';
-    
-  ELSIF p_action = 'DELETE' THEN
-    DELETE FROM auth.users WHERE email = v_email;
-    RETURN 'USER_DELETED';
-  ELSE
-    RAISE EXCEPTION 'Accion no valida: %', p_action;
-  END IF;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
-
-
--- ============================================================
--- 5. TABLA DE HORARIOS (SCHEDULES)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.schedules (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id   TEXT NOT NULL,       -- Cédula del especialista
-  date          DATE NOT NULL,       -- Fecha del turno (YYYY-MM-DD)
-  shift_type    TEXT NOT NULL,       -- 'Laboral', 'Capacitación', 'Descanso', 'Incapacidad'
-  check_in      TEXT,                -- Formato 'HH:MM' (ej. '08:00')
-  check_out     TEXT,                -- Formato 'HH:MM' (ej. '16:00')
-  restaurant_id TEXT,              -- CECO de la tienda asignada
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (employee_id, date)
-);
-
--- Habilitar RLS en la tabla
-ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
-
--- Políticas de RLS para Horarios
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.schedules;
-CREATE POLICY "Permitir lectura a autenticados" ON public.schedules
-  FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir gestión de turnos a gestores" ON public.schedules;
-CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
-  FOR ALL TO authenticated USING (true);
-
--- ============================================================
--- 6. ACTUALIZACIONES DE ESQUEMA (AJUSTES DE HORARIOS)
--- ============================================================
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS activity TEXT;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "pendingDays" INTEGER DEFAULT 0;
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS custom_message TEXT;
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS no_restaurant BOOLEAN DEFAULT FALSE;
-
-
--- ============================================================
--- 7. TABLA DE SOLICITUDES DE DÍAS Y PERMISOS (SCHEDULE REQUESTS)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.schedule_requests (
-  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id          TEXT NOT NULL,           -- Cédula del especialista
-  date                 DATE NOT NULL,           -- Fecha solicitada (YYYY-MM-DD)
-  request_type         TEXT NOT NULL,           -- 'Descanso', 'Horario Específico', 'Permiso Especial'
-  requested_shift_id   INTEGER,                 -- ID del turno del catálogo (si aplica)
-  comments             TEXT,                    -- Justificación / nota del especialista
-  status               TEXT NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'PROCESADO'
-  created_at           TIMESTAMPTZ DEFAULT NOW(), -- Timestamp exacto de la solicitud
-  UNIQUE (employee_id, date)
-);
-
--- Índices para mejorar búsquedas
-CREATE INDEX IF NOT EXISTS idx_sr_date       ON public.schedule_requests(date);
-CREATE INDEX IF NOT EXISTS idx_sr_employee   ON public.schedule_requests(employee_id);
-CREATE INDEX IF NOT EXISTS idx_sr_status     ON public.schedule_requests(status);
-
--- Habilitar RLS
-ALTER TABLE public.schedule_requests ENABLE ROW LEVEL SECURITY;
-
--- Lectura para todos los roles autenticados (admins/coordinadores/líderes ven todo)
-DROP POLICY IF EXISTS "Lectura de solicitudes para autenticados" ON public.schedule_requests;
-CREATE POLICY "Lectura de solicitudes para autenticados" ON public.schedule_requests
-  FOR SELECT TO authenticated USING (true);
-
--- Escritura: especialistas solo pueden gestionar sus propias solicitudes
-DROP POLICY IF EXISTS "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests;
-CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests
-  FOR ALL TO authenticated
-  USING (
-    -- Admin, Coordinator y Lider pueden ver y modificar todo
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-    )
-    OR
-    -- Specialist solo puede gestionar sus propias solicitudes (donde employee_id = su cédula)
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) = 'SPECIALIST'
-        AND u.cedula = employee_id
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-    )
-  v_email := LOWER(p_username) || '@kfc.co';
-  
-  -- Verificar accion
-  IF p_action = 'CREATE' THEN
-    -- Verificar si ya existe en auth.users
-    SELECT id INTO v_user_id FROM auth.users WHERE email = v_email;
-    IF v_user_id IS NOT NULL THEN
-      RETURN v_user_id::TEXT;
-    END IF;
-    
-    v_user_id := gen_random_uuid();
-    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
-    
-    -- Columnas base obligatorias comunes (inicializadas como ARRAY)
-    v_cols := ARRAY['id', 'instance_id', 'email', 'encrypted_password', 'email_confirmed_at', 'created_at', 'updated_at', 'aud', 'role', 'raw_app_meta_data', 'raw_user_meta_data'];
-    v_vals := ARRAY[quote_literal(v_user_id::text), quote_literal('00000000-0000-0000-0000-000000000000'), quote_literal(v_email), quote_literal(v_encrypted_password), 'NOW()', 'NOW()', 'NOW()', quote_literal('authenticated'), quote_literal('authenticated'), quote_literal('{"provider":"email","providers":["email"]}'), quote_literal('{}')];
-    
-    -- Inspeccionar dinámicamente columnas existentes en la tabla auth.users
-    -- y setear valores seguros por defecto para evitar errores de Scan de GoTrue (NULL a tipo estricto)
-    FOR v_col IN 
-      SELECT column_name::text as colname
-      FROM information_schema.columns 
-      WHERE table_schema = 'auth' AND table_name = 'users'
-    LOOP
-      IF v_col.colname = 'is_super_admin' THEN
-        v_cols := array_append(v_cols, 'is_super_admin');
-        v_vals := array_append(v_vals, 'FALSE');
-      ELSIF v_col.colname = 'is_sso_user' THEN
-        v_cols := array_append(v_cols, 'is_sso_user');
-        v_vals := array_append(v_vals, 'FALSE');
-      ELSIF v_col.colname = 'email_change_confirm_status' THEN
-        v_cols := array_append(v_cols, 'email_change_confirm_status');
-        v_vals := array_append(v_vals, '0');
-      ELSIF v_col.colname = 'confirmation_token' THEN
-        v_cols := array_append(v_cols, 'confirmation_token');
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'recovery_token' THEN
-        v_cols := array_append(v_cols, 'recovery_token');
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'phone_change' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change_token_new' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'phone_change_token_new' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'email_change_token_current' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      ELSIF v_col.colname = 'reauthentication_token' THEN
-        v_cols := array_append(v_cols, v_col.colname);
-        v_vals := array_append(v_vals, quote_literal(''));
-      END IF;
-    END LOOP;
-    
-    -- Compilar y ejecutar la inserción dinámica
-    v_sql := 'INSERT INTO auth.users (' || array_to_string(v_cols, ', ') || ') VALUES (' || array_to_string(v_vals, ', ') || ')';
-    EXECUTE v_sql;
-    
-    -- Insertar en auth.identities
-    INSERT INTO auth.identities (
-      id,
-      user_id,
-      identity_data,
-      provider,
-      last_sign_in_at,
-      created_at,
-      updated_at,
-      provider_id
-    ) VALUES (
-      gen_random_uuid(),
-      v_user_id,
-      json_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true, 'phone_verified', false)::jsonb,
-      'email',
-      NOW(),
-      NOW(),
-      NOW(),
-      v_email
-    );
-    
-    RETURN v_user_id::TEXT;
-    
-  ELSIF p_action = 'UPDATE_PASSWORD' THEN
-    v_encrypted_password := extensions.crypt(p_password, extensions.gen_salt('bf', 10));
-    UPDATE auth.users 
-    SET encrypted_password = v_encrypted_password,
-        updated_at = NOW()
-    WHERE email = v_email;
-    RETURN 'PASSWORD_UPDATED';
-    
-  ELSIF p_action = 'DELETE' THEN
-    DELETE FROM auth.users WHERE email = v_email;
-    RETURN 'USER_DELETED';
-  ELSE
-    RAISE EXCEPTION 'Accion no valida: %', p_action;
-  END IF;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
-
-
--- ============================================================
--- 5. TABLA DE HORARIOS (SCHEDULES)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.schedules (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id   TEXT NOT NULL,       -- Cédula del especialista
-  date          DATE NOT NULL,       -- Fecha del turno (YYYY-MM-DD)
-  shift_type    TEXT NOT NULL,       -- 'Laboral', 'Capacitación', 'Descanso', 'Incapacidad'
-  check_in      TEXT,                -- Formato 'HH:MM' (ej. '08:00')
-  check_out     TEXT,                -- Formato 'HH:MM' (ej. '16:00')
-  restaurant_id TEXT,              -- CECO de la tienda asignada
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (employee_id, date)
-);
-
--- Habilitar RLS en la tabla
-ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
-
--- Políticas de RLS para Horarios
-DROP POLICY IF EXISTS "Permitir lectura a autenticados" ON public.schedules;
-CREATE POLICY "Permitir lectura a autenticados" ON public.schedules
-  FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir gestión de turnos a gestores" ON public.schedules;
-CREATE POLICY "Permitir gestión de turnos a gestores" ON public.schedules
-  FOR ALL TO authenticated USING (true);
-
--- ============================================================
--- 6. ACTUALIZACIONES DE ESQUEMA (AJUSTES DE HORARIOS)
--- ============================================================
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS activity TEXT;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "pendingDays" INTEGER DEFAULT 0;
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS custom_message TEXT;
-ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS no_restaurant BOOLEAN DEFAULT FALSE;
-
-
--- ============================================================
--- 7. TABLA DE SOLICITUDES DE DÍAS Y PERMISOS (SCHEDULE REQUESTS)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.schedule_requests (
-  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id          TEXT NOT NULL,           -- Cédula del especialista
-  date                 DATE NOT NULL,           -- Fecha solicitada (YYYY-MM-DD)
-  request_type         TEXT NOT NULL,           -- 'Descanso', 'Horario Específico', 'Permiso Especial'
-  requested_shift_id   INTEGER,                 -- ID del turno del catálogo (si aplica)
-  comments             TEXT,                    -- Justificación / nota del especialista
-  status               TEXT NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'PROCESADO'
-  created_at           TIMESTAMPTZ DEFAULT NOW(), -- Timestamp exacto de la solicitud
-  UNIQUE (employee_id, date)
-);
-
--- Índices para mejorar búsquedas
-CREATE INDEX IF NOT EXISTS idx_sr_date       ON public.schedule_requests(date);
-CREATE INDEX IF NOT EXISTS idx_sr_employee   ON public.schedule_requests(employee_id);
-CREATE INDEX IF NOT EXISTS idx_sr_status     ON public.schedule_requests(status);
-
--- Habilitar RLS
-ALTER TABLE public.schedule_requests ENABLE ROW LEVEL SECURITY;
-
--- Lectura para todos los roles autenticados (admins/coordinadores/líderes ven todo)
-DROP POLICY IF EXISTS "Lectura de solicitudes para autenticados" ON public.schedule_requests;
-CREATE POLICY "Lectura de solicitudes para autenticados" ON public.schedule_requests
-  FOR SELECT TO authenticated USING (true);
-
--- Escritura: especialistas solo pueden gestionar sus propias solicitudes
-DROP POLICY IF EXISTS "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests;
-CREATE POLICY "Especialistas gestionan sus propias solicitudes" ON public.schedule_requests
-  FOR ALL TO authenticated
-  USING (
-    -- Admin, Coordinator y Lider pueden ver y modificar todo
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-    )
-    OR
-    -- Specialist solo puede gestionar sus propias solicitudes (donde employee_id = su cédula)
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) = 'SPECIALIST'
-        AND u.cedula = employee_id
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) IN ('ADMIN', 'COORDINATOR', 'LIDER')
-    )
-    OR
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE (u.id = auth.uid()::text OR LOWER(u.username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1)))
-        AND UPPER(u.role) = 'SPECIALIST'
-        AND u.cedula = employee_id
-    )
-  );
-
--- ========================================================
--- RED PULSE - ENCUESTAS Y EVALUACIONES (SURVEYS & RESPONSES)
--- ========================================================
-
-CREATE TABLE IF NOT EXISTS public.surveys (
-  id TEXT PRIMARY KEY,
-  owner_id TEXT NOT NULL,
-  owner_name TEXT,
-  title TEXT NOT NULL,
-  description TEXT,
-  type TEXT NOT NULL DEFAULT 'survey',
-  category TEXT DEFAULT 'General',
-  status TEXT NOT NULL DEFAULT 'draft',
-  access_mode TEXT NOT NULL DEFAULT 'open',
-  access_password TEXT,
-  passing_score_percent INTEGER DEFAULT 70,
-  scoring_type TEXT DEFAULT 'simple',
-  time_limit_seconds INTEGER DEFAULT 0,
-  max_attempts INTEGER DEFAULT 0,
-  shuffle_questions BOOLEAN DEFAULT false,
-  shuffle_options BOOLEAN DEFAULT false,
-  show_results_immediately BOOLEAN DEFAULT true,
-  show_results_in_reports BOOLEAN DEFAULT true,
-  theme JSONB NOT NULL DEFAULT '{"primary_color": "#E4002B", "background_color": "#F8FAFC", "card_style": "standard", "font_family": "jakarta"}'::jsonb,
-  thank_you JSONB NOT NULL DEFAULT '{"title": "¡Muchas gracias!", "message": "Tus respuestas han sido registradas exitosamente.", "show_button": false}'::jsonb,
-  questions JSONB DEFAULT '[]'::jsonb,
-  hidden_fields JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Idempotent column additions for existing installations
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS time_limit_seconds INTEGER DEFAULT 0;
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS max_attempts INTEGER DEFAULT 0;
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS shuffle_questions BOOLEAN DEFAULT false;
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS shuffle_options BOOLEAN DEFAULT false;
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS show_results_immediately BOOLEAN DEFAULT true;
-ALTER TABLE public.surveys ADD COLUMN IF NOT EXISTS show_results_in_reports BOOLEAN DEFAULT true;
-
-CREATE TABLE IF NOT EXISTS public.responses (
-  id TEXT PRIMARY KEY,
-  survey_id TEXT NOT NULL REFERENCES public.surveys(id) ON DELETE CASCADE,
-  token TEXT,
-  respondent_id TEXT,
-  respondent_email TEXT,
-  respondent_ref TEXT,
-  status TEXT NOT NULL DEFAULT 'completed',
-  started_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ DEFAULT NOW(),
-  duration_seconds INTEGER DEFAULT 0,
-  score_percent INTEGER,
-  passed BOOLEAN,
-  earned_points INTEGER,
-  total_points INTEGER,
-  last_question_id TEXT,
-  answers JSONB DEFAULT '[]'::jsonb,
-  segments JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.responses ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Lectura pública de encuestas publicadas" ON public.surveys;
-CREATE POLICY "Lectura pública de encuestas publicadas" ON public.surveys FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Control total para personal autenticado en encuestas" ON public.surveys;
-CREATE POLICY "Gestion de encuestas para administradores y coordinadores" ON public.surveys 
-  FOR ALL TO authenticated 
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users 
-      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-        AND UPPER(role) IN ('ADMIN', 'COORDINATOR')
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.users 
-      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-        AND UPPER(role) IN ('ADMIN', 'COORDINATOR')
-    )
-  );
-
-DROP POLICY IF EXISTS "Permitir guardar y actualizar respuestas" ON public.responses;
--- Respuestas: inserción pública/autenticada, lectura solo para autenticados
-CREATE POLICY "Permitir insertar respuestas" ON public.responses FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir lectura de respuestas a autenticados" ON public.responses FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Admin elimina respuestas" ON public.responses FOR DELETE TO authenticated USING (
-  EXISTS (
-    SELECT 1 FROM public.users 
-    WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-      AND UPPER(role) = 'ADMIN'
-  )
-);
-
--- ============================================================
--- QUICK SHORTCUTS: Accesos Directos Personalizables
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.quick_shortcuts (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  url TEXT NOT NULL,
-  icon TEXT DEFAULT 'Globe',
-  description TEXT,
-  target TEXT DEFAULT '_blank',
-  roles JSONB,
-  "order" INTEGER DEFAULT 1,
-  "isActive" BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.quick_shortcuts ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Permitir lectura de accesos directos" ON public.quick_shortcuts;
-CREATE POLICY "Permitir lectura de accesos directos" ON public.quick_shortcuts FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir administracion de accesos directos" ON public.quick_shortcuts;
-CREATE POLICY "Solo admin gestiona accesos directos" ON public.quick_shortcuts 
-  FOR ALL TO authenticated 
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users 
-      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-        AND UPPER(role) = 'ADMIN'
-    )
-  ) 
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.users 
-      WHERE (id = auth.uid()::text OR LOWER(username) = LOWER(SPLIT_PART(auth.jwt() ->> 'email', '@', 1))) 
-        AND UPPER(role) = 'ADMIN'
-    )
-  );
-
--- ============================================================
--- ÍNDICES DE ALTO RENDIMIENTO (OPTIMIZACIÓN DE ESCALABILIDAD)
--- ============================================================
-CREATE INDEX IF NOT EXISTS idx_grades_lookup ON public.grades(employee_id, restaurant_id, month DESC, "group");
-CREATE INDEX IF NOT EXISTS idx_grades_month_group ON public.grades(month DESC, "group");
-CREATE INDEX IF NOT EXISTS idx_employees_store ON public.employees(restaurant_id);
-CREATE INDEX IF NOT EXISTS idx_employees_id ON public.employees(id);
-CREATE INDEX IF NOT EXISTS idx_monthly_group_stats_lookup ON public.monthly_group_stats(month, restaurant_id, group_id);
-
--- Eliminar políticas anónimas inseguras
-DROP POLICY IF EXISTS "Permitir lectura con anon de usuarios" ON public.users;
-DROP POLICY IF EXISTS "Permitir lectura con anon de empleados" ON public.employees;
-DROP POLICY IF EXISTS "Permitir lectura con anon de notas" ON public.grades;
-DROP POLICY IF EXISTS "Permitir lectura con anon de banca" ON public.banca;
-DROP POLICY IF EXISTS "Permitir lectura con anon de jerarquia" ON public.hierarchy;
-DROP POLICY IF EXISTS "Permitir lectura con anon de estadisticas" ON public.monthly_group_stats;
-
-
-
+-- Accesos directos por defecto
+INSERT INTO public.quick_shortcuts (id, title, url, icon, description, target, "order", "isActive")
+VALUES
+    ('sc-kfc-portal', 'Portal Corporativo', 'https://kfc.co', 'Globe', 'Sitio oficial KFC Colombia', '_blank', 1, true),
+    ('sc-learning', 'Campus Virtual', 'https://learningzone.yum.com', 'BookOpen', 'Plataforma de capacitación y cursos', '_blank', 2, true)
+ON CONFLICT (id) DO NOTHING;
