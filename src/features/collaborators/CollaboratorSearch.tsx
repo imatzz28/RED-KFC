@@ -111,12 +111,16 @@ export const CollaboratorSearch: React.FC = () => {
   // Datos globales de Banca en caché
   const bancaData = useMemo<BancaData>(() => dataService.getBancaData(), []);
 
-  // Mapas de ayuda para restaurantes
+  // Mapas de ayuda para restaurantes (null-safe)
   const restaurantById = useMemo(() => {
     const map = new Map<string, Restaurant>();
-    restaurants.forEach(r => {
-      map.set(r.id.trim().toUpperCase(), r);
-      map.set(r.name.trim().toUpperCase(), r);
+    (restaurants || []).forEach(r => {
+      if (r?.id != null) {
+        map.set(String(r.id).trim().toUpperCase(), r);
+      }
+      if (r?.name != null) {
+        map.set(String(r.name).trim().toUpperCase(), r);
+      }
     });
     return map;
   }, [restaurants]);
@@ -124,8 +128,8 @@ export const CollaboratorSearch: React.FC = () => {
   // Lista de cargos únicos para el dropdown
   const uniqueTitles = useMemo(() => {
     const set = new Set<string>();
-    filteredEmployees.forEach(e => {
-      if (e.title) set.add(e.title);
+    (filteredEmployees || []).forEach(e => {
+      if (e?.title) set.add(String(e.title).trim());
     });
     return Array.from(set).sort();
   }, [filteredEmployees]);
@@ -140,18 +144,27 @@ export const CollaboratorSearch: React.FC = () => {
     }
   };
 
-  // Filtrado de colaboradores
+  // Filtrado de colaboradores con protección completa contra null / undefined
   const filteredList = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = (searchTerm || '').trim().toLowerCase();
 
-    return filteredEmployees.filter(emp => {
+    return (filteredEmployees || []).filter(emp => {
+      if (!emp) return false;
+
       // 1. Búsqueda por texto (cédula, nombre, tienda)
       if (term) {
-        const idMatch = emp.id.toLowerCase().includes(term);
-        const nameMatch = emp.name.toLowerCase().includes(term);
-        const storeIdMatch = emp.restaurant_id.toLowerCase().includes(term);
-        const storeObj = restaurantById.get(emp.restaurant_id.trim().toUpperCase());
-        const storeNameMatch = storeObj ? storeObj.name.toLowerCase().includes(term) : false;
+        const empId = emp.id != null ? String(emp.id).toLowerCase() : '';
+        const empName = emp.name != null ? String(emp.name).toLowerCase() : '';
+        const rawStoreId = emp.restaurant_id != null ? String(emp.restaurant_id).trim() : '';
+        const storeIdLower = rawStoreId.toLowerCase();
+
+        const storeObj = rawStoreId ? restaurantById.get(rawStoreId.toUpperCase()) : undefined;
+        const storeNameLower = storeObj?.name != null ? String(storeObj.name).toLowerCase() : '';
+
+        const idMatch = empId.includes(term);
+        const nameMatch = empName.includes(term);
+        const storeIdMatch = storeIdLower.includes(term);
+        const storeNameMatch = storeNameLower.includes(term);
 
         if (!idMatch && !nameMatch && !storeIdMatch && !storeNameMatch) {
           return false;
@@ -160,14 +173,16 @@ export const CollaboratorSearch: React.FC = () => {
 
       // 2. Filtro por Tienda
       if (filterStore !== 'all') {
-        if (emp.restaurant_id.trim().toUpperCase() !== filterStore.trim().toUpperCase()) {
+        const empStore = emp.restaurant_id != null ? String(emp.restaurant_id).trim().toUpperCase() : '';
+        if (empStore !== filterStore.trim().toUpperCase()) {
           return false;
         }
       }
 
       // 3. Filtro por Cargo
       if (filterTitle !== 'all') {
-        if (emp.title !== filterTitle) return false;
+        const empTitle = emp.title != null ? String(emp.title).trim() : '';
+        if (empTitle !== filterTitle.trim()) return false;
       }
 
       // 4. Filtro por Estado
@@ -200,23 +215,23 @@ export const CollaboratorSearch: React.FC = () => {
       return;
     }
 
-    const empId = selectedEmployee.id;
+    const empId = String(selectedEmployee.id);
 
     // 1. Cargar Notas
     setIsLoadingGrades(true);
     dataService.fetchEmployeeGradesHistory(empId)
-      .then(grades => setEmployeeGrades(grades))
+      .then(grades => setEmployeeGrades(grades || []))
       .catch(err => console.warn('Error cargando notas del colaborador:', err))
       .finally(() => setIsLoadingGrades(false));
 
     // 2. Cargar Certificados Safe Hands
     dataService.getSafeHandsCerts(empId)
-      .then(certs => setEmployeeCerts(certs))
+      .then(certs => setEmployeeCerts(certs || []))
       .catch(err => console.warn('Error cargando certificados:', err));
 
     // 3. Cargar registro de personal Safe Hands si existe
     dataService.getSafeHandsPersonnel().then(personnel => {
-      const match = personnel.find(p => p.id === empId);
+      const match = (personnel || []).find(p => String(p.id).trim() === empId.trim());
       if (match) setSafeHandsPerson(match);
     }).catch(() => {});
 
@@ -237,8 +252,9 @@ export const CollaboratorSearch: React.FC = () => {
   // Consulta de asignación en Banca para el colaborador seleccionado
   const selectedBancaLeader = useMemo<StoreLeader | null>(() => {
     if (!selectedEmployee) return null;
+    const empId = String(selectedEmployee.id).trim();
     for (const assignment of bancaData.assignments || []) {
-      const match = (assignment.members || []).find(m => m.employeeId === selectedEmployee.id);
+      const match = (assignment.members || []).find(m => String(m.employeeId).trim() === empId);
       if (match) return match;
     }
     return null;
@@ -249,13 +265,14 @@ export const CollaboratorSearch: React.FC = () => {
     if (filteredList.length === 0) return;
 
     const dataToExport = filteredList.map(emp => {
-      const storeObj = restaurantById.get(emp.restaurant_id.trim().toUpperCase());
+      const rawStoreId = emp.restaurant_id != null ? String(emp.restaurant_id).trim() : '';
+      const storeObj = rawStoreId ? restaurantById.get(rawStoreId.toUpperCase()) : undefined;
 
       return {
-        'Cédula / ID': emp.id,
-        'Nombre': emp.name,
+        'Cédula / ID': emp.id != null ? String(emp.id) : '-',
+        'Nombre': emp.name || '-',
         'Cargo': emp.title || '-',
-        'CECO Tienda': emp.restaurant_id,
+        'CECO Tienda': emp.restaurant_id || '-',
         'Nombre Tienda': storeObj?.name || '-',
         'Zona': storeObj?.zone || emp.zone || '-',
         'Región': storeObj?.region || '-',
@@ -273,10 +290,10 @@ export const CollaboratorSearch: React.FC = () => {
   };
 
   // Contadores rápidos
-  const totalEmployees = filteredEmployees.length;
-  const activeCount = useMemo(() => filteredEmployees.filter(e => e.active && !e.suspended_since).length, [filteredEmployees]);
-  const inactiveCount = useMemo(() => filteredEmployees.filter(e => !e.active).length, [filteredEmployees]);
-  const suspendedCount = useMemo(() => filteredEmployees.filter(e => !!e.suspended_since).length, [filteredEmployees]);
+  const totalEmployees = (filteredEmployees || []).length;
+  const activeCount = useMemo(() => (filteredEmployees || []).filter(e => e.active && !e.suspended_since).length, [filteredEmployees]);
+  const inactiveCount = useMemo(() => (filteredEmployees || []).filter(e => !e.active).length, [filteredEmployees]);
+  const suspendedCount = useMemo(() => (filteredEmployees || []).filter(e => !!e.suspended_since).length, [filteredEmployees]);
 
   const user = auth.user;
   const isAuthorized = user && (user.role === UserRole.ADMIN || user.role === UserRole.LIDER);
@@ -360,7 +377,7 @@ export const CollaboratorSearch: React.FC = () => {
       {/* Barra de Filtros */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-center">
-          {/* Búsqueda por Cédula / Nombre */}
+          {/* Búsqueda por Cédula / Nombre / Tienda */}
           <div className="relative sm:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -374,7 +391,7 @@ export const CollaboratorSearch: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -389,7 +406,7 @@ export const CollaboratorSearch: React.FC = () => {
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-red-500 transition cursor-pointer"
             >
               <option value="all">Todas las tiendas</option>
-              {restaurants.map(r => (
+              {(restaurants || []).map(r => (
                 <option key={r.id} value={r.id}>
                   {r.id} - {r.name}
                 </option>
@@ -475,7 +492,8 @@ export const CollaboratorSearch: React.FC = () => {
                 </tr>
               ) : (
                 paginatedList.map(emp => {
-                  const storeObj = restaurantById.get(emp.restaurant_id.trim().toUpperCase());
+                  const rawStoreId = emp.restaurant_id != null ? String(emp.restaurant_id).trim() : '';
+                  const storeObj = rawStoreId ? restaurantById.get(rawStoreId.toUpperCase()) : undefined;
                   const isSuspended = !!emp.suspended_since;
                   const isActive = emp.active && !isSuspended;
 
@@ -493,7 +511,7 @@ export const CollaboratorSearch: React.FC = () => {
                       {/* Nombre */}
                       <td className="py-3 px-4 font-bold text-slate-900 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <span>{emp.name}</span>
+                          <span>{emp.name || '-'}</span>
                           {isSuspended && (
                             <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                               Susp.
@@ -510,7 +528,7 @@ export const CollaboratorSearch: React.FC = () => {
                       {/* Tienda */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span className="font-bold text-slate-800">
-                          {emp.restaurant_id}
+                          {emp.restaurant_id || '-'}
                         </span>
                         {storeObj && (
                           <span className="text-slate-500 ml-1.5 text-[11px]">
@@ -636,7 +654,7 @@ export const CollaboratorSearch: React.FC = () => {
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-base sm:text-xl font-black uppercase italic tracking-tight text-slate-900 leading-tight">
-                    {selectedEmployee.name}
+                    {selectedEmployee.name || 'Colaborador'}
                   </h2>
                   <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
                     ID: {selectedEmployee.id}
@@ -662,9 +680,9 @@ export const CollaboratorSearch: React.FC = () => {
                   </span>
                   <span>·</span>
                   <span>
-                    Tienda: <strong className="text-slate-800">{selectedEmployee.restaurant_id}</strong>
-                    {restaurantById.get(selectedEmployee.restaurant_id.trim().toUpperCase()) && (
-                      ` (${restaurantById.get(selectedEmployee.restaurant_id.trim().toUpperCase())?.name})`
+                    Tienda: <strong className="text-slate-800">{selectedEmployee.restaurant_id || '-'}</strong>
+                    {selectedEmployee.restaurant_id && restaurantById.get(String(selectedEmployee.restaurant_id).trim().toUpperCase()) && (
+                      ` (${restaurantById.get(String(selectedEmployee.restaurant_id).trim().toUpperCase())?.name})`
                     )}
                   </span>
                   <span>·</span>
@@ -779,7 +797,7 @@ export const CollaboratorSearch: React.FC = () => {
                         Historial Inicial
                       </span>
                       <p className="text-xs font-bold text-slate-700">
-                        Ingreso registrado el {formatDate(selectedEmployee.join_date)} en la tienda {selectedEmployee.restaurant_id}. Sin traslados posteriores registrados.
+                        Ingreso registrado el {formatDate(selectedEmployee.join_date)} en la tienda {selectedEmployee.restaurant_id || '-'}. Sin traslados posteriores registrados.
                       </p>
                     </div>
                   ) : (
@@ -789,7 +807,8 @@ export const CollaboratorSearch: React.FC = () => {
                         const isTraslado = mov.action === 'TRASLADO';
                         const isIngreso = mov.action === 'INGRESO';
 
-                        const storeObj = restaurantById.get(mov.restaurantName?.trim().toUpperCase());
+                        const rawStore = mov.restaurantName != null ? String(mov.restaurantName).trim().toUpperCase() : '';
+                        const storeObj = rawStore ? restaurantById.get(rawStore) : undefined;
 
                         return (
                           <div
@@ -801,15 +820,15 @@ export const CollaboratorSearch: React.FC = () => {
                                 isIngreso
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                   : isTraslado
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200'
                               }`}>
                                 {mov.action}
                               </span>
 
                               <div>
                                 <span className="text-xs font-bold text-slate-900 block">
-                                  Tienda: {mov.restaurantName} {storeObj ? `(${storeObj.name})` : ''}
+                                  Tienda: {mov.restaurantName || '-'} {storeObj ? `(${storeObj.name})` : ''}
                                 </span>
                                 {storeObj && (
                                   <span className="text-[10px] text-slate-400 font-medium">
@@ -933,7 +952,7 @@ export const CollaboratorSearch: React.FC = () => {
                           </span>
                           <span className="text-xl font-black text-slate-900 mt-0.5 block">
                             {Math.round(
-                              employeeGrades.reduce((sum, g) => sum + g.score, 0) / employeeGrades.length
+                              employeeGrades.reduce((sum, g) => sum + (g.score || 0), 0) / employeeGrades.length
                             )} / 100 pts
                           </span>
                         </div>
@@ -975,8 +994,8 @@ export const CollaboratorSearch: React.FC = () => {
                                       g.score >= 80
                                         ? 'bg-emerald-50 text-emerald-700'
                                         : g.score >= 70
-                                        ? 'bg-amber-50 text-amber-700'
-                                        : 'bg-rose-50 text-rose-700'
+                                          ? 'bg-amber-50 text-amber-700'
+                                          : 'bg-rose-50 text-rose-700'
                                     }`}>
                                       {g.score}
                                     </span>
