@@ -744,14 +744,14 @@ const AssignPersonModal: React.FC<{
   );
 };
 
-// Componente DonutGauge para KPIs
+// Componente DonutGauge para KPIs con Porcentaje Destacado
 const DonutGauge: React.FC<{
   pct: number;
   color: string;
   bgColor?: string;
   size?: number;
   strokeWidth?: number;
-}> = ({ pct, color, bgColor = 'text-slate-100', size = 68, strokeWidth = 7 }) => {
+}> = ({ pct, color, bgColor = 'text-slate-100', size = 80, strokeWidth = 8 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clampedPct = Math.min(100, Math.max(0, pct));
@@ -783,7 +783,7 @@ const DonutGauge: React.FC<{
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-        <span className="text-[13px] font-black text-slate-900 tracking-tight leading-none">
+        <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
           {pct}%
         </span>
       </div>
@@ -1164,12 +1164,12 @@ const BancaDashboardModal: React.FC<{
 
         {/* Cuerpo Scrollable con Tema Claro Ultra Profesional */}
         <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(92vh-80px)] text-xs">
-          {/* Top 3 KPI Cards con Gráficos de Dona */}
+          {/* Top 3 KPI Cards con Gráficos de Dona y Porcentajes Protagonistas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1: Banca Administrativa */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-3">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2.5">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
                     <Briefcase className="w-3.5 h-3.5" />
                   </div>
@@ -1178,22 +1178,19 @@ const BancaDashboardModal: React.FC<{
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none">
                     {analytics.totalRealAdmin}
                   </span>
                   <span className="text-sm font-bold text-slate-400">/ {analytics.totalIdealAdmin}</span>
                 </div>
-                <p className="text-[10px] font-semibold text-slate-400 mt-2 truncate">
-                  Gerentes, Subgerentes y Líderes
-                </p>
               </div>
               <DonutGauge pct={analytics.pctAdmin} color="text-red-600" />
             </div>
 
             {/* Card 2: Banca Administrativa + Potenciales */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-3">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2.5">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                     <TrendingUp className="w-3.5 h-3.5" />
                   </div>
@@ -1202,22 +1199,19 @@ const BancaDashboardModal: React.FC<{
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none">
                     {analytics.totalRealAdminPotenciales}
                   </span>
                   <span className="text-sm font-bold text-slate-400">/ {analytics.totalIdealAdmin}</span>
                 </div>
-                <p className="text-[10px] font-semibold text-slate-400 mt-2 truncate">
-                  Adm. + {analytics.totalPotenciales} Potenciales
-                </p>
               </div>
               <DonutGauge pct={analytics.pctAdminPotenciales} color="text-amber-500" />
             </div>
 
             {/* Card 3: Banca Operativa */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-3">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2.5">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
                     <Target className="w-3.5 h-3.5" />
                   </div>
@@ -1226,16 +1220,13 @@ const BancaDashboardModal: React.FC<{
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none">
                     {analytics.totalRealOperativa}
                   </span>
                   <span className="text-sm font-bold text-slate-400">/ {analytics.totalIdealOperativa}</span>
                 </div>
-                <p className="text-[10px] font-semibold text-slate-400 mt-2 truncate">
-                  Únicamente Entrenadores
-                </p>
               </div>
-              <DonutGauge pct={analytics.pctOperativa} color="text-slate-900" />
+              <DonutGauge pct={analytics.pctOperativa} color="text-slate-800" />
             </div>
           </div>
 
@@ -1244,51 +1235,46 @@ const BancaDashboardModal: React.FC<{
             {/* Columna Izquierda (60%): Ranking Dinámico por Región, Jefe de Área o Tiendas */}
             <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-red-600" />
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                        {analytics.rankingType === 'stores' ? 'Ranking de Tiendas' :
-                         analytics.rankingType === 'zones' ? 'Ranking por Jefe de Área' :
-                         'Ranking por Región'}
-                      </h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        Cumplimiento Banca Administrativa (Reales vs Ideales)
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-400">
-                    {analytics.rankingStats.length} {analytics.rankingType === 'stores' ? 'Tiendas' : analytics.rankingType === 'zones' ? 'Jefes de Área' : 'Regiones'}
-                  </span>
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    {analytics.rankingType === 'stores' ? 'Ranking de Tiendas' :
+                     analytics.rankingType === 'zones' ? 'Ranking por Jefe de Área' :
+                     'Ranking por Región'}
+                  </h3>
+                  <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                    Cumplimiento Banca Administrativa (Reales vs Ideales)
+                  </p>
                 </div>
 
                 <div className="mt-4 space-y-3.5 max-h-80 overflow-y-auto pr-1">
-                  {analytics.rankingStats.map((item, idx) => {
+                  {analytics.rankingStats.map((item) => {
                     return (
-                      <div key={item.name} className="space-y-1">
+                      <div key={item.name} className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-5 h-5 rounded-lg bg-slate-900 text-white font-black text-[10px] flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="font-black text-slate-800 uppercase italic tracking-tight">
-                              {item.name} {item.storesCount ? <span className="text-[9px] font-bold text-slate-400 uppercase font-normal">({item.storesCount} TIENDAS)</span> : null}
-                            </span>
-                          </div>
+                          <span className="font-bold text-slate-700 uppercase tracking-tight">
+                            {item.name}
+                          </span>
 
-                          <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-bold text-slate-500">
-                              Adm: <strong className="text-slate-800">{item.realAdmin}/{item.idealAdmin}</strong>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-medium text-slate-400">
+                              Adm: <strong className="text-slate-600 font-semibold">{item.realAdmin}/{item.idealAdmin}</strong>
                             </span>
-                            <span className="font-black text-slate-900 text-xs">{item.compliancePct}%</span>
+                            <span className="font-black text-slate-800 text-xs min-w-[34px] text-right">
+                              {item.compliancePct}%
+                            </span>
                           </div>
                         </div>
 
-                        {/* Barra de Progreso Unificada */}
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        {/* Barra de Progreso Sutil y Estilizada */}
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-slate-900 rounded-full transition-all duration-700"
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              item.compliancePct >= 85 
+                                ? 'bg-emerald-500' 
+                                : item.compliancePct >= 65 
+                                ? 'bg-amber-500' 
+                                : 'bg-rose-500'
+                            }`}
                             style={{ width: `${Math.min(100, item.compliancePct)}%` }}
                           />
                         </div>
