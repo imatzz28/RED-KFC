@@ -751,14 +751,14 @@ const DonutGauge: React.FC<{
   bgColor?: string;
   size?: number;
   strokeWidth?: number;
-}> = ({ pct, color, bgColor = 'text-slate-100', size = 80, strokeWidth = 8 }) => {
+}> = ({ pct, color, bgColor = 'text-slate-100', size = 92, strokeWidth = 9 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clampedPct = Math.min(100, Math.max(0, pct));
   const strokeDashoffset = circumference - (clampedPct / 100) * circumference;
 
   return (
-    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+    <div className="relative flex items-center justify-center shrink-0 drop-shadow-xs" style={{ width: size, height: size }}>
       <svg className="w-full h-full transform -rotate-90" viewBox={`0 0 ${size} ${size}`}>
         <circle
           cx={size / 2}
@@ -783,7 +783,7 @@ const DonutGauge: React.FC<{
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-        <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
+        <span className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none">
           {pct}%
         </span>
       </div>
@@ -1167,7 +1167,7 @@ const BancaDashboardModal: React.FC<{
           {/* Top 3 KPI Cards con Gráficos de Dona y Porcentajes Protagonistas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1: Banca Administrativa */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-md shadow-slate-200/60 hover:shadow-lg hover:shadow-slate-200/80 transition-all flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
@@ -1188,7 +1188,7 @@ const BancaDashboardModal: React.FC<{
             </div>
 
             {/* Card 2: Banca Administrativa + Potenciales */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-md shadow-slate-200/60 hover:shadow-lg hover:shadow-slate-200/80 transition-all flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -1209,7 +1209,7 @@ const BancaDashboardModal: React.FC<{
             </div>
 
             {/* Card 3: Banca Operativa */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between gap-4">
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-md shadow-slate-200/60 hover:shadow-lg hover:shadow-slate-200/80 transition-all flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
@@ -1403,57 +1403,114 @@ const BancaDashboardModal: React.FC<{
               </div>
 
               {/* Box 2: Tipología de Tiendas */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs space-y-3">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                  <Store className="w-4 h-4 text-red-600" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+              <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-150 pb-2.5">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
                     TIPOLOGÍA DE TIENDAS
                   </h3>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {analytics.totalStores} Tiendas
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
-                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. A</span>
-                    <Trophy className="w-4 h-4 text-slate-500 my-1" />
-                    <div>
-                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catA}</span>
-                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatA}%</span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+                  {/* Categoría A */}
+                  <div className="bg-gradient-to-b from-white to-red-50/40 p-3 rounded-2xl border border-red-200/70 hover:border-red-400 hover:shadow-xs transition-all flex flex-col justify-between text-center group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="w-6 h-6 rounded-lg bg-red-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        A
+                      </span>
+                      <span className="text-[10px] font-black text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
+                        {pctCatA}%
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <span className="text-xl font-black text-slate-900 block leading-tight">
+                        {analytics.categories.catA}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                        Tiendas
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. B</span>
-                    <Medal className="w-4 h-4 text-slate-500 my-1" />
-                    <div>
-                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catB}</span>
-                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatB}%</span>
+                  {/* Categoría B */}
+                  <div className="bg-gradient-to-b from-white to-blue-50/40 p-3 rounded-2xl border border-blue-200/70 hover:border-blue-400 hover:shadow-xs transition-all flex flex-col justify-between text-center group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        B
+                      </span>
+                      <span className="text-[10px] font-black text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                        {pctCatB}%
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <span className="text-xl font-black text-slate-900 block leading-tight">
+                        {analytics.categories.catB}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                        Tiendas
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. C</span>
-                    <Medal className="w-4 h-4 text-slate-500 my-1" />
-                    <div>
-                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catC}</span>
-                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatC}%</span>
+                  {/* Categoría C */}
+                  <div className="bg-gradient-to-b from-white to-emerald-50/40 p-3 rounded-2xl border border-emerald-200/70 hover:border-emerald-400 hover:shadow-xs transition-all flex flex-col justify-between text-center group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        C
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                        {pctCatC}%
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <span className="text-xl font-black text-slate-900 block leading-tight">
+                        {analytics.categories.catC}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                        Tiendas
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">CAT. D</span>
-                    <Medal className="w-4 h-4 text-slate-500 my-1" />
-                    <div>
-                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catD}</span>
-                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatD}%</span>
+                  {/* Categoría D */}
+                  <div className="bg-gradient-to-b from-white to-purple-50/40 p-3 rounded-2xl border border-purple-200/70 hover:border-purple-400 hover:shadow-xs transition-all flex flex-col justify-between text-center group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="w-6 h-6 rounded-lg bg-purple-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        D
+                      </span>
+                      <span className="text-[10px] font-black text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-full">
+                        {pctCatD}%
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <span className="text-xl font-black text-slate-900 block leading-tight">
+                        {analytics.categories.catD}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                        Tiendas
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70 text-center flex flex-col items-center justify-between col-span-2 sm:col-span-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">SIN CAT.</span>
-                    <MinusCircle className="w-4 h-4 text-slate-400 my-1" />
-                    <div>
-                      <span className="text-base font-black text-slate-900 block leading-tight">{analytics.categories.catNone}</span>
-                      <span className="text-[8px] font-bold text-slate-400 block">{pctCatNone}%</span>
+                  {/* Sin Categoría */}
+                  <div className="bg-gradient-to-b from-white to-slate-50 p-3 rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between text-center col-span-2 sm:col-span-1 group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="px-1.5 h-6 rounded-lg bg-slate-400 text-white font-bold text-[10px] flex items-center justify-center shadow-xs">
+                        SIN CAT
+                      </span>
+                      <span className="text-[10px] font-black text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                        {pctCatNone}%
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <span className="text-xl font-black text-slate-900 block leading-tight">
+                        {analytics.categories.catNone}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                        Tiendas
+                      </span>
                     </div>
                   </div>
                 </div>

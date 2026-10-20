@@ -67,7 +67,9 @@ if (!found) {
 // Auto-sync verify logo for PublicValidation (/verify)
 try {
   const verifyLogoCandidates = [
-    'C:/Users/andres.matiz/.gemini/antigravity/brain/8eae4990-9456-4140-8948-2a46ab3a3002/.user_uploaded/media_1792468515788_5b0f47aa.png'
+    path.resolve(rootDir, 'public/kfc_verify_logo.png'),
+    path.resolve(rootDir, 'public/KFC Colonel Side Logo Red RGB.png'),
+    path.normalize('C:/Users/andres.matiz/.gemini/antigravity/brain/8eae4990-9456-4140-8948-2a46ab3a3002/.user_uploaded/media_1792468515788_5b0f47aa.png')
   ];
   for (const vp of verifyLogoCandidates) {
     if (fs.existsSync(vp)) {
