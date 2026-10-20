@@ -45,6 +45,39 @@ export const APP_LOGO_RATIO = ${ratio.toFixed(4)};
   // Silent fallback in production/Vercel
 }
 
+// Auto-sync verify logo for PublicValidation (/verify)
+try {
+  const verifyLogoCandidates = [
+    'C:/Users/andres.matiz/.gemini/antigravity/brain/8eae4990-9456-4140-8948-2a46ab3a3002/.user_uploaded/media_1792468515788_5b0f47aa.png'
+  ];
+  for (const vp of verifyLogoCandidates) {
+    if (fs.existsSync(vp)) {
+      const vbuf = fs.readFileSync(vp);
+      const vb64 = vbuf.toString('base64');
+      const vdataUri = `data:image/png;base64,${vb64}`;
+
+      // Write to public in RED
+      const p1 = path.resolve(__dirname, './public/kfc_verify_logo.png');
+      fs.writeFileSync(p1, vbuf);
+
+      // Write to public in red-kfc (GitLab)
+      const p2 = 'c:/Users/andres.matiz/OneDrive - International Food Services - Grupo KFC/Escritorio/A2M Labs/RED_Gitlab/red-kfc/public/kfc_verify_logo.png';
+      try { fs.writeFileSync(p2, vbuf); } catch (_) {}
+
+      // Write TS in RED
+      const ts1 = path.resolve(__dirname, './src/features/safe-hands/verifyLogo.ts');
+      fs.writeFileSync(ts1, `export const VERIFY_LOGO = "${vdataUri}";\n`, 'utf8');
+
+      // Write TS in red-kfc
+      const ts2 = 'c:/Users/andres.matiz/OneDrive - International Food Services - Grupo KFC/Escritorio/A2M Labs/RED_Gitlab/red-kfc/src/features/safe-hands/verifyLogo.ts';
+      try { fs.writeFileSync(ts2, `export const VERIFY_LOGO = "${vdataUri}";\n`, 'utf8'); } catch (_) {}
+      break;
+    }
+  }
+} catch (e) {
+  // Silent fallback
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {

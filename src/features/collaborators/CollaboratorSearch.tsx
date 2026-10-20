@@ -219,21 +219,29 @@ export const CollaboratorSearch: React.FC = () => {
 
     // 1. Cargar Notas
     setIsLoadingGrades(true);
-    dataService.fetchEmployeeGradesHistory(empId)
-      .then(grades => setEmployeeGrades(grades || []))
-      .catch(err => console.warn('Error cargando notas del colaborador:', err))
-      .finally(() => setIsLoadingGrades(false));
+    if (typeof dataService.fetchEmployeeGradesHistory === 'function') {
+      dataService.fetchEmployeeGradesHistory(empId)
+        .then(grades => setEmployeeGrades(grades || []))
+        .catch(err => console.warn('Error cargando notas del colaborador:', err))
+        .finally(() => setIsLoadingGrades(false));
+    } else {
+      setIsLoadingGrades(false);
+    }
 
     // 2. Cargar Certificados Safe Hands
-    dataService.getSafeHandsCerts(empId)
-      .then(certs => setEmployeeCerts(certs || []))
-      .catch(err => console.warn('Error cargando certificados:', err));
+    if (typeof dataService.getSafeHandsCerts === 'function') {
+      dataService.getSafeHandsCerts(empId)
+        .then(certs => setEmployeeCerts(certs || []))
+        .catch(err => console.warn('Error cargando certificados:', err));
+    }
 
     // 3. Cargar registro de personal Safe Hands si existe
-    dataService.getSafeHandsPersonnel().then(personnel => {
-      const match = (personnel || []).find(p => String(p.id).trim() === empId.trim());
-      if (match) setSafeHandsPerson(match);
-    }).catch(() => {});
+    if (typeof dataService.getSafeHandsPersonnel === 'function') {
+      dataService.getSafeHandsPersonnel().then(personnel => {
+        const match = (personnel || []).find(p => String(p.id).trim() === empId.trim());
+        if (match) setSafeHandsPerson(match);
+      }).catch(() => {});
+    }
 
   }, [selectedEmployee]);
 
