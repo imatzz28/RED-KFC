@@ -82,6 +82,39 @@ try {
   // Silent fallback
 }
 
+// Auto-sync carnet template for Safe Hands (templateBase64.ts)
+try {
+  const carnetCandidates = [
+    'C:/Users/andres.matiz/.gemini/antigravity/brain/8eae4990-9456-4140-8948-2a46ab3a3002/.user_uploaded/media_1792471270216_db5a5006.png',
+    path.resolve(__dirname, './public/plantilla_carnet.png'),
+    path.resolve(__dirname, './public/plantilla_carnet.jpg'),
+    path.resolve(__dirname, './public/carnet_template.png'),
+    path.resolve(__dirname, './public/carnet_template.jpg'),
+    path.resolve(__dirname, './public/template_carnet.png'),
+    path.resolve(__dirname, './public/template_carnet.jpg'),
+    path.resolve(__dirname, './public/Carnet de Manipulación - 1.png'),
+    path.resolve(__dirname, './public/carnet.png'),
+    path.resolve(__dirname, './public/carnet.jpg'),
+    path.resolve(__dirname, './src/features/safe-hands/plantilla_carnet.png'),
+    path.resolve(__dirname, './src/features/safe-hands/carnet_template.png')
+  ];
+  for (const cp of carnetCandidates) {
+    if (fs.existsSync(cp)) {
+      const cbuf = fs.readFileSync(cp);
+      const cb64 = cbuf.toString('base64');
+      const ext = path.extname(cp).toLowerCase() === '.jpg' || path.extname(cp).toLowerCase() === '.jpeg' ? 'jpeg' : 'png';
+      const cdataUri = `data:image/${ext};base64,${cb64}`;
+
+      const ts1 = path.resolve(__dirname, './src/features/safe-hands/utils/templateBase64.ts');
+      fs.writeFileSync(ts1, `export const templateBase64 = "${cdataUri}";\n`, 'utf8');
+
+      const ts2 = 'c:/Users/andres.matiz/OneDrive - International Food Services - Grupo KFC/Escritorio/A2M Labs/RED_Gitlab/red-kfc/src/features/safe-hands/utils/templateBase64.ts';
+      try { fs.writeFileSync(ts2, `export const templateBase64 = "${cdataUri}";\n`, 'utf8'); } catch (_) {}
+      break;
+    }
+  }
+} catch (e) {}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {

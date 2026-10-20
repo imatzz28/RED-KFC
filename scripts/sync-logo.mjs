@@ -97,3 +97,49 @@ try {
   console.error('[SYNC-LOGO] Error al sincronizar logo verify:', err);
 }
 
+// Auto-sync carnet template for Safe Hands (templateBase64.ts)
+try {
+  const carnetCandidates = [
+    path.normalize('C:/Users/andres.matiz/.gemini/antigravity/brain/8eae4990-9456-4140-8948-2a46ab3a3002/.user_uploaded/media_1792471270216_db5a5006.png'),
+    path.resolve(rootDir, 'public/plantilla_carnet.png'),
+    path.resolve(rootDir, 'public/plantilla_carnet.jpg'),
+    path.resolve(rootDir, 'public/carnet_template.png'),
+    path.resolve(rootDir, 'public/carnet_template.jpg'),
+    path.resolve(rootDir, 'public/template_carnet.png'),
+    path.resolve(rootDir, 'public/template_carnet.jpg'),
+    path.resolve(rootDir, 'public/Carnet de Manipulación - 1.png'),
+    path.resolve(rootDir, 'public/carnet.png'),
+    path.resolve(rootDir, 'public/carnet.jpg'),
+    path.resolve(rootDir, 'src/features/safe-hands/plantilla_carnet.png'),
+    path.resolve(rootDir, 'src/features/safe-hands/carnet_template.png')
+  ];
+  for (const cp of carnetCandidates) {
+    if (fs.existsSync(cp)) {
+      const cbuf = fs.readFileSync(cp);
+      const cb64 = cbuf.toString('base64');
+      const ext = path.extname(cp).toLowerCase() === '.jpg' || path.extname(cp).toLowerCase() === '.jpeg' ? 'jpeg' : 'png';
+      const cdataUri = `data:image/${ext};base64,${cb64}`;
+
+      // Write physical file to public/plantilla_carnet.png in RED
+      const pub1 = path.resolve(rootDir, 'public/plantilla_carnet.png');
+      fs.writeFileSync(pub1, cbuf);
+
+      // Write physical file to public/plantilla_carnet.png in red-kfc
+      const pub2 = 'c:/Users/andres.matiz/OneDrive - International Food Services - Grupo KFC/Escritorio/A2M Labs/RED_Gitlab/red-kfc/public/plantilla_carnet.png';
+      try { fs.writeFileSync(pub2, cbuf); } catch (_) {}
+
+      // Write TS in RED
+      const ts1 = path.resolve(rootDir, 'src/features/safe-hands/utils/templateBase64.ts');
+      fs.writeFileSync(ts1, `export const templateBase64 = "${cdataUri}";\n`, 'utf8');
+
+      // Write TS in red-kfc
+      const ts2 = 'c:/Users/andres.matiz/OneDrive - International Food Services - Grupo KFC/Escritorio/A2M Labs/RED_Gitlab/red-kfc/src/features/safe-hands/utils/templateBase64.ts';
+      try { fs.writeFileSync(ts2, `export const templateBase64 = "${cdataUri}";\n`, 'utf8'); } catch (_) {}
+
+      console.log(`[SYNC-LOGO] Plantilla Carnet Safe Hands sincronizada exitosamente desde: ${cp}`);
+      break;
+    }
+  }
+} catch (err) {
+  console.error('[SYNC-LOGO] Error al sincronizar plantilla de carnet:', err);
+}
