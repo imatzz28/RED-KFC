@@ -828,6 +828,8 @@ const BancaDashboardModal: React.FC<{
       name: string;
       storesCount?: number;
       compliancePct: number;
+      realAdmin: number;
+      idealAdmin: number;
       realGerentes: number;
       idealGerentes: number;
     }[] = [];
@@ -872,9 +874,10 @@ const BancaDashboardModal: React.FC<{
 
             totalStores++;
 
-            const sIdealSum = (ideal.gerentes + ideal.lideresTurno + ideal.entrenadores);
-            const sRealSum = (gCount + lCount + eCount);
-            const pct = sIdealSum > 0 ? Math.min(100, Math.round((sRealSum / sIdealSum) * 100)) : 0;
+            // Cumplimiento Banca Administrativa sin potenciales
+            const sIdealAdmin = ideal.gerentes + ideal.lideresTurno;
+            const sRealAdmin = gCount + lCount;
+            const pct = sIdealAdmin > 0 ? Math.min(100, Math.round((sRealAdmin / sIdealAdmin) * 100)) : 0;
 
             members.forEach(m => {
               const norm = normalizeCerts(m.certifications);
@@ -887,6 +890,8 @@ const BancaDashboardModal: React.FC<{
             rankingStats.push({
               name: `${rest.name} (${id})`,
               compliancePct: pct,
+              realAdmin: sRealAdmin,
+              idealAdmin: sIdealAdmin,
               realGerentes: gCount,
               idealGerentes: ideal.gerentes,
             });
@@ -901,8 +906,8 @@ const BancaDashboardModal: React.FC<{
         const zoneStoreIds = zone.restaurantIds.filter(id => restaurants.some(r => r.id === id));
         totalStores += zoneStoreIds.length;
 
-        let zIdealSum = 0;
-        let zRealSum = 0;
+        let zIdealAdmin = 0;
+        let zRealAdmin = 0;
         let zRealG = 0;
         let zIdealG = 0;
 
@@ -936,8 +941,9 @@ const BancaDashboardModal: React.FC<{
           zRealG += gCount;
           zIdealG += ideal.gerentes;
 
-          zIdealSum += (ideal.gerentes + ideal.lideresTurno + ideal.entrenadores);
-          zRealSum += (gCount + lCount + eCount);
+          // Cumplimiento Banca Administrativa sin potenciales
+          zIdealAdmin += (ideal.gerentes + ideal.lideresTurno);
+          zRealAdmin += (gCount + lCount);
 
           members.forEach(m => {
             const norm = normalizeCerts(m.certifications);
@@ -948,11 +954,13 @@ const BancaDashboardModal: React.FC<{
           });
         });
 
-        const pct = zIdealSum > 0 ? Math.min(100, Math.round((zRealSum / zIdealSum) * 100)) : 0;
+        const pct = zIdealAdmin > 0 ? Math.min(100, Math.round((zRealAdmin / zIdealAdmin) * 100)) : 0;
         rankingStats.push({
           name: zone.name,
           storesCount: zoneStoreIds.length,
           compliancePct: pct,
+          realAdmin: zRealAdmin,
+          idealAdmin: zIdealAdmin,
           realGerentes: zRealG,
           idealGerentes: zIdealG,
         });
@@ -964,8 +972,8 @@ const BancaDashboardModal: React.FC<{
         const regStoreIds = region.zones.flatMap(z => z.restaurantIds).filter(id => restaurants.some(r => r.id === id));
         totalStores += regStoreIds.length;
 
-        let regIdealSum = 0;
-        let regRealSum = 0;
+        let regIdealAdmin = 0;
+        let regRealAdmin = 0;
         let regRealG = 0;
         let regIdealG = 0;
 
@@ -999,8 +1007,9 @@ const BancaDashboardModal: React.FC<{
           regRealG += gCount;
           regIdealG += ideal.gerentes;
 
-          regIdealSum += (ideal.gerentes + ideal.lideresTurno + ideal.entrenadores);
-          regRealSum += (gCount + lCount + eCount);
+          // Cumplimiento Banca Administrativa sin potenciales
+          regIdealAdmin += (ideal.gerentes + ideal.lideresTurno);
+          regRealAdmin += (gCount + lCount);
 
           members.forEach(m => {
             const norm = normalizeCerts(m.certifications);
@@ -1011,20 +1020,29 @@ const BancaDashboardModal: React.FC<{
           });
         });
 
-        const pct = regIdealSum > 0 ? Math.min(100, Math.round((regRealSum / regIdealSum) * 100)) : 0;
+        const pct = regIdealAdmin > 0 ? Math.min(100, Math.round((regRealAdmin / regIdealAdmin) * 100)) : 0;
         rankingStats.push({
           name: region.name,
           storesCount: regStoreIds.length,
           compliancePct: pct,
+          realAdmin: regRealAdmin,
+          idealAdmin: regIdealAdmin,
           realGerentes: regRealG,
           idealGerentes: regIdealG,
         });
       });
     }
 
-    const totalIdealGlobal = totalIdealGerentes + totalIdealLideres + totalIdealEntrenadores;
-    const totalRealGlobal = totalRealGerentes + totalRealLideres + totalRealEntrenadores;
-    const globalCompliancePct = totalIdealGlobal > 0 ? Math.min(100, Math.round((totalRealGlobal / totalIdealGlobal) * 100)) : 0;
+    const totalIdealAdmin = totalIdealGerentes + totalIdealLideres;
+    const totalRealAdmin = totalRealGerentes + totalRealLideres;
+    const totalRealAdminPotenciales = totalRealAdmin + totalPotenciales;
+
+    const totalIdealOperativa = totalIdealEntrenadores;
+    const totalRealOperativa = totalRealEntrenadores;
+
+    const pctAdmin = totalIdealAdmin > 0 ? Math.round((totalRealAdmin / totalIdealAdmin) * 100) : 0;
+    const pctAdminPotenciales = totalIdealAdmin > 0 ? Math.round((totalRealAdminPotenciales / totalIdealAdmin) * 100) : 0;
+    const pctOperativa = totalIdealOperativa > 0 ? Math.round((totalRealOperativa / totalIdealOperativa) * 100) : 0;
 
     rankingStats.sort((a, b) => b.compliancePct - a.compliancePct);
 
@@ -1032,7 +1050,14 @@ const BancaDashboardModal: React.FC<{
 
     return {
       totalStores,
-      globalCompliancePct,
+      totalIdealAdmin,
+      totalRealAdmin,
+      totalRealAdminPotenciales,
+      totalIdealOperativa,
+      totalRealOperativa,
+      pctAdmin,
+      pctAdminPotenciales,
+      pctOperativa,
       totalIdealGerentes,
       totalRealGerentes,
       totalIdealLideres,
@@ -1092,62 +1117,24 @@ const BancaDashboardModal: React.FC<{
 
         {/* Cuerpo Scrollable con Tema Claro Ultra Profesional */}
         <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(92vh-80px)] text-xs">
-          {/* Top 4 KPI Cards (Fondo Blanco) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Cumplimiento Nacional / Cobertura Filtrada */}
+          {/* Top 3 KPI Cards (Fondo Blanco) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Banca Administrativa */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
-                  <TrendingUp className="w-5 h-5" />
+                  <Briefcase className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">
-                    {activeZone ? 'CUMPLIMIENTO ZONA' : activeRegion ? 'CUMPLIMIENTO REGIONAL' : 'CUMPLIMIENTO NACIONAL'}
+                    BANCA ADMINISTRATIVA
                   </p>
-                  <div className="flex items-center gap-2 justify-end mt-1">
-                    <span className="text-3xl font-black text-slate-900 tracking-tight">{analytics.globalCompliancePct}%</span>
-                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                      {activeZone ? activeZone : activeRegion ? activeRegion : 'Global'}
+                  <div className="flex items-baseline justify-end gap-1.5 mt-1">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight leading-none">
+                      {analytics.totalRealAdmin}
                     </span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-1">
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-slate-900 rounded-full transition-all duration-700" style={{ width: `${analytics.globalCompliancePct}%` }} />
-                </div>
-                <p className="text-[10px] font-bold text-slate-400">Meta: 100%</p>
-              </div>
-            </div>
-
-            {/* Card 2: Vacantes Gerente / Sub */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">VACANTES GERENTE / SUB</p>
-                  <div className="flex items-baseline justify-end gap-1 mt-1">
-                    <span className="text-3xl font-black text-rose-600 tracking-tight">{analytics.storesWithoutManager}</span>
-                    <span className="text-[10px] font-medium text-slate-400">de {analytics.totalStores} tiendas</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-[11px] font-medium text-rose-600/90 mt-3">Requieren atención prioritaria</p>
-            </div>
-
-            {/* Card 3: Cobertura de Gerentes */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
-                  <Award className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">COBERTURA DE GERENTES</p>
-                  <div className="flex items-baseline justify-end gap-1 mt-1">
-                    <span className="text-2xl font-black text-slate-900 tracking-tight">{analytics.totalRealGerentes}</span>
-                    <span className="text-xs font-bold text-slate-400">/ {analytics.totalIdealGerentes}</span>
+                    <span className="text-xs font-bold text-slate-400">/ {analytics.totalIdealAdmin}</span>
+                    <span className="ml-2 text-xl font-black text-slate-900">{analytics.pctAdmin}%</span>
                   </div>
                 </div>
               </div>
@@ -1155,32 +1142,80 @@ const BancaDashboardModal: React.FC<{
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-slate-900 rounded-full transition-all duration-700"
-                    style={{ width: `${Math.min(100, Math.round((analytics.totalRealGerentes / (analytics.totalIdealGerentes || 1)) * 100))}%` }}
+                    style={{ width: `${Math.min(100, analytics.pctAdmin)}%` }}
                   />
                 </div>
-                <p className="text-[10px] font-medium text-slate-400">
-                  {Math.min(100, Math.round((analytics.totalRealGerentes / (analytics.totalIdealGerentes || 1)) * 100))}% del objetivo ideal
-                </p>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span>Gerentes, Subgerentes y Líderes</span>
+                  <span>Meta: 100%</span>
+                </div>
               </div>
             </div>
 
-            {/* Card 4: Fuerza de Potenciales */}
+            {/* Card 2: Banca Administrativa + Potenciales */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">
+                    BANCA ADM. + POTENCIALES
+                  </p>
+                  <div className="flex items-baseline justify-end gap-1.5 mt-1">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight leading-none">
+                      {analytics.totalRealAdminPotenciales}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">/ {analytics.totalIdealAdmin}</span>
+                    <span className="ml-2 text-xl font-black text-slate-900">{analytics.pctAdminPotenciales}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-slate-900 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, analytics.pctAdminPotenciales)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span>Adm. + Potenciales ({analytics.totalPotenciales})</span>
+                  <span>Meta: 100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Banca Operativa */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
                   <Target className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">FUERZA DE POTENCIALES</p>
-                  <div className="flex items-center justify-end gap-2 mt-1">
-                    <span className="text-3xl font-black text-slate-900 tracking-tight">{analytics.totalPotenciales}</span>
-                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                      En preparación
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">
+                    BANCA OPERATIVA
+                  </p>
+                  <div className="flex items-baseline justify-end gap-1.5 mt-1">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight leading-none">
+                      {analytics.totalRealOperativa}
                     </span>
+                    <span className="text-xs font-bold text-slate-400">/ {analytics.totalIdealOperativa}</span>
+                    <span className="ml-2 text-xl font-black text-slate-900">{analytics.pctOperativa}%</span>
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 mt-3">Candidatos a Líderes de Turno</p>
+              <div className="mt-3 space-y-1">
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-slate-900 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, analytics.pctOperativa)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span>Únicamente Entrenadores</span>
+                  <span>Meta: 100%</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1194,12 +1229,12 @@ const BancaDashboardModal: React.FC<{
                     <Trophy className="w-4 h-4 text-red-600" />
                     <div>
                       <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                        {analytics.rankingType === 'stores' ? 'RANKING POR TIENDAS (CUMPLIMIENTO)' :
-                         analytics.rankingType === 'zones' ? 'RANKING POR JEFE DE ÁREA (ZONAS)' :
-                         'RANKING DE CUMPLIMIENTO POR REGIÓN'}
+                        {analytics.rankingType === 'stores' ? 'RANKING POR TIENDAS (CUMPLIMIENTO ADM.)' :
+                         analytics.rankingType === 'zones' ? 'RANKING POR JEFE DE ÁREA (CUMPLIMIENTO ADM.)' :
+                         'RANKING DE CUMPLIMIENTO POR REGIÓN (CUMPLIMIENTO ADM.)'}
                       </h3>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        PORCENTAJE DE COBERTURA VS IDEALES POR UNIDAD OPERATIVA
+                        COBERTURA BANCA ADMINISTRATIVA (GERENTES + SUBGERENTES + LÍDERES) VS IDEALES
                       </p>
                     </div>
                   </div>
@@ -1224,7 +1259,7 @@ const BancaDashboardModal: React.FC<{
 
                           <div className="flex items-center gap-4">
                             <span className="text-[10px] font-bold text-slate-500">
-                              Gerentes: <strong className="text-slate-800">{item.realGerentes}/{item.idealGerentes}</strong>
+                              Adm: <strong className="text-slate-800">{item.realAdmin}/{item.idealAdmin}</strong>
                             </span>
                             <span className="font-black text-slate-900 text-xs">{item.compliancePct}%</span>
                           </div>
@@ -1234,7 +1269,7 @@ const BancaDashboardModal: React.FC<{
                         <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-slate-900 rounded-full transition-all duration-700"
-                            style={{ width: `${item.compliancePct}%` }}
+                            style={{ width: `${Math.min(100, item.compliancePct)}%` }}
                           />
                         </div>
                       </div>
@@ -1415,54 +1450,6 @@ const BancaDashboardModal: React.FC<{
                       <span className="text-[8px] font-bold text-slate-400 block">{pctCatNone}%</span>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Banner: Alertas Prioritarias */}
-          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">ALERTAS PRIORITARIAS</p>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="text-2xl font-black text-slate-900 tracking-tight">{analytics.storesWithoutManager}</span>
-                  <span className="text-[10px] font-bold text-rose-600">Requieren atención</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 text-xs">
-              <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-600 mt-1 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800 text-[11px] leading-tight">
-                    {analytics.storesWithoutManager} tiendas sin Gerente/Subgerente
-                  </p>
-                  <p className="text-[9px] text-slate-500 font-medium">Intervención inmediata recomendada</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400 mt-1 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800 text-[11px] leading-tight">
-                    {analytics.storesZeroAssigned} tiendas vacantes
-                  </p>
-                  <p className="text-[9px] text-slate-500 font-medium">Impacta la operación y cumplimiento</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-900 mt-1 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800 text-[11px] leading-tight">
-                    {analytics.totalPotenciales} potenciales disponibles
-                  </p>
-                  <p className="text-[9px] text-slate-500 font-medium">Revisar y programar ascensos</p>
                 </div>
               </div>
             </div>
